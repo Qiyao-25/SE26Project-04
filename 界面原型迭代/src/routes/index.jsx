@@ -14,37 +14,92 @@ import SettingsPage from '../pages/Settings/SettingsPage';
 
 const theme = {
   token: {
-    colorPrimary: '#3b63f4',
-    colorInfo: '#3b63f4',
-    colorSuccess: '#16a34a',
-    colorWarning: '#f59e0b',
-    colorError: '#ef4444',
-    colorText: '#111827',
-    colorTextSecondary: '#667085',
-    colorBgLayout: '#f6f8fc',
-    colorBgContainer: '#ffffff',
-    borderRadius: 14,
+    colorPrimary: '#A7793D',
+    colorInfo: '#A7793D',
+    colorSuccess: '#2F7D5C',
+    colorWarning: '#C28A2E',
+    colorError: '#B64B4B',
+
+    colorText: '#1B2430',
+    colorTextSecondary: '#6E6251',
+    colorTextTertiary: '#9A8D78',
+
+    colorBgLayout: '#0D1624',
+    colorBgContainer: '#F4EBDD',
+    colorBorder: 'rgba(93, 72, 46, 0.22)',
+
+    borderRadius: 16,
     wireframe: false,
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif"
+
+    fontFamily:
+      "Inter, 'Times New Roman', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
+
   components: {
     Layout: {
-      headerBg: 'rgba(246, 248, 252, 0.78)',
-      siderBg: 'rgba(255, 255, 255, 0.74)'
+      headerBg: 'rgba(244, 235, 221, 0.88)',
+      siderBg: '#0D1624',
+      bodyBg: '#0D1624',
     },
+
     Card: {
-      borderRadiusLG: 20
+      colorBgContainer: '#F4EBDD',
+      colorBorderSecondary: 'rgba(93, 72, 46, 0.20)',
+      borderRadiusLG: 20,
     },
+
     Button: {
       borderRadius: 12,
-      controlHeight: 38
+      controlHeight: 40,
+      colorPrimary: '#A7793D',
+      colorPrimaryHover: '#B98B4B',
+      colorPrimaryActive: '#7E5A2B',
+      primaryColor: '#FFF8EA',
     },
+
     Menu: {
+      itemBg: 'transparent',
+      itemColor: 'rgba(244, 235, 221, 0.72)',
+      itemHoverColor: '#D8B36A',
+      itemHoverBg: 'rgba(216, 179, 106, 0.10)',
+      itemSelectedColor: '#F3D58A',
+      itemSelectedBg: 'rgba(216, 179, 106, 0.16)',
       itemBorderRadius: 14,
-      itemSelectedBg: 'rgba(59, 99, 244, 0.12)',
-      itemSelectedColor: '#3b63f4'
-    }
-  }
+    },
+
+    Input: {
+      colorBgContainer: '#FFF8EA',
+      colorText: '#1B2430',
+      colorTextPlaceholder: '#9A8D78',
+      colorBorder: 'rgba(93, 72, 46, 0.24)',
+      activeBorderColor: '#A7793D',
+    },
+
+    Select: {
+      colorBgContainer: '#FFF8EA',
+      colorText: '#1B2430',
+      colorBorder: 'rgba(93, 72, 46, 0.24)',
+    },
+
+    Tabs: {
+      itemColor: '#7C715F',
+      itemSelectedColor: '#8A612F',
+      itemHoverColor: '#A7793D',
+      inkBarColor: '#A7793D',
+    },
+
+    Table: {
+      colorBgContainer: '#F4EBDD',
+      headerBg: '#E8DDC7',
+      headerColor: '#1B2430',
+      colorText: '#1B2430',
+      colorBorderSecondary: 'rgba(93, 72, 46, 0.16)',
+    },
+
+    Tag: {
+      borderRadiusSM: 999,
+    },
+  },
 };
 
 export default function AppRoutes() {

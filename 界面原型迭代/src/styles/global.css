@@ -864,3 +864,512 @@ select {
     padding: 18px;
   }
 }
+/* =========================================
+   PaperMate Academic Noir Theme
+   学术藏书阁风格：深墨蓝 / 羊皮纸 / 铜金 / 墨绿
+========================================= */
+
+:root {
+  --pm-ink: #0d1624;
+  --pm-ink-2: #111d2f;
+  --pm-ink-3: #17263a;
+
+  --pm-library-green: #183b35;
+  --pm-library-green-2: #0f2d2b;
+
+  --pm-parchment: #f4ebdd;
+  --pm-parchment-2: #fff8ea;
+  --pm-parchment-3: #e8ddc7;
+
+  --pm-brass: #a7793d;
+  --pm-brass-light: #d8b36a;
+  --pm-brass-soft: rgba(167, 121, 61, 0.14);
+
+  --pm-burgundy: #7a2e35;
+
+  --pm-text: #1b2430;
+  --pm-muted: #6e6251;
+  --pm-subtle: #9a8d78;
+
+  --pm-border: rgba(93, 72, 46, 0.22);
+  --pm-shadow-paper: 0 18px 46px rgba(5, 10, 18, 0.18);
+  --pm-shadow-dark: 0 24px 70px rgba(0, 0, 0, 0.32);
+}
+
+/* 全局背景：像深色图书馆桌面，而不是普通白底 */
+html,
+body {
+  background: var(--pm-ink) !important;
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(167, 121, 61, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(24, 59, 53, 0.42), transparent 30%),
+    radial-gradient(circle at 70% 88%, rgba(122, 46, 53, 0.18), transparent 34%),
+    linear-gradient(135deg, #09111d 0%, #0d1624 46%, #111d2f 100%) !important;
+  color: var(--pm-text) !important;
+}
+
+/* 主布局 */
+.ant-layout,
+.main-layout {
+  background: transparent !important;
+}
+
+/* 左侧导航：深墨蓝 + 暗绿，形成图书馆侧栏感 */
+.main-sider {
+  background:
+    linear-gradient(180deg, rgba(13, 22, 36, 0.98), rgba(15, 45, 43, 0.96)) !important;
+  border-right: 1px solid rgba(216, 179, 106, 0.18) !important;
+  box-shadow:
+    18px 0 56px rgba(0, 0, 0, 0.32),
+    inset -1px 0 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.main-layout .logo-area {
+  border-bottom: 1px solid rgba(216, 179, 106, 0.16) !important;
+}
+
+.logo-row h5 {
+  color: var(--pm-parchment-2) !important;
+  letter-spacing: -0.02em;
+}
+
+.logo-row .ant-typography-secondary {
+  color: rgba(244, 235, 221, 0.56) !important;
+}
+
+.logo-mark,
+.auth-brand-mark {
+  background:
+    linear-gradient(145deg, #d8b36a 0%, #a7793d 55%, #6f4c25 100%) !important;
+  color: #fff8ea !important;
+  box-shadow:
+    0 14px 34px rgba(167, 121, 61, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+}
+
+/* 菜单 */
+.main-sider .ant-menu {
+  background: transparent !important;
+}
+
+.main-sider .ant-menu-item {
+  color: rgba(244, 235, 221, 0.68) !important;
+  font-weight: 650;
+}
+
+.main-sider .ant-menu-item:hover {
+  background: rgba(216, 179, 106, 0.10) !important;
+  color: #f3d58a !important;
+}
+
+.main-sider .ant-menu-item-selected {
+  color: #f3d58a !important;
+  background:
+    linear-gradient(90deg, rgba(216, 179, 106, 0.18), rgba(24, 59, 53, 0.12)) !important;
+  box-shadow:
+    inset 3px 0 0 #d8b36a,
+    0 10px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+.sider-footer {
+  border-top: 1px solid rgba(216, 179, 106, 0.16) !important;
+}
+
+/* 顶部栏：羊皮纸半透明 */
+.main-header {
+  border-bottom: 1px solid rgba(93, 72, 46, 0.18) !important;
+  background:
+    linear-gradient(90deg, rgba(244, 235, 221, 0.94), rgba(232, 221, 199, 0.88)) !important;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 10px 28px rgba(5, 10, 18, 0.08);
+}
+
+.header-title-wrap h4 {
+  color: var(--pm-text) !important;
+  letter-spacing: -0.03em;
+}
+
+.header-title-wrap .ant-typography-secondary {
+  color: var(--pm-muted) !important;
+}
+
+.header-tags .ant-tag {
+  border: 1px solid rgba(93, 72, 46, 0.16) !important;
+  background: rgba(255, 248, 234, 0.82) !important;
+  color: #5d482e !important;
+}
+
+/* 内容区：深背景上承载羊皮纸卡片 */
+.main-content {
+  background:
+    radial-gradient(circle at 78% 6%, rgba(216, 179, 106, 0.11), transparent 26%),
+    radial-gradient(circle at 12% 72%, rgba(24, 59, 53, 0.22), transparent 28%);
+}
+
+.main-content::before {
+  background: radial-gradient(circle, rgba(216, 179, 106, 0.11), transparent 68%) !important;
+}
+
+/* 卡片：羊皮纸 + 轻微纸张阴影 */
+.ant-card {
+  border: 1px solid var(--pm-border) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 248, 234, 0.96), rgba(244, 235, 221, 0.95)) !important;
+  box-shadow:
+    var(--pm-shadow-paper),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(12px);
+}
+
+.ant-card:hover {
+  border-color: rgba(167, 121, 61, 0.34) !important;
+  box-shadow:
+    0 24px 64px rgba(5, 10, 18, 0.22),
+    0 0 0 1px rgba(167, 121, 61, 0.08) !important;
+}
+
+.ant-card .ant-card-head {
+  border-bottom: 1px solid rgba(93, 72, 46, 0.14) !important;
+  background:
+    linear-gradient(90deg, rgba(216, 179, 106, 0.12), rgba(255, 248, 234, 0)) !important;
+}
+
+.ant-card .ant-card-head-title {
+  color: var(--pm-text) !important;
+  font-weight: 800;
+}
+
+.ant-card .ant-card-body {
+  color: var(--pm-text);
+}
+
+/* 文字 */
+.ant-typography,
+.ant-card,
+.ant-card *,
+.ant-form-item-label > label {
+  color: var(--pm-text);
+}
+
+.ant-typography-secondary,
+.ant-card .ant-typography-secondary {
+  color: var(--pm-muted) !important;
+}
+
+/* 按钮：铜金色，不刺眼 */
+.ant-btn-primary {
+  border: none !important;
+  color: #fff8ea !important;
+  font-weight: 800 !important;
+  background:
+    linear-gradient(135deg, #8f632f 0%, #a7793d 50%, #c99a55 100%) !important;
+  box-shadow:
+    0 12px 30px rgba(167, 121, 61, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.ant-btn-primary:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.ant-btn-default {
+  border-color: rgba(93, 72, 46, 0.24) !important;
+  background: rgba(255, 248, 234, 0.78) !important;
+  color: #4f3b24 !important;
+}
+
+.ant-btn-default:hover {
+  border-color: var(--pm-brass) !important;
+  color: #7c5528 !important;
+  background: #fff8ea !important;
+}
+
+/* 输入框 */
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-password,
+.ant-select-selector,
+.ant-picker,
+.ant-input-number {
+  border-color: rgba(93, 72, 46, 0.24) !important;
+  background: rgba(255, 248, 234, 0.90) !important;
+  color: var(--pm-text) !important;
+}
+
+.ant-input::placeholder,
+.ant-input input::placeholder,
+.ant-select-selection-placeholder {
+  color: var(--pm-subtle) !important;
+}
+
+.ant-input-affix-wrapper-focused,
+.ant-input:focus,
+.ant-select-focused .ant-select-selector {
+  border-color: var(--pm-brass) !important;
+  box-shadow: 0 0 0 4px rgba(167, 121, 61, 0.13) !important;
+}
+
+/* Tabs */
+.ant-tabs .ant-tabs-tab {
+  color: var(--pm-muted) !important;
+  font-weight: 700;
+}
+
+.ant-tabs .ant-tabs-tab:hover {
+  color: var(--pm-brass) !important;
+}
+
+.ant-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #8a612f !important;
+}
+
+.ant-tabs .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #7a2e35, #a7793d, #d8b36a) !important;
+  height: 3px !important;
+  border-radius: 999px;
+}
+
+/* Tags：像学术分类标签 */
+.ant-tag {
+  border-color: rgba(93, 72, 46, 0.18) !important;
+  background: rgba(167, 121, 61, 0.11) !important;
+  color: #6e4b24 !important;
+  font-weight: 650;
+}
+
+.ant-tag-blue,
+.ant-tag-geekblue {
+  border-color: rgba(24, 59, 53, 0.24) !important;
+  background: rgba(24, 59, 53, 0.12) !important;
+  color: #183b35 !important;
+}
+
+.ant-tag-red {
+  border-color: rgba(122, 46, 53, 0.24) !important;
+  background: rgba(122, 46, 53, 0.11) !important;
+  color: #7a2e35 !important;
+}
+
+/* 登录页：学术藏书阁视觉 */
+.auth-page {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(216, 179, 106, 0.18), transparent 26%),
+    radial-gradient(circle at 70% 20%, rgba(24, 59, 53, 0.42), transparent 34%),
+    radial-gradient(circle at 78% 82%, rgba(122, 46, 53, 0.16), transparent 30%),
+    linear-gradient(135deg, #08101b 0%, #0d1624 52%, #12251f 100%) !important;
+}
+
+.auth-page::before {
+  border-color: rgba(216, 179, 106, 0.14) !important;
+}
+
+.auth-brand {
+  color: var(--pm-parchment-2);
+}
+
+.auth-hero-copy h1 {
+  color: var(--pm-parchment-2) !important;
+  text-shadow: 0 18px 58px rgba(0, 0, 0, 0.38);
+}
+
+.auth-hero-copy p {
+  color: rgba(244, 235, 221, 0.68) !important;
+}
+
+.auth-metric-card,
+.auth-floating-panel {
+  border: 1px solid rgba(216, 179, 106, 0.18) !important;
+  background:
+    linear-gradient(145deg, rgba(17, 29, 47, 0.80), rgba(15, 45, 43, 0.62)) !important;
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(18px);
+}
+
+.auth-metric-card strong {
+  color: var(--pm-parchment-2) !important;
+}
+
+.auth-metric-card span,
+.auth-flow-title {
+  color: rgba(244, 235, 221, 0.64) !important;
+}
+
+.auth-flow span {
+  border: 1px solid rgba(216, 179, 106, 0.18);
+  background: rgba(244, 235, 221, 0.08) !important;
+  color: #e8ddc7;
+}
+
+.auth-card {
+  border: 1px solid rgba(216, 179, 106, 0.26) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 248, 234, 0.97), rgba(232, 221, 199, 0.94)) !important;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.80) !important;
+}
+
+.auth-card-title h2 {
+  color: var(--pm-text) !important;
+}
+
+.auth-card-title p,
+.auth-note {
+  color: var(--pm-muted) !important;
+}
+
+.auth-card .ant-tabs-nav-list {
+  background: rgba(93, 72, 46, 0.09) !important;
+}
+
+.auth-card .ant-tabs-tab-active {
+  background: #fff8ea !important;
+  box-shadow: 0 10px 26px rgba(93, 72, 46, 0.12);
+}
+
+.auth-note {
+  border-color: rgba(167, 121, 61, 0.16) !important;
+  background:
+    linear-gradient(135deg, rgba(167, 121, 61, 0.11), rgba(24, 59, 53, 0.07)) !important;
+}
+
+/* 论文卡片：更像论文索引卡 */
+.paper-card {
+  background:
+    linear-gradient(145deg, rgba(255, 248, 234, 0.98), rgba(244, 235, 221, 0.96)) !important;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.paper-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(167, 121, 61, 0.40) !important;
+  box-shadow:
+    0 26px 70px rgba(5, 10, 18, 0.24),
+    0 0 0 1px rgba(167, 121, 61, 0.10) !important;
+}
+
+.paper-card-thumb {
+  border-color: rgba(167, 121, 61, 0.24) !important;
+  background:
+    linear-gradient(145deg, rgba(216, 179, 106, 0.22), rgba(24, 59, 53, 0.12)) !important;
+}
+
+.paper-card-thumb .anticon {
+  color: #8a612f !important;
+}
+
+.paper-card-title {
+  color: var(--pm-text) !important;
+}
+
+.paper-card-meta-row,
+.paper-card .ant-typography-secondary {
+  color: var(--pm-muted) !important;
+}
+
+/* 聊天区：不要太像普通 IM，更像研究助理面板 */
+.chat-panel {
+  border-color: rgba(93, 72, 46, 0.16) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 234, 0.82), rgba(232, 221, 199, 0.62)) !important;
+}
+
+.chat-bubble.bot {
+  border: 1px solid rgba(93, 72, 46, 0.16) !important;
+  background: rgba(255, 248, 234, 0.90) !important;
+  color: var(--pm-text) !important;
+}
+
+.chat-bubble.user {
+  color: #fff8ea !important;
+  background:
+    linear-gradient(135deg, #183b35, #0f2d2b) !important;
+  box-shadow: 0 14px 34px rgba(24, 59, 53, 0.20) !important;
+}
+
+/* PDF / 图谱占位区域 */
+.pdf-placeholder,
+.graph-placeholder {
+  border-color: rgba(167, 121, 61, 0.22) !important;
+  background:
+    linear-gradient(135deg, rgba(167, 121, 61, 0.07), rgba(24, 59, 53, 0.08)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(93, 72, 46, 0.045),
+      rgba(93, 72, 46, 0.045) 1px,
+      transparent 1px,
+      transparent 22px
+    ),
+    rgba(255, 248, 234, 0.72) !important;
+}
+
+/* 表格 */
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-thead > tr > th {
+  border-bottom-color: rgba(93, 72, 46, 0.16) !important;
+  background: #e8ddc7 !important;
+  color: var(--pm-text) !important;
+  font-weight: 800 !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom-color: rgba(93, 72, 46, 0.10) !important;
+  background: rgba(255, 248, 234, 0.74) !important;
+  color: var(--pm-text) !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(216, 179, 106, 0.14) !important;
+}
+
+/* Modal / Dropdown */
+.ant-modal-content,
+.ant-modal-header,
+.ant-dropdown-menu,
+.ant-select-dropdown {
+  border: 1px solid rgba(93, 72, 46, 0.18) !important;
+  background: var(--pm-parchment-2) !important;
+  color: var(--pm-text) !important;
+}
+
+.ant-modal-title,
+.ant-dropdown-menu-title-content,
+.ant-select-item {
+  color: var(--pm-text) !important;
+}
+
+.ant-select-item-option-selected {
+  background: rgba(167, 121, 61, 0.14) !important;
+}
+
+.ant-select-item-option-active {
+  background: rgba(24, 59, 53, 0.08) !important;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(244, 235, 221, 0.06);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(167, 121, 61, 0.40);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 121, 61, 0.58);
+}

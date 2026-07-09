@@ -57,7 +57,7 @@ export default function LoginPage() {
       <section className="auth-visual">
         <div>
           <div className="auth-brand">
-            <span className="auth-brand-mark">P</span>
+            <span className="auth-brand-mark">PM</span>
             <span>PaperMate</span>
           </div>
 

@@ -39,7 +39,7 @@ export default function MainLayout() {
       <Sider width={248} theme="light" className="main-sider">
         <div className="logo-area">
           <div className="logo-row">
-            <span className="logo-mark">P</span>
+            <span className="logo-mark">PM</span>
             <div className="logo-text">
               <Title level={5} style={{ margin: 0 }}>PaperMate</Title>
               <Text type="secondary" style={{ fontSize: 12 }}>ArXiv 智能论文阅读</Text>
