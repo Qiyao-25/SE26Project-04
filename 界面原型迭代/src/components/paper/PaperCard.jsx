@@ -1,5 +1,5 @@
 import { Card, Tag, Typography, Space } from 'antd';
-import { FileTextOutlined } from '@ant-design/icons';
+import { FileTextOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { PAPERS } from '../../data/papers';
 
@@ -13,14 +13,14 @@ export default function PaperCard({ paperId, compact = false }) {
   if (compact) {
     return (
       <Card size="small" hoverable className="paper-card-compact" onClick={() => navigate(`/paper/${paperId}`)}>
-        <Space>
-          <FileTextOutlined style={{ fontSize: 20, color: '#999' }} />
+        <Space align="start">
+          <FileTextOutlined style={{ fontSize: 22, color: '#3b63f4', marginTop: 3 }} />
           <div>
             <Text strong ellipsis style={{ maxWidth: 280 }}>{paper.title}</Text>
             <br />
             <Text type="secondary" style={{ fontSize: 12 }}>{paper.authors}</Text>
           </div>
-          <Tag>{paper.tag}</Tag>
+          <Tag color="blue">{paper.tag}</Tag>
         </Space>
       </Card>
     );
@@ -29,20 +29,34 @@ export default function PaperCard({ paperId, compact = false }) {
   return (
     <Card hoverable className="paper-card" onClick={() => navigate(`/paper/${paperId}`)}>
       <div className="paper-card-thumb">
-        <FileTextOutlined style={{ fontSize: 32, color: '#bfbfbf' }} />
-        <Text type="secondary" style={{ fontSize: 11 }}>PDF</Text>
+        <FileTextOutlined style={{ fontSize: 32, color: '#3b63f4' }} />
+        <Text type="secondary" style={{ fontSize: 11, marginTop: 6 }}>PDF</Text>
       </div>
+
       <div className="paper-card-body">
-        <Paragraph strong ellipsis={{ rows: 2 }} style={{ marginBottom: 8 }}>{paper.title}</Paragraph>
-        <Text type="secondary" style={{ fontSize: 12 }}>{paper.authors}</Text>
-        <br />
-        <Space size={4} style={{ marginTop: 8 }}>
+        <Paragraph className="paper-card-title" strong ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+          {paper.title}
+        </Paragraph>
+
+        <div className="paper-card-meta-row">
+          <span>{paper.authors}</span>
+        </div>
+
+        <Space size={6} wrap>
           <Tag color="blue">{paper.tag}</Tag>
           <Tag>arXiv:{paper.arxiv}</Tag>
+          <Tag icon={<CalendarOutlined />}>{paper.date}</Tag>
         </Space>
-        <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+
+        <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ fontSize: 13, marginTop: 12, marginBottom: 0 }}>
           {paper.summary}
         </Paragraph>
+
+        <div className="paper-keywords">
+          {(paper.keywords || []).slice(0, 3).map((keyword) => (
+            <Tag key={keyword} color="geekblue">{keyword}</Tag>
+          ))}
+        </div>
       </div>
     </Card>
   );
