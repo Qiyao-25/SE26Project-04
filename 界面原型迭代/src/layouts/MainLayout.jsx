@@ -1,6 +1,10 @@
-import { Layout, Menu, Button, Typography, Space, Tag, theme } from 'antd';
+import { Layout, Menu, Button, Typography, Space, Tag } from 'antd';
 import {
-  HomeOutlined, BookOutlined, SettingOutlined, LogoutOutlined, DashboardOutlined
+  HomeOutlined,
+  BookOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  DashboardOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -19,7 +23,6 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, persona, topics, isAdmin, showAdminNav } = useApp();
-  const { token } = theme.useToken();
 
   const pathKey = location.pathname.startsWith('/paper') ? '/workspace' : location.pathname;
   const meta = PAGE_TITLES[pathKey] || { title: 'PaperMate', sub: '' };
@@ -32,36 +35,51 @@ export default function MainLayout() {
   ];
 
   return (
-    <Layout className="main-layout" style={{ minHeight: '100vh' }}>
-      <Sider width={200} theme="light" className="main-sider">
+    <Layout className="main-layout">
+      <Sider width={248} theme="light" className="main-sider">
         <div className="logo-area">
-          <Title level={5} style={{ margin: 0, color: token.colorPrimary }}>PaperMate</Title>
-          <Text type="secondary" style={{ fontSize: 11 }}>ArXiv 论文阅读</Text>
+          <div className="logo-row">
+            <span className="logo-mark">P</span>
+            <div className="logo-text">
+              <Title level={5} style={{ margin: 0 }}>PaperMate</Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>ArXiv 智能论文阅读</Text>
+            </div>
+          </div>
         </div>
+
         <Menu
           mode="inline"
           selectedKeys={[pathKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
         />
+
         <div className="sider-footer">
           {showAdminNav && !isAdmin && (
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>
-              演示模式：管理员入口可见
+            <Text className="demo-admin-tip">
+              演示模式：管理员入口暂时可见，正式环境可关闭。
             </Text>
           )}
-          <Button block icon={<LogoutOutlined />} onClick={() => { logout(); navigate('/login'); }}>
+          <Button
+            block
+            icon={<LogoutOutlined />}
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+          >
             退出登录
           </Button>
         </div>
       </Sider>
+
       <Layout>
-        <Header className="main-header" style={{ background: token.colorBgContainer }}>
-          <div>
+        <Header className="main-header">
+          <div className="header-title-wrap">
             <Title level={4} style={{ margin: 0 }}>{meta.title}</Title>
             <Text type="secondary">{meta.sub}</Text>
           </div>
-          <Space>
+          <Space className="header-tags" wrap>
             <Tag color={isAdmin ? 'red' : 'blue'}>
               {isAdmin ? '管理员' : `画像: ${persona}`}
             </Tag>

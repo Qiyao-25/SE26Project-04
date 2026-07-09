@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { DEFAULT_PAPER_NOTES, getDefaultCompareTarget } from '../data/papers';
 
-const WIREFRAME_DEMO = true;
+const WIREFRAME_DEMO = false;
 
 const AppContext = createContext(null);
 

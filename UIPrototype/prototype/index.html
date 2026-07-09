@@ -1,851 +1,94 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PaperMate 低保真线框图 v2</title>
-  <link rel="stylesheet" href="wireframe.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PaperMate 前端原型</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div id="toast" class="toast" aria-live="polite"></div>
 
-<div class="wf-toast" id="wf-toast"></div>
-
-<!-- ========== 页面一：登录/注册 ========== -->
-<section class="wf-page active" id="page-login">
-  <div class="wf-page-id">页面一 · 登录/注册</div>
-  <div class="wf-login-layout">
-    <div class="wf-login-box">
-      <h2 style="text-align:center;margin-bottom:4px;">[ PaperMate ]</h2>
-      <p style="text-align:center;color:#666;font-size:12px;margin-bottom:20px;">ArXiv 论文阅读工具</p>
-
-      <div class="wf-tabs" id="auth-tabs">
-        <button class="wf-tab active" data-auth="login">登录</button>
-        <button class="wf-tab" data-auth="register">注册</button>
+  <section id="auth-view" class="auth-view">
+    <div class="auth-card">
+      <div class="brand-block">
+        <div class="brand-logo">PM</div>
+        <div>
+          <h1>PaperMate</h1>
+          <p>面向 arXiv 论文的智能阅读工作台</p>
+        </div>
       </div>
 
-      <div id="auth-login">
-        <div style="margin-bottom:12px;">
-          <label class="wf-label">账号 / 邮箱</label>
-          <input class="wf-input" id="login-email" type="text" placeholder="输入账号或邮箱">
-        </div>
-        <div style="margin-bottom:12px;">
-          <label class="wf-label">密码</label>
-          <input class="wf-input" id="login-pwd" type="password" placeholder="输入密码">
-        </div>
-        <button class="wf-btn primary block" id="btn-login">[ 登录 ]</button>
-        <p class="wf-annotation" style="margin-top:8px;">普通用户：任意账号登录 · 管理员演示：输入 <b>admin</b></p>
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" data-auth-panel="login">登录</button>
+        <button class="auth-tab" data-auth-panel="register">注册</button>
       </div>
 
-      <div id="auth-register" class="wf-hidden">
-        <div style="margin-bottom:12px;">
-          <label class="wf-label">邮箱</label>
-          <input class="wf-input" id="reg-email" type="text" placeholder="注册邮箱">
-        </div>
-        <div style="margin-bottom:12px;">
-          <label class="wf-label">密码</label>
-          <input class="wf-input" id="reg-pwd" type="password" placeholder="设置密码">
-        </div>
-        <button class="wf-btn primary block" id="btn-register">[ 注册 ]</button>
+      <div id="login-panel" class="auth-panel active">
+        <label>账号 / 邮箱</label>
+        <input id="login-email" type="text" placeholder="任意账号可登录，输入 admin 进入管理员演示" />
+        <label>密码</label>
+        <input id="login-password" type="password" placeholder="原型阶段无需真实校验" />
+        <button class="btn primary full" data-action="login">进入系统</button>
+        <p class="hint">当前版本不绑定后端，不读写数据库；登录按钮仅切换到前端演示界面。</p>
       </div>
 
-      <p class="wf-annotation" style="margin-top:12px;">交互：登录 → 工作空间；注册 → 首次引导 → 工作空间</p>
+      <div id="register-panel" class="auth-panel">
+        <label>邮箱</label>
+        <input id="register-email" type="text" placeholder="example@school.edu" />
+        <label>密码</label>
+        <input id="register-password" type="password" placeholder="设置密码" />
+        <button class="btn primary full" data-action="register">注册并进入引导</button>
+        <p class="hint">注册后展示首次画像引导，不会真正创建账号。</p>
+      </div>
     </div>
+
+    <div class="auth-preview">
+      <span class="eyebrow">Prototype First</span>
+      <h2>先把页面流程跑通，再逐步替换为真实接口</h2>
+      <p>这个版本把页面渲染、状态切换、Mock 数据和将来的接口入口分开，后端接入时可以从 app.js 的 mockApi 开始替换。</p>
+      <div class="preview-grid">
+        <div><strong>6</strong><span>核心页面</span></div>
+        <div><strong>0</strong><span>后端依赖</span></div>
+        <div><strong>1</strong><span>Mock API 层</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="app-view" class="app-view hidden">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo small">PM</div>
+        <div>
+          <strong>PaperMate</strong>
+          <span>前端原型</span>
+        </div>
+      </div>
+      <nav id="main-nav" class="nav-list"></nav>
+      <div class="sidebar-footer">
+        <div class="user-chip" id="user-chip"></div>
+        <button class="btn ghost full" data-action="logout">退出登录</button>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="page-eyebrow">Prototype</p>
+          <h2 id="page-title">工作台</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn soft" data-action="quick-search">快速检索</button>
+          <button class="btn primary" data-route="search">新建论文检索</button>
+        </div>
+      </header>
+
+      <section id="page-root" class="page-root"></section>
+    </main>
   </div>
-</section>
 
-<!-- 首次登录引导弹窗 -->
-<div class="wf-overlay hidden" id="onboarding-overlay">
-  <div class="wf-modal">
-    <h3 style="margin-bottom:12px;">首次登录引导</h3>
-    <p class="wf-label">选择研究方向</p>
-    <div style="margin-bottom:12px;" id="onboard-topics">
-      <button class="wf-tag wf-topic-btn" data-topic="cs.CL">cs.CL</button>
-      <button class="wf-tag wf-topic-btn" data-topic="cs.LG">cs.LG</button>
-      <button class="wf-tag wf-topic-btn" data-topic="cs.CV">cs.CV</button>
-      <button class="wf-tag wf-topic-btn" data-topic="cs.AI">cs.AI</button>
-    </div>
-    <p class="wf-label">选择用户画像</p>
-    <div class="wf-mode-bar" id="onboard-persona">
-      <button class="wf-mode-btn" data-persona="新手">新手</button>
-      <button class="wf-mode-btn active" data-persona="研究">研究</button>
-      <button class="wf-mode-btn" data-persona="工程">工程</button>
-      <button class="wf-mode-btn" data-persona="教学">教学</button>
-      <button class="wf-mode-btn" data-persona="管理">管理</button>
-    </div>
-    <button class="wf-btn primary block" id="btn-onboard-done" style="margin-top:16px;">[ 完成，进入工作空间 ]</button>
-  </div>
-</div>
+  <div id="modal-root" class="modal-root hidden"></div>
 
-<!-- ========== 主应用 ========== -->
-<div class="wf-app wf-hidden" id="wf-app">
-
-  <aside class="wf-sidebar">
-    <nav class="wf-nav" style="padding-top:12px;">
-      <a class="wf-nav-item active" data-page="workspace">工作空间</a>
-      <a class="wf-nav-item" data-page="learning">学习空间</a>
-      <a class="wf-nav-item wf-nav-admin" data-page="agent" id="nav-agent">
-        管理员后台 <span class="wf-badge admin-badge">管理员</span>
-      </a>
-      <a class="wf-nav-item" data-page="settings">设置</a>
-    </nav>
-    <p class="wf-sidebar-note" id="admin-nav-note">线框演示中常驻显示 · 正式环境仅管理员可见</p>
-    <div style="padding:8px;border-top:1px solid #ccc;">
-      <button class="wf-btn sm block" id="btn-logout">[ 退出登录 ]</button>
-    </div>
-  </aside>
-
-  <div class="wf-main">
-    <header class="wf-header">
-      <div>
-        <h1 id="wf-title">论文检索与发现（工作空间）</h1>
-        <span class="subtitle" id="wf-subtitle">页面二 · 论文检索与发现</span>
-      </div>
-      <div class="wf-row" style="margin:0;">
-        <span class="wf-badge" id="user-badge">画像: 研究</span>
-      </div>
-    </header>
-
-    <div class="wf-content">
-
-      <!-- 页面二：论文检索与发现（工作空间） -->
-      <section class="wf-page active" id="page-workspace">
-        <div class="wf-page-id">页面二 · 工作空间</div>
-
-        <!-- 多轮对话搜索区 -->
-        <div class="wf-box" style="margin-bottom:16px;">
-          <strong>智能搜索 / 多轮问答</strong>
-          <div class="wf-chat-panel" style="margin-top:8px;">
-            <div class="wf-chat-messages" id="ws-chat-messages">
-              <div class="wf-bubble bot" style="max-width:90%;">您好，可输入自然语言检索论文，支持多轮追问。搜索后将展示检索结果。</div>
-            </div>
-            <div class="wf-chat-input-row">
-              <input class="wf-input" id="ws-chat-input" placeholder="输入关键词搜索或提问，支持追问...">
-              <button class="wf-btn primary" id="ws-chat-send">搜索 / 提问</button>
-            </div>
-          </div>
-          <p class="wf-annotation">交互：搜索或提问后移除推荐论文，显示检索结果列表</p>
-        </div>
-
-        <!-- 推荐论文（每日精选 + 画像推荐，搜索后移除） -->
-        <div id="ws-recommend">
-          <div class="wf-grid-2">
-            <div class="wf-box">
-              <strong>每日 ArXiv 精选列表</strong>
-              <div class="wf-list-item wf-paper-card" data-paper="attention" style="margin-top:8px;">
-                <div class="wf-img-placeholder" style="width:40px;height:40px;flex-shrink:0;">PDF</div>
-                <div style="flex:1;">
-                  <span class="wf-tag">cs.CL</span>
-                  <div class="wf-card-title">Attention Is All You Need</div>
-                  <div class="wf-card-meta">Vaswani et al. · 2026-07-07</div>
-                </div>
-              </div>
-              <div class="wf-list-item wf-paper-card" data-paper="vlm">
-                <div class="wf-img-placeholder" style="width:40px;height:40px;flex-shrink:0;">PDF</div>
-                <div style="flex:1;">
-                  <span class="wf-tag">cs.CV</span>
-                  <div class="wf-card-title">Vision-Language Models for Scientific Documents</div>
-                  <div class="wf-card-meta">Li et al. · 2026-07-07</div>
-                </div>
-              </div>
-            </div>
-            <div class="wf-box">
-              <strong>基于画像推荐的论文</strong>
-              <div class="wf-list-item wf-paper-card" data-paper="lora" style="margin-top:8px;">
-                <div class="wf-img-placeholder" style="width:40px;height:40px;flex-shrink:0;">PDF</div>
-                <div style="flex:1;">
-                  <div class="wf-card-title">LoRA: Low-Rank Adaptation of LLMs</div>
-                  <div class="wf-card-meta">匹配度 92% · Parameter-Efficient FT</div>
-                </div>
-              </div>
-              <div class="wf-list-item wf-paper-card" data-paper="rag">
-                <div class="wf-img-placeholder" style="width:40px;height:40px;flex-shrink:0;">PDF</div>
-                <div style="flex:1;">
-                  <div class="wf-card-title">Retrieval-Augmented Generation for NLP</div>
-                  <div class="wf-card-meta">匹配度 87% · 概念关联推荐</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 论文卡片列表（搜索后显示） -->
-        <div class="wf-box wf-hidden" id="ws-search-results" style="margin-top:16px;">
-          <strong>论文卡片视图</strong>
-          <span class="wf-badge" id="ws-result-count" style="margin-left:8px;">0 篇</span>
-          <div id="ws-paper-list" style="margin-top:8px;"></div>
-          <p class="wf-annotation">交互：点击论文卡片 → 跳转论文详情</p>
-        </div>
-      </section>
-
-      <!-- 页面三：论文详情 -->
-      <section class="wf-page" id="page-paper-detail">
-        <div class="wf-page-id">页面三 · 论文详情</div>
-
-        <div class="wf-row pd-layout">
-          <div class="wf-col pd-main">
-            <div class="wf-tabs" id="pd-view-tabs">
-              <button class="wf-tab active" data-pdview="content">a · 论文主体</button>
-              <button class="wf-tab" data-pdview="summary">b · 智能总结</button>
-              <button class="wf-tab" data-pdview="graph">c · 知识图谱&脉络</button>
-            </div>
-
-            <div class="wf-subview active" id="pdview-content">
-              <div class="wf-box">
-                <strong>论文文本</strong>
-                <div class="wf-placeholder" style="min-height:420px;margin-top:6px;text-align:left;padding:10px;align-items:flex-start;">
-                  [ PDF/HTML 原文渲染区域占位 ]
-                </div>
-              </div>
-            </div>
-
-            <div class="wf-subview" id="pdview-summary">
-              <div class="wf-box" style="margin-bottom:12px;">
-                <strong>摘要</strong>
-                <div class="wf-placeholder dark" style="min-height:50px;margin-top:6px;text-align:left;padding:10px;align-items:flex-start;" id="pd-summary">
-                  提出 Transformer 架构，完全基于注意力机制...
-                </div>
-              </div>
-              <div class="wf-grid-2" style="margin-bottom:12px;">
-                <div class="wf-box">
-                  <strong>核心概念</strong>
-                  <div class="wf-card" style="margin-top:6px;border:none;padding:0;">
-                    <div class="wf-card-title">Transformer</div>
-                    <div class="wf-card-body">纯注意力序列转换架构</div>
-                  </div>
-                  <div class="wf-card" style="margin-top:6px;border:none;padding:0;">
-                    <div class="wf-card-title">Self-Attention</div>
-                    <div class="wf-card-body">序列内部位置关联机制</div>
-                  </div>
-                </div>
-                <div class="wf-box">
-                  <strong>方法论</strong>
-                  <div class="wf-img-placeholder" style="height:80px;margin-top:6px;">架构图</div>
-                </div>
-              </div>
-              <div class="wf-box">
-                <strong>关联论文图谱（引用/被引用）</strong>
-                <div class="wf-graph-canvas" style="height:140px;margin-top:6px;">
-                  <div class="wf-graph-node center" style="top:35%;left:40%;">本文</div>
-                  <div class="wf-graph-node paper" style="top:10%;left:15%;">Bahdanau'15</div>
-                  <div class="wf-graph-node paper" style="top:10%;left:65%;">BERT'18</div>
-                  <div class="wf-graph-node paper" style="top:65%;left:40%;">GPT-3'20</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="wf-subview" id="pdview-graph">
-              <div class="wf-box">
-                <strong>可视化画布</strong>
-                <div class="wf-graph-canvas" style="height:360px;margin-top:8px;" id="pd-graph-canvas">
-                  <div class="wf-graph-node center" style="top:40%;left:42%;" data-node="Transformer">Transformer</div>
-                  <div class="wf-graph-node concept" style="top:12%;left:25%;" data-node="Self-Attention">Self-Attention</div>
-                  <div class="wf-graph-node concept" style="top:12%;left:62%;" data-node="Multi-Head">Multi-Head</div>
-                  <div class="wf-graph-node paper" style="top:70%;left:15%;" data-node="BERT">BERT</div>
-                  <div class="wf-graph-node paper" style="top:70%;left:65%;" data-node="GPT-3">GPT-3</div>
-                  <div class="wf-graph-node concept" style="top:82%;left:40%;" data-node="WMT">数据集 WMT</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 右侧：切换侧边栏 -->
-          <div class="wf-col pd-sidebar-col">
-            <div class="wf-box pd-sidebar">
-              <div class="wf-tabs pd-side-tabs" id="pd-sidebar-tabs">
-                <button class="wf-tab active" data-pdside="all">全部</button>
-                <button class="wf-tab" data-pdside="info">信息</button>
-                <button class="wf-tab" data-pdside="qa">问答</button>
-                <button class="wf-tab" data-pdside="assist">辅助</button>
-                <button class="wf-tab" data-pdside="notes">笔记</button>
-                <button class="wf-tab" data-pdside="compare">对比</button>
-              </div>
-
-              <!-- 全部 -->
-              <div class="pd-side-panel active pd-side-panel-all" id="pdside-all">
-                <div class="pd-side-scroll">
-
-                  <div class="pd-side-section pd-side-jump" data-pdside="info">
-                    <div class="pd-side-section-head">
-                      <strong>论文信息</strong>
-                      <span class="pd-side-jump-hint">查看 →</span>
-                    </div>
-                    <div class="pd-info-block compact">
-                      <div class="pd-info-tags"></div>
-                      <h3 class="pd-info-title"></h3>
-                      <p class="pd-info-authors"></p>
-                      <p class="pd-info-date"></p>
-                      <button class="wf-btn sm" id="btn-collect">[ ⭐ 收藏 ]</button>
-                    </div>
-                  </div>
-
-                  <div class="pd-side-section pd-side-jump" data-pdside="assist">
-                    <div class="pd-side-section-head">
-                      <strong>辅助阅读</strong>
-                      <span class="wf-badge" id="pd-mode-badge-all">研究模式</span>
-                    </div>
-                    <div class="pd-assist-content pd-assist-preview" id="pd-assist-content-all"></div>
-                  </div>
-
-                  <div class="pd-side-section pd-side-jump" data-pdside="notes">
-                    <div class="pd-side-section-head">
-                      <strong>笔记与评论</strong>
-                      <span class="pd-side-jump-hint">展开 →</span>
-                    </div>
-                    <div id="pd-notes-preview-all" class="pd-notes-preview"></div>
-                  </div>
-
-                  <div class="pd-side-section pd-side-jump" data-pdside="compare">
-                    <div class="pd-side-section-head">
-                      <strong>对比阅读</strong>
-                      <span class="pd-side-jump-hint">展开 →</span>
-                    </div>
-                    <div id="pd-compare-preview-all" class="pd-compare-preview"></div>
-                  </div>
-
-                  <div class="pd-side-section pd-side-jump" data-pdside="qa">
-                    <div class="pd-side-section-head">
-                      <strong>智能问答</strong>
-                      <span class="pd-side-jump-hint">展开 →</span>
-                    </div>
-                    <div class="wf-chat-messages pd-chat-box" id="pd-chat-messages-all">
-                      <div class="wf-bubble bot">可围绕本篇论文提问</div>
-                    </div>
-                    <div class="wf-chat-input-row">
-                      <input class="wf-input" id="pd-chat-input-all" placeholder="输入问题...">
-                      <button class="wf-btn sm primary pd-chat-send" data-target="all">发送</button>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              <!-- 论文信息 + 知识 Wiki -->
-              <div class="pd-side-panel" id="pdside-info">
-                <div class="pd-info-scroll">
-                  <div class="pd-info-block">
-                    <div class="pd-info-tags"></div>
-                    <h3 class="pd-info-title" style="font-size:14px;margin:8px 0;"></h3>
-                    <p class="pd-info-authors"></p>
-                    <p class="pd-info-date"></p>
-                    <hr class="wf-divider">
-                    <p class="wf-label">摘要</p>
-                    <p class="pd-info-abstract" style="font-size:12px;color:#666;"></p>
-                    <button class="wf-btn sm block" style="margin-top:12px;" id="btn-collect-info">[ ⭐ 收藏 ]</button>
-                    <button class="wf-btn sm block" style="margin-top:6px;">[ 🔗 原文链接 ]</button>
-                  </div>
-
-                  <div class="pd-wiki-section">
-                    <div class="pd-side-section-head">
-                      <strong>论文知识 Wiki</strong>
-                      <span class="wf-badge" id="pd-wiki-count">0 条</span>
-                    </div>
-                    <p class="wf-annotation" style="margin-bottom:8px;">支持按标题、作者、关键词、研究方向、概念标签检索关联论文与词条</p>
-
-                    <div class="pd-wiki-filter-bar" id="pd-wiki-filters">
-                      <button class="pd-wiki-filter active" data-wiki-mode="all">全部</button>
-                      <button class="pd-wiki-filter" data-wiki-mode="title">标题</button>
-                      <button class="pd-wiki-filter" data-wiki-mode="author">作者</button>
-                      <button class="pd-wiki-filter" data-wiki-mode="keyword">关键词</button>
-                      <button class="pd-wiki-filter" data-wiki-mode="direction">研究方向</button>
-                      <button class="pd-wiki-filter" data-wiki-mode="concept">概念标签</button>
-                    </div>
-
-                    <div class="pd-wiki-search-row">
-                      <input class="wf-input" id="pd-wiki-search" placeholder="输入检索词，或点击下方标签快捷搜索...">
-                      <button class="wf-btn sm primary" id="pd-wiki-search-btn">检索</button>
-                    </div>
-
-                    <p class="wf-label" style="margin-top:10px;">本篇 Wiki 标签</p>
-                    <div class="pd-wiki-quick-tags" id="pd-wiki-quick-tags"></div>
-
-                    <p class="wf-label" style="margin-top:10px;">检索结果</p>
-                    <div class="pd-wiki-results" id="pd-wiki-results"></div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 智能问答 -->
-              <div class="pd-side-panel" id="pdside-qa">
-                <div class="wf-chat-messages pd-chat-box lg" id="pd-chat-messages">
-                  <div class="wf-bubble bot" style="max-width:95%;font-size:11px;">可围绕本篇论文提问</div>
-                </div>
-                <div class="wf-chat-input-row" style="margin-top:8px;">
-                  <input class="wf-input" id="pd-chat-input" placeholder="输入问题...">
-                  <button class="wf-btn sm primary pd-chat-send" data-target="qa">发送</button>
-                </div>
-              </div>
-
-              <!-- 辅助阅读 -->
-              <div class="pd-side-panel" id="pdside-assist">
-                <p class="wf-annotation" style="margin-bottom:8px;">默认模式在学习空间设置 · 此处可快捷切换</p>
-                <div class="wf-mode-bar" id="pd-mode-bar">
-                  <button class="wf-mode-btn" data-persona="新手">新手</button>
-                  <button class="wf-mode-btn active" data-persona="研究">研究</button>
-                  <button class="wf-mode-btn" data-persona="工程">工程</button>
-                  <button class="wf-mode-btn" data-persona="教学">教学</button>
-                  <button class="wf-mode-btn" data-persona="管理">管理</button>
-                </div>
-                <div class="pd-side-section" style="margin-top:10px;">
-                  <p class="wf-label">个性化总结 · <span id="pd-mode-badge">研究模式</span></p>
-                  <div class="pd-assist-content" id="pd-assist-content"></div>
-                </div>
-              </div>
-
-              <!-- 笔记与评论 -->
-              <div class="pd-side-panel" id="pdside-notes">
-                <div class="pd-side-section">
-                  <p class="wf-label">添加笔记</p>
-                  <div class="pd-highlight-quote" id="pd-highlight-quote">
-                    [ 选中文本高亮占位：Multi-Head Attention 允许模型关注不同表示子空间... ]
-                  </div>
-                  <textarea class="wf-input pd-note-input" id="pd-note-input" rows="3" placeholder="记录阅读笔记、想法或疑问..."></textarea>
-                  <button class="wf-btn sm primary block" id="pd-note-save" style="margin-top:6px;">[ 保存笔记 ]</button>
-                </div>
-                <div class="pd-side-section">
-                  <div class="pd-side-section-head">
-                    <strong>我的笔记</strong>
-                    <span class="wf-badge" id="pd-notes-count">0 条</span>
-                  </div>
-                  <div id="pd-notes-list" class="pd-notes-list"></div>
-                </div>
-                <div class="pd-side-section">
-                  <div class="pd-side-section-head">
-                    <strong>评论</strong>
-                  </div>
-                  <div id="pd-comments-list" class="pd-comments-list"></div>
-                  <div class="wf-row" style="margin-top:8px;margin-bottom:0;">
-                    <input class="wf-input" id="pd-comment-input" placeholder="添加评论...">
-                    <button class="wf-btn sm" id="pd-comment-add">发表</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 对比阅读 -->
-              <div class="pd-side-panel" id="pdside-compare">
-                <div class="pd-compare-scroll">
-                  <div class="pd-side-section-head">
-                    <strong>对比阅读</strong>
-                    <button class="wf-btn sm" id="pd-compare-swap">⇄ 互换</button>
-                  </div>
-                  <p class="wf-annotation" style="margin-bottom:10px;">并排对比两篇论文，支持快捷切换对比对象</p>
-
-                  <div class="pd-compare-slots" id="pd-compare-slots">
-                    <div class="pd-compare-slot active" data-slot="a">
-                      <span class="wf-label">论文 A</span>
-                      <select class="wf-select pd-compare-select" id="pd-compare-select-a"></select>
-                    </div>
-                    <div class="pd-compare-slot" data-slot="b">
-                      <span class="wf-label">论文 B</span>
-                      <select class="wf-select pd-compare-select" id="pd-compare-select-b"></select>
-                    </div>
-                  </div>
-
-                  <p class="wf-label" style="margin-top:12px;">快速切换 <span class="wf-annotation">（先选 A/B 栏，再点论文）</span></p>
-                  <div class="pd-compare-quick" id="pd-compare-quick"></div>
-
-                  <div class="pd-compare-body" id="pd-compare-body"></div>
-
-                  <div class="pd-compare-actions">
-                    <button class="wf-btn sm block" id="pd-compare-open-a">[ 阅读论文 A ]</button>
-                    <button class="wf-btn sm block" id="pd-compare-open-b" style="margin-top:6px;">[ 阅读论文 B ]</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 页面四：学习空间 -->
-      <section class="wf-page" id="page-learning">
-        <div class="wf-page-id">页面四 · 学习空间</div>
-
-        <div class="wf-tabs" id="learn-tabs">
-          <button class="wf-tab active" data-learn="favorites">收藏夹</button>
-          <button class="wf-tab" data-learn="notes">笔记/评论</button>
-          <button class="wf-tab" data-learn="history">阅读历史</button>
-          <button class="wf-tab" data-learn="wiki">概念词典</button>
-          <button class="wf-tab" data-learn="profile">个人画像</button>
-          <button class="wf-tab" data-learn="mode">默认模式</button>
-        </div>
-
-        <div class="wf-subview active" id="learn-favorites">
-          <div class="wf-row">
-            <div class="wf-col" style="max-width:180px;">
-              <div class="wf-box">
-                <strong>文件夹</strong>
-                <div class="wf-list-item" style="padding:6px;font-size:11px;border-color:#333;cursor:pointer;">📁 Transformer</div>
-                <div class="wf-list-item" style="padding:6px;font-size:11px;cursor:pointer;">📁 微调方法</div>
-                <button class="wf-btn sm block" style="margin-top:8px;">[ + 新建 ]</button>
-              </div>
-            </div>
-            <div class="wf-col">
-              <div class="wf-grid-2">
-                <div class="wf-card wf-paper-card" data-paper="attention">
-                  <div class="wf-card-title">Attention Is All You Need</div>
-                  <div class="wf-card-meta">Transformer 专题 · 2026-06-15</div>
-                </div>
-                <div class="wf-card wf-paper-card" data-paper="bert">
-                  <div class="wf-card-title">BERT</div>
-                  <div class="wf-card-meta">2026-06-18</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="learn-notes">
-          <div class="wf-box">
-            <div class="wf-card-title">Attention Is All You Need</div>
-            <div class="wf-card-body" style="margin:8px 0;">[ 高亮段落 ] Multi-Head Attention 允许关注不同子空间...</div>
-            <div class="wf-card-meta">2026-07-01 更新</div>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="learn-history">
-          <div class="wf-row">
-            <div class="wf-col" style="max-width:220px;">
-              <div class="wf-box">
-                <strong>阅读时间轴</strong>
-                <p class="wf-annotation" style="margin:6px 0;">点击日期查看当日阅读论文</p>
-                <div class="wf-history-dates" id="history-dates">
-                  <button class="wf-history-date active" data-history="today">今天 · 2篇 · 45min</button>
-                  <button class="wf-history-date" data-history="yesterday">昨天 · 3篇 · 1.5h</button>
-                  <button class="wf-history-date" data-history="earlier">本周更早 · 5篇 · 3.2h</button>
-                </div>
-              </div>
-            </div>
-            <div class="wf-col">
-              <div class="wf-box">
-                <strong id="history-panel-title">今天 · 阅读记录</strong>
-                <div id="history-cards-list" class="wf-history-cards"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="learn-wiki">
-          <div class="wf-grid-3">
-            <div class="wf-card" style="cursor:pointer;"><div class="wf-card-title">Self-Attention</div><div class="wf-card-meta">15篇 · Wiki词条</div></div>
-            <div class="wf-card" style="cursor:pointer;"><div class="wf-card-title">Pre-training</div><div class="wf-card-meta">12篇</div></div>
-            <div class="wf-card" style="cursor:pointer;"><div class="wf-card-title">LoRA</div><div class="wf-card-meta">8篇</div></div>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="learn-profile">
-          <div class="wf-grid-2">
-            <div class="wf-box">
-              <strong>画像标签（系统自动）</strong>
-              <div style="margin-top:8px;"><span class="wf-label">常看方向</span> <span class="wf-tag">NLP</span><span class="wf-tag">Transformer</span></div>
-              <div style="margin-top:6px;"><span class="wf-label">偏好难度</span> <span class="wf-tag">中等偏高</span></div>
-              <div style="margin-top:6px;"><span class="wf-label">理论/工程</span> <span class="wf-tag">理论60% 工程40%</span></div>
-            </div>
-            <div class="wf-box">
-              <strong>手动微调</strong>
-              <div style="margin-top:8px;display:flex;justify-content:space-between;"><span>偏好有代码</span><span class="wf-switch on" data-toggle></span></div>
-              <div style="margin-top:6px;display:flex;justify-content:space-between;"><span>偏好有数据集</span><span class="wf-switch" data-toggle></span></div>
-              <div style="margin-top:8px;"><label class="wf-label">关注作者/机构</label><input class="wf-input" value="Google, OpenAI"></div>
-            </div>
-          </div>
-          <div class="wf-box" style="margin-top:12px;">
-            <strong>推荐理由解释</strong>
-            <div class="wf-list-item" style="margin-top:8px;">
-              <div class="wf-card-title">FlashAttention</div>
-              <div class="wf-card-body">因为您关注 <b>Attention优化</b>，且近期阅读3篇Transformer论文</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="learn-mode">
-          <div class="wf-box">
-            <strong>默认阅读模式设置</strong>
-            <p class="wf-annotation" style="margin:8px 0;">在此设置全局默认阅读模式；论文详情页「辅助阅读」可快捷切换，未切换时使用此默认模式</p>
-            <div class="wf-mode-bar" id="learn-mode-bar">
-              <button class="wf-mode-btn" data-persona="新手">新手</button>
-              <button class="wf-mode-btn active" data-persona="研究">研究</button>
-              <button class="wf-mode-btn" data-persona="工程">工程</button>
-              <button class="wf-mode-btn" data-persona="教学">教学</button>
-              <button class="wf-mode-btn" data-persona="管理">管理</button>
-            </div>
-            <div class="wf-box-dashed" style="margin-top:12px;">
-              <p class="wf-label">当前模式说明</p>
-              <p id="learn-mode-desc" style="font-size:12px;margin-top:4px;">研究模式：侧重创新点、方法、实验设计与局限性分析</p>
-            </div>
-            <div class="wf-grid-2" style="margin-top:12px;">
-              <div class="wf-card">
-                <div class="wf-card-title">新手模式</div>
-                <div class="wf-card-body">背景解释、术语翻译、白话总结</div>
-              </div>
-              <div class="wf-card">
-                <div class="wf-card-title">工程模式</div>
-                <div class="wf-card-body">实现流程、依赖数据、复现难度</div>
-              </div>
-              <div class="wf-card">
-                <div class="wf-card-title">教学模式</div>
-                <div class="wf-card-body">讲义结构、思考题、课堂讨论点</div>
-              </div>
-              <div class="wf-card">
-                <div class="wf-card-title">管理模式</div>
-                <div class="wf-card-body">研究趋势、应用价值、风险与前景</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 页面五：管理员后台（系统管理端） -->
-      <section class="wf-page" id="page-agent">
-        <div class="wf-page-id">页面五 · 管理员后台（系统管理端）</div>
-
-        <div class="wf-admin-banner">
-          <strong>⚙ 管理员专用 · 系统管理端</strong>
-          <span>正式环境中仅管理员账户登录后显示于侧栏 · 线框演示中常驻可见</span>
-        </div>
-
-        <div class="wf-tabs admin-module-tabs" id="admin-tabs">
-          <button class="wf-tab active" data-admin="overview">系统概览</button>
-          <button class="wf-tab" data-admin="fleet">Agent舰队</button>
-          <button class="wf-tab" data-admin="tasks">任务队列</button>
-          <button class="wf-tab" data-admin="quality">质量异常</button>
-          <button class="wf-tab" data-admin="config">配置治理</button>
-          <button class="wf-tab" data-admin="audit">审计日志</button>
-        </div>
-
-        <!-- 模块一：系统概览仪表盘 -->
-        <div class="wf-subview active" id="admin-overview">
-          <div class="admin-metric-grid">
-            <div class="admin-metric-card"><span class="admin-metric-label">总论文数</span><strong class="admin-metric-value">12,847</strong><span class="admin-metric-delta">+128 本周</span></div>
-            <div class="admin-metric-card"><span class="admin-metric-label">总用户数</span><strong class="admin-metric-value">3,562</strong><span class="admin-metric-delta">+42 本周</span></div>
-            <div class="admin-metric-card"><span class="admin-metric-label">今日活跃用户</span><strong class="admin-metric-value">486</strong><span class="admin-metric-delta">较昨日 +12%</span></div>
-            <div class="admin-metric-card"><span class="admin-metric-label">今日新增论文</span><strong class="admin-metric-value">37</strong><span class="admin-metric-delta">抓取完成 35</span></div>
-            <div class="admin-metric-card"><span class="admin-metric-label">系统运行时长</span><strong class="admin-metric-value">18d 6h</strong><span class="admin-metric-delta">自上次部署</span></div>
-          </div>
-
-          <div class="wf-grid-2" style="margin-top:16px;">
-            <div class="wf-box">
-              <strong>系统健康状态 · Agent 指示灯</strong>
-              <div class="admin-health-list" id="admin-health-list"></div>
-            </div>
-            <div class="wf-box">
-              <strong>待办事项</strong>
-              <div class="admin-todo-grid" id="admin-todo-list"></div>
-            </div>
-          </div>
-
-          <div class="wf-box" style="margin-top:16px;">
-            <strong>近期活动动态</strong>
-            <div class="admin-activity-feed" id="admin-activity-feed"></div>
-          </div>
-        </div>
-
-        <!-- 模块二：Agent舰队管理 -->
-        <div class="wf-subview" id="admin-fleet">
-          <div class="wf-grid-2">
-            <div class="wf-box admin-fleet-main">
-              <div class="admin-section-head">
-                <strong>Agent 列表</strong>
-                <span class="wf-annotation">点击行查看 24h 详细指标</span>
-              </div>
-              <table class="wf-table admin-table" id="admin-agent-table">
-                <thead><tr><th>Agent</th><th>状态</th><th>当前任务</th><th>最后活跃</th><th>运维</th></tr></thead>
-                <tbody id="admin-agent-tbody"></tbody>
-              </table>
-            </div>
-            <div class="wf-box admin-agent-detail" id="admin-agent-detail">
-              <strong>Agent 详细指标</strong>
-              <p class="wf-annotation" style="margin:8px 0;">← 点击左侧 Agent 查看</p>
-              <div id="admin-agent-detail-body" class="admin-detail-placeholder">
-                <p>选择 Agent 查看过去 24 小时处理量、平均耗时、成功/失败率</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 模块三：任务队列与调度 -->
-        <div class="wf-subview" id="admin-tasks">
-          <div class="admin-kanban" id="admin-kanban"></div>
-
-          <div class="wf-box" style="margin-top:16px;">
-            <div class="admin-section-head">
-              <strong>任务列表</strong>
-              <div class="admin-filter-row">
-                <select class="wf-select sm" id="admin-task-filter">
-                  <option value="all">全部状态</option>
-                  <option value="pending">待处理</option>
-                  <option value="processing">处理中</option>
-                  <option value="done">已完成</option>
-                  <option value="failed">失败</option>
-                </select>
-                <select class="wf-select sm" id="admin-task-sort">
-                  <option value="start">按开始时间</option>
-                  <option value="duration">按耗时</option>
-                </select>
-              </div>
-            </div>
-            <table class="wf-table admin-table" id="admin-task-table">
-              <thead><tr><th>论文标题</th><th>所属 Agent</th><th>状态</th><th>进度</th><th>开始时间</th><th>耗时</th><th></th></tr></thead>
-              <tbody id="admin-task-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- 模块四：质量与异常管理 -->
-        <div class="wf-subview" id="admin-quality">
-          <div class="wf-grid-2">
-            <div class="wf-box">
-              <div class="admin-section-head">
-                <strong>异常论文工作台</strong>
-                <span class="wf-badge">需人工干预</span>
-              </div>
-              <p class="wf-annotation" style="margin-bottom:8px;">校验 Agent 标记为「不确定内容」的论文</p>
-              <div id="admin-exception-list"></div>
-            </div>
-            <div class="wf-box">
-              <strong>质量统计</strong>
-              <p class="wf-label" style="margin-top:10px;">各 Agent 错误率趋势（近 7 日）</p>
-              <div class="admin-chart-bars" id="admin-error-chart"></div>
-              <p class="wf-label" style="margin-top:14px;">常见异常类型分布</p>
-              <div class="admin-chart-bars" id="admin-exception-chart"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 模块五：配置与治理中心 -->
-        <div class="wf-subview" id="admin-config">
-          <div class="wf-grid-2">
-            <div class="wf-box">
-              <strong>订阅规则管理</strong>
-              <table class="wf-table admin-table" style="margin-top:8px;">
-                <thead><tr><th>类型</th><th>值</th><th>操作</th></tr></thead>
-                <tbody id="admin-sub-table"></tbody>
-              </table>
-              <div class="wf-row" style="margin-top:8px;">
-                <select class="wf-select sm" id="admin-sub-type"><option>学科</option><option>关键词</option></select>
-                <input class="wf-input" id="admin-sub-new" placeholder="如 cs.AI / Transformer">
-                <button class="wf-btn sm" id="admin-sub-add">[ 添加 ]</button>
-              </div>
-            </div>
-            <div class="wf-box">
-              <strong>用户管理</strong>
-              <table class="wf-table admin-table" style="margin-top:8px;">
-                <thead><tr><th>用户</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
-                <tbody id="admin-user-table"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- 模块六：审计与日志 -->
-        <div class="wf-subview" id="admin-audit">
-          <div class="wf-grid-2">
-            <div class="wf-box">
-              <div class="admin-section-head">
-                <strong>操作审计日志</strong>
-                <div class="admin-filter-row">
-                  <input class="wf-input sm" id="audit-filter-user" placeholder="操作人">
-                  <select class="wf-select sm" id="audit-filter-type">
-                    <option value="">全部类型</option>
-                    <option>重启Agent</option>
-                    <option>人工修正</option>
-                    <option>用户管理</option>
-                    <option>订阅变更</option>
-                  </select>
-                </div>
-              </div>
-              <div class="admin-log-list" id="admin-audit-list"></div>
-            </div>
-            <div class="wf-box">
-              <div class="admin-section-head">
-                <strong>系统运行日志</strong>
-                <div class="admin-filter-row">
-                  <select class="wf-select sm" id="syslog-filter-level">
-                    <option value="">全部级别</option>
-                    <option>Info</option>
-                    <option>Warning</option>
-                    <option>Error</option>
-                  </select>
-                  <input class="wf-input sm" id="syslog-search" placeholder="关键词搜索">
-                </div>
-              </div>
-              <div class="admin-log-list mono" id="admin-syslog-list"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 页面六：设置 -->
-      <section class="wf-page" id="page-settings">
-        <div class="wf-page-id">页面六 · 设置</div>
-
-        <div class="wf-tabs" id="settings-tabs">
-          <button class="wf-tab active" data-settings="fetch">抓取与订阅</button>
-          <button class="wf-tab" data-settings="account">个人账户</button>
-          <button class="wf-tab" data-settings="web">网页设置</button>
-        </div>
-
-        <div class="wf-subview active" id="settings-fetch">
-          <div class="wf-grid-2">
-            <div class="wf-box">
-              <strong>订阅设置（增删改查）</strong>
-              <table class="wf-table" style="margin-top:8px;">
-                <thead><tr><th>类型</th><th>值</th><th>操作</th></tr></thead>
-                <tbody id="sub-table">
-                  <tr><td>学科</td><td>cs.CL</td><td><button class="wf-btn sm sub-del">删</button></td></tr>
-                  <tr><td>学科</td><td>cs.LG</td><td><button class="wf-btn sm sub-del">删</button></td></tr>
-                  <tr><td>关键词</td><td>Transformer</td><td><button class="wf-btn sm sub-del">删</button></td></tr>
-                </tbody>
-              </table>
-              <div class="wf-row" style="margin-top:8px;">
-                <input class="wf-input" id="sub-new" placeholder="新关键词/学科">
-                <button class="wf-btn sm" id="sub-add">[ 添加 ]</button>
-              </div>
-            </div>
-            <div class="wf-box">
-              <strong>抓取资源配置</strong>
-              <div style="margin-top:8px;">
-                <label class="wf-label">抓取频率</label>
-                <select class="wf-select"><option>每日</option><option>每周</option></select>
-              </div>
-              <div style="margin-top:8px;display:flex;justify-content:space-between;"><span>仅抓取有代码论文</span><span class="wf-switch on" data-toggle></span></div>
-              <div style="margin-top:6px;display:flex;justify-content:space-between;"><span>仅抓取工程型论文</span><span class="wf-switch" data-toggle></span></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="settings-account">
-          <div class="wf-box">
-            <strong>个人账户设置</strong>
-            <div style="margin-top:12px;"><label class="wf-label">邮箱</label><input class="wf-input" value="user@example.com"></div>
-            <div style="margin-top:8px;"><label class="wf-label">密码</label><input class="wf-input" type="password" value="******"></div>
-            <button class="wf-btn sm" style="margin-top:8px;" id="btn-save-account">[ 保存 ]</button>
-          </div>
-        </div>
-
-        <div class="wf-subview" id="settings-web">
-          <div class="wf-box">
-            <strong>网页设置</strong>
-            <div style="margin-top:12px;"><label class="wf-label">界面语言</label><select class="wf-select"><option>简体中文</option><option>English</option></select></div>
-            <div style="margin-top:8px;"><label class="wf-label">每页条数</label><select class="wf-select"><option>10</option><option>20</option></select></div>
-            <button class="wf-btn sm" style="margin-top:8px;" id="btn-save-web">[ 保存 ]</button>
-          </div>
-        </div>
-      </section>
-
-    </div>
-  </div>
-</div>
-
-<!-- 管理员：任务处理日志弹窗 -->
-<div class="wf-overlay hidden" id="admin-task-modal">
-  <div class="wf-modal admin-modal">
-    <div class="admin-section-head">
-      <h3 id="admin-task-modal-title">任务处理日志</h3>
-      <button class="wf-btn sm" id="admin-task-modal-close">关闭</button>
-    </div>
-    <div class="admin-log-viewer" id="admin-task-modal-body"></div>
-  </div>
-</div>
-
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
