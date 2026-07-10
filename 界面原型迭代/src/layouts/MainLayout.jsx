@@ -1,48 +1,138 @@
-import { Layout, Menu, Button, Typography, Space, Tag } from 'antd';
+import {
+  Layout,
+  Menu,
+  Button,
+  Typography,
+  Space,
+  Tag,
+} from 'antd';
+
 import {
   HomeOutlined,
   BookOutlined,
   SettingOutlined,
   LogoutOutlined,
-  DashboardOutlined
+  DashboardOutlined,
+  MoonOutlined,
+  SunOutlined,
 } from '@ant-design/icons';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+
+import {
+  Outlet,
+  useNavigate,
+  useLocation,
+} from 'react-router-dom';
+
 import { useApp } from '../context/AppContext';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
 const PAGE_TITLES = {
-  '/workspace': { title: '论文检索与发现', sub: '工作空间 · 推荐与搜索' },
-  '/learning': { title: '学习空间', sub: '收藏 / 笔记 / 历史 / 画像' },
-  '/admin': { title: '管理员后台', sub: '系统管理端' },
-  '/settings': { title: '设置', sub: '抓取订阅 / 账户 / 网页' }
+  '/workspace': {
+    title: '论文检索与发现',
+    sub: '工作空间 · 推荐与搜索',
+  },
+  '/learning': {
+    title: '学习空间',
+    sub: '收藏 / 笔记 / 历史 / 画像',
+  },
+  '/admin': {
+    title: '管理员后台',
+    sub: '系统管理端',
+  },
+  '/settings': {
+    title: '设置',
+    sub: '抓取订阅 / 账户 / 网页',
+  },
 };
 
-export default function MainLayout() {
+export default function MainLayout({
+  themeMode,
+  setThemeMode,
+}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, persona, topics, isAdmin, showAdminNav } = useApp();
 
-  const pathKey = location.pathname.startsWith('/paper') ? '/workspace' : location.pathname;
-  const meta = PAGE_TITLES[pathKey] || { title: 'PaperMate', sub: '' };
+  const {
+    logout,
+    persona,
+    topics,
+    isAdmin,
+    showAdminNav,
+  } = useApp();
+
+  const pathKey = location.pathname.startsWith('/paper')
+    ? '/workspace'
+    : location.pathname;
+
+  const meta = PAGE_TITLES[pathKey] || {
+    title: 'PaperMate',
+    sub: '',
+  };
 
   const menuItems = [
-    { key: '/workspace', icon: <HomeOutlined />, label: '工作空间' },
-    { key: '/learning', icon: <BookOutlined />, label: '学习空间' },
-    ...(showAdminNav ? [{ key: '/admin', icon: <DashboardOutlined />, label: '管理员后台' }] : []),
-    { key: '/settings', icon: <SettingOutlined />, label: '设置' }
+    {
+      key: '/workspace',
+      icon: <HomeOutlined />,
+      label: '工作空间',
+    },
+    {
+      key: '/learning',
+      icon: <BookOutlined />,
+      label: '学习空间',
+    },
+    ...(showAdminNav
+      ? [
+          {
+            key: '/admin',
+            icon: <DashboardOutlined />,
+            label: '管理员后台',
+          },
+        ]
+      : []),
+    {
+      key: '/settings',
+      icon: <SettingOutlined />,
+      label: '设置',
+    },
   ];
+
+  const toggleTheme = () => {
+    setThemeMode(
+      themeMode === 'dark'
+        ? 'light'
+        : 'dark'
+    );
+  };
 
   return (
     <Layout className="main-layout">
-      <Sider width={248} theme="light" className="main-sider">
+      <Sider
+        width={248}
+        theme={themeMode === 'dark' ? 'dark' : 'light'}
+        className="main-sider"
+      >
         <div className="logo-area">
           <div className="logo-row">
-            <span className="logo-mark">P</span>
+            <span className="logo-mark">
+              PM
+            </span>
+
             <div className="logo-text">
-              <Title level={5} style={{ margin: 0 }}>PaperMate</Title>
-              <Text type="secondary" style={{ fontSize: 12 }}>ArXiv 智能论文阅读</Text>
+              <Title
+                level={5}
+                style={{ margin: 0 }}
+              >
+                PaperMate
+              </Title>
+
+              <Text
+                type="secondary"
+                style={{ fontSize: 12 }}
+              >
+                ArXiv 智能论文阅读
+              </Text>
             </div>
           </div>
         </div>
@@ -60,6 +150,7 @@ export default function MainLayout() {
               演示模式：管理员入口暂时可见，正式环境可关闭。
             </Text>
           )}
+
           <Button
             block
             icon={<LogoutOutlined />}
@@ -76,16 +167,56 @@ export default function MainLayout() {
       <Layout>
         <Header className="main-header">
           <div className="header-title-wrap">
-            <Title level={4} style={{ margin: 0 }}>{meta.title}</Title>
-            <Text type="secondary">{meta.sub}</Text>
+            <Title
+              level={4}
+              style={{ margin: 0 }}
+            >
+              {meta.title}
+            </Title>
+
+            <Text type="secondary">
+              {meta.sub}
+            </Text>
           </div>
-          <Space className="header-tags" wrap>
+
+          <Space
+            className="header-tags"
+            size={8}
+            wrap
+          >
+            <Button
+              className="theme-toggle-btn"
+              icon={
+                themeMode === 'dark'
+                  ? <SunOutlined />
+                  : <MoonOutlined />
+              }
+              onClick={toggleTheme}
+              title={
+                themeMode === 'dark'
+                  ? '切换到浅色模式'
+                  : '切换到深色模式'
+              }
+            >
+              {themeMode === 'dark'
+                ? '浅色模式'
+                : '深色模式'}
+            </Button>
+
             <Tag color={isAdmin ? 'red' : 'blue'}>
-              {isAdmin ? '管理员' : `画像: ${persona}`}
+              {isAdmin
+                ? '管理员'
+                : `画像: ${persona}`}
             </Tag>
-            <Tag>{topics.join(', ')}</Tag>
+
+            <Tag>
+              {Array.isArray(topics) && topics.length > 0
+                ? topics.join(', ')
+                : '未设置研究方向'}
+            </Tag>
           </Space>
         </Header>
+
         <Content className="main-content">
           <Outlet />
         </Content>

@@ -14,7 +14,7 @@ export default function PaperCard({ paperId, compact = false }) {
     return (
       <Card size="small" hoverable className="paper-card-compact" onClick={() => navigate(`/paper/${paperId}`)}>
         <Space align="start">
-          <FileTextOutlined style={{ fontSize: 22, color: '#3b63f4', marginTop: 3 }} />
+          <FileTextOutlined style={{ fontSize: 22, color: '#8b5cf6', marginTop: 3 }} />
           <div>
             <Text strong ellipsis style={{ maxWidth: 280 }}>{paper.title}</Text>
             <br />
@@ -29,7 +29,7 @@ export default function PaperCard({ paperId, compact = false }) {
   return (
     <Card hoverable className="paper-card" onClick={() => navigate(`/paper/${paperId}`)}>
       <div className="paper-card-thumb">
-        <FileTextOutlined style={{ fontSize: 32, color: '#3b63f4' }} />
+        <FileTextOutlined style={{ fontSize: 32,color: '#8b5cf6' }} />
         <Text type="secondary" style={{ fontSize: 11, marginTop: 6 }}>PDF</Text>
       </div>
 
