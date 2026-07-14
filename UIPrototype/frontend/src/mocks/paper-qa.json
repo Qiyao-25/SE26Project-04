@@ -1,0 +1,31 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "conversationId": "conversation-attention-001",
+    "messageId": "assistant-message-001",
+    "paperId": "attention",
+    "answer": "核心创新是提出完全基于注意力机制的 Transformer 架构。该架构取消了循环神经网络和卷积神经网络，通过多头自注意力并行处理序列，提高了训练效率和长距离依赖建模能力。",
+    "createdAt": "2026-07-14T11:30:00+09:00",
+    "citations": [
+      {
+        "citationId": "citation-001",
+        "paperId": "attention",
+        "paperTitle": "Attention Is All You Need",
+        "sectionId": "section-abstract",
+        "sectionTitle": "Abstract",
+        "pageNumber": 1,
+        "quote": "The paper proposes a new simple network architecture, the Transformer, based solely on attention mechanisms."
+      },
+      {
+        "citationId": "citation-002",
+        "paperId": "attention",
+        "paperTitle": "Attention Is All You Need",
+        "sectionId": "section-model",
+        "sectionTitle": "3 Model Architecture",
+        "pageNumber": 3,
+        "quote": "The Transformer follows an encoder-decoder structure using stacked self-attention and point-wise fully connected layers."
+      }
+    ]
+  }
+}
