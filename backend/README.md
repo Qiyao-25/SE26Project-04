@@ -51,6 +51,20 @@
 - http://127.0.0.1:8000/docs
 - http://127.0.0.1:8000/openapi.json
 
+
+如果遇到“ERROR:    [Errno 98] Address already in use”，可以：
+
+查询运行端口：
+- ss -ltnp | grep ':8000'
+
+输出中会包含类似：users:(("python",pid=231978,fd=6))
+
+然后运行：
+- kill -TERM <pid>
+
+确认端口释放：
+- ss -ltnp | grep ':8000'
+
 ## 4. 迁移升级、回滚和测试
 
     python -m alembic upgrade head
