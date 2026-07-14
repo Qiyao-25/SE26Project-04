@@ -1,18 +1,30 @@
-import { useState } from 'react';
-import { mockPaperReply } from '../../../../utils/mock';
+import { Alert, Typography } from 'antd';
 import { ChatBox } from '../../../common/ChatBox';
 
-export default function SidebarQaPanel({ paperId }) {
-  const [messages, setMessages] = useState([
-    { role: 'bot', text: '可围绕本篇论文提问' }
-  ]);
+const { Text } = Typography;
 
-  const handleSend = (text) => {
-    setMessages((m) => [...m, { role: 'user', text }]);
-    setTimeout(() => {
-      setMessages((m) => [...m, { role: 'bot', text: mockPaperReply(text, paperId) }]);
-    }, 400);
-  };
+export default function SidebarQaPanel({ messages, onSend, qaStatus }) {
+  return (
+    <div>
+      <Alert
+        type="info"
+        showIcon
+        message="当前为单论文问答"
+        description="回答基于当前论文的结构化内容生成，并展示引用章节与页码。"
+        style={{ marginBottom: 12 }}
+      />
 
-  return <ChatBox messages={messages} onSend={handleSend} minHeight={280} />;
+      <ChatBox
+        messages={messages}
+        onSend={onSend}
+        loading={qaStatus === 'generating'}
+        placeholder="例如：这篇论文的核心创新是什么？"
+        minHeight={320}
+      />
+
+      <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
+        “全部”和“问答”标签共享同一会话，切换标签不会丢失消息。
+      </Text>
+    </div>
+  );
 }

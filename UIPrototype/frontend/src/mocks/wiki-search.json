@@ -1,0 +1,29 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "total": 2,
+    "page": 1,
+    "pageSize": 10,
+    "items": [
+      {
+        "paperId": "bert",
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers",
+        "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+        "primaryCategory": "cs.CL",
+        "matchedFields": ["conceptTags"],
+        "matchedText": ["Transformer Encoder"],
+        "relevanceScore": 0.91
+      },
+      {
+        "paperId": "gpt3",
+        "title": "Language Models are Few-Shot Learners",
+        "authors": ["Tom Brown", "Benjamin Mann", "Nick Ryder"],
+        "primaryCategory": "cs.CL",
+        "matchedFields": ["keywords", "researchDirection"],
+        "matchedText": ["Transformer", "大语言模型"],
+        "relevanceScore": 0.84
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "paperId": "attention",
+    "title": "Attention Is All You Need",
+    "authors": ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar"],
+    "authorDetails": [
+      {
+        "authorId": "author-vaswani",
+        "name": "Ashish Vaswani",
+        "affiliation": "Google Brain"
+      },
+      {
+        "authorId": "author-shazeer",
+        "name": "Noam Shazeer",
+        "affiliation": "Google Brain"
+      },
+      {
+        "authorId": "author-parmar",
+        "name": "Niki Parmar",
+        "affiliation": "Google Research"
+      }
+    ],
+    "primaryCategory": "cs.CL",
+    "categories": ["cs.CL", "cs.LG"],
+    "arxivId": "1706.03762",
+    "doi": "10.48550/arXiv.1706.03762",
+    "publishedAt": "2017-06-12",
+    "updatedAt": "2023-08-02",
+    "abstract": "The paper proposes the Transformer, a sequence transduction model based entirely on attention mechanisms.",
+    "summary": "论文提出 Transformer 架构，使用多头注意力和位置编码完成序列建模。",
+    "keywords": ["Transformer", "Self-Attention", "Encoder-Decoder", "Machine Translation"],
+    "researchDirection": "序列建模 / 神经机器翻译",
+    "conceptTags": ["Multi-Head Attention", "Positional Encoding", "Encoder-Decoder"],
+    "pdfUrl": "https://arxiv.org/pdf/1706.03762",
+    "sourceUrl": "https://arxiv.org/abs/1706.03762",
+    "codeUrl": "https://github.com/tensorflow/tensor2tensor",
+    "parseStatus": "completed",
+    "isFavorite": false
+  }
+}

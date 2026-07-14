@@ -1,23 +1,121 @@
-import { Row, Col, Card, Tabs, Typography, Tag } from 'antd';
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Row,
+  Space,
+  Spin,
+  Tabs,
+  Tag,
+  Typography
+} from 'antd';
+import { FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
-import { useEffect } from 'react';
-import { PAPERS } from '../../data/papers';
 import { useApp } from '../../context/AppContext';
+import {
+  getPaperContent,
+  getPaperDetail,
+  getPaperSummary
+} from '../../services/paperService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 
 const { Title, Paragraph, Text } = Typography;
 
+function getParseStatusLabel(status) {
+  const labels = {
+    pending: '待解析',
+    parsing: '解析中',
+    completed: '已完成',
+    failed: '解析失败'
+  };
+
+  return labels[status] || status || '未知';
+}
+
 export default function PaperDetailPage() {
   const { paperId } = useParams();
-  const paper = PAPERS[paperId];
   const { setCompareForPaper } = useApp();
+
+  const [paper, setPaper] = useState(null);
+  const [content, setContent] = useState(null);
+  const [summaryData, setSummaryData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (paperId) setCompareForPaper(paperId);
   }, [paperId, setCompareForPaper]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPaper() {
+      setLoading(true);
+      setLoadError('');
+      setPaper(null);
+      setContent(null);
+      setSummaryData(null);
+
+      try {
+        const [detail, paperContent, paperSummary] = await Promise.all([
+          getPaperDetail(paperId),
+          getPaperContent(paperId),
+          getPaperSummary(paperId)
+        ]);
+
+        if (cancelled) return;
+
+        setPaper(detail);
+        setContent(paperContent);
+        setSummaryData(paperSummary);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message || '论文加载失败');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPaper();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paperId]);
+
+  if (loading) {
+    return (
+      <Card className="section-card">
+        <div style={{ minHeight: 260, display: 'grid', placeItems: 'center' }}>
+          <Spin tip="正在加载论文详情、原文和智能摘要..." />
+        </div>
+      </Card>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message="论文加载失败"
+        description={loadError}
+      />
+    );
+  }
+
   if (!paper) {
-    return <Card>论文不存在</Card>;
+    return (
+      <Card className="section-card">
+        <Empty description={`论文不存在：${paperId}`} />
+      </Card>
+    );
   }
 
   const mainTabs = [
@@ -25,10 +123,80 @@ export default function PaperDetailPage() {
       key: 'content',
       label: 'a · 论文主体',
       children: (
-        <div className="pdf-placeholder">
-          <Text type="secondary">[ PDF / HTML 原文阅读区 ]</Text>
-          <Paragraph style={{ marginTop: 16 }}>{paper.title}</Paragraph>
-          <Paragraph type="secondary">{paper.summary}</Paragraph>
+        <div>
+          <Title level={4} style={{ marginTop: 0 }}>
+            {paper.title}
+          </Title>
+
+          <Space size={6} wrap style={{ marginBottom: 12 }}>
+            <Tag color="blue">{paper.primaryCategory || paper.tag}</Tag>
+            <Tag>arXiv:{paper.arxivId || paper.arxiv}</Tag>
+            <Tag>{paper.publishedAt || paper.date}</Tag>
+            <Tag color={paper.parseStatus === 'completed' ? 'success' : 'warning'}>
+              解析状态：{getParseStatusLabel(paper.parseStatus)}
+            </Tag>
+          </Space>
+
+          <Paragraph type="secondary">
+            {(paper.authors || []).join?.(', ') || paper.authorsText || paper.authors}
+          </Paragraph>
+
+          {content?.pdfUrl ? (
+            <>
+              <iframe
+                title={`${paper.title} PDF`}
+                src={content.pdfUrl}
+                style={{
+                  width: '100%',
+                  height: '72vh',
+                  minHeight: 560,
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  background: '#ffffff'
+                }}
+              />
+
+              <Space wrap style={{ marginTop: 12 }}>
+                <Button
+                  type="primary"
+                  icon={<FilePdfOutlined />}
+                  href={content.pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  新窗口打开 PDF
+                </Button>
+
+                {content.htmlUrl && (
+                  <Button
+                    icon={<LinkOutlined />}
+                    href={content.htmlUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开 HTML 版本
+                  </Button>
+                )}
+
+                {paper.sourceUrl && (
+                  <Button
+                    icon={<LinkOutlined />}
+                    href={paper.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    查看 arXiv 详情
+                  </Button>
+                )}
+
+                <Text type="secondary">
+                  {content.pageCount ? `共 ${content.pageCount} 页` : '页数待后端解析'}
+                </Text>
+              </Space>
+            </>
+          ) : (
+            <Empty description="当前论文没有可读取的 PDF" />
+          )}
         </div>
       )
     },
@@ -37,12 +205,53 @@ export default function PaperDetailPage() {
       label: 'b · 智能总结',
       children: (
         <div>
-          <Title level={5}>摘要</Title>
-          <Paragraph>{paper.summary}</Paragraph>
+          <Space size={6} wrap style={{ marginBottom: 12 }}>
+            <Tag
+              color={summaryData?.parseStatus === 'completed' ? 'success' : 'warning'}
+            >
+              解析状态：{getParseStatusLabel(summaryData?.parseStatus)}
+            </Tag>
+          </Space>
+
+          <Title level={5}>结构化摘要</Title>
+          <Paragraph>{summaryData?.summary || paper.summary}</Paragraph>
+
           <Title level={5}>核心概念</Title>
-          <Paragraph>{(paper.conceptTags || []).join('、')}</Paragraph>
-          <Title level={5}>方法论</Title>
-          <Paragraph>基于 {paper.direction} 的方法设计与实验验证（原型占位）。</Paragraph>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {(summaryData?.concepts || []).map((concept) => (
+              <Card size="small" key={concept.conceptId}>
+                <Text strong>{concept.name}</Text>
+                <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
+                  {concept.description}
+                </Paragraph>
+              </Card>
+            ))}
+          </Space>
+
+          <Title level={5} style={{ marginTop: 20 }}>
+            方法步骤
+          </Title>
+          <ol style={{ paddingLeft: 22 }}>
+            {(summaryData?.methods || []).map((method) => (
+              <li key={method.order} style={{ marginBottom: 12 }}>
+                <Text strong>{method.title}</Text>
+                <Paragraph style={{ marginBottom: 0 }}>{method.description}</Paragraph>
+              </li>
+            ))}
+          </ol>
+
+          <Title level={5}>局限性</Title>
+          {(summaryData?.limitations || []).length > 0 ? (
+            <ul style={{ paddingLeft: 22 }}>
+              {summaryData.limitations.map((limitation) => (
+                <li key={limitation} style={{ marginBottom: 8 }}>
+                  {limitation}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Text type="secondary">暂无局限性解析结果。</Text>
+          )}
         </div>
       )
     },
@@ -52,10 +261,14 @@ export default function PaperDetailPage() {
       children: (
         <div className="graph-placeholder">
           <Tag>{paper.title.split(':')[0]}</Tag>
-          {(paper.conceptTags || []).map((c) => (
-            <Tag key={c} color="processing" style={{ margin: 8 }}>{c}</Tag>
+          {(paper.conceptTags || []).map((concept) => (
+            <Tag key={concept} color="processing" style={{ margin: 8 }}>
+              {concept}
+            </Tag>
           ))}
-          <Paragraph type="secondary" style={{ marginTop: 16 }}>[ 关联论文与概念关系图谱 ]</Paragraph>
+          <Paragraph type="secondary" style={{ marginTop: 16 }}>
+            知识图谱属于 P1。本轮保留论文节点和核心概念节点，后续接入关系边接口。
+          </Paragraph>
         </div>
       )
     }
