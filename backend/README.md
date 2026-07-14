@@ -60,7 +60,10 @@
 输出中会包含类似：users:(("python",pid=231978,fd=6))
 
 然后运行：
-- kill -TERM <pid>
+
+```bash
+    kill -TERM <pid>
+```
 
 确认端口释放：
 - ss -ltnp | grep ':8000'
