@@ -1,0 +1,43 @@
+from uuid import uuid4
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.api.health import router as health_router
+from app.core.config import Settings, get_settings
+from app.core.database import create_engine_for
+from app.schema.common import ApiResponse
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    app = FastAPI(title="PaperMate Backend API", description="PaperMate 技术原型迭代二后端 API", version=settings.version, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+    app.state.settings = settings
+    app.state.engine = create_engine_for(settings)
+
+    @app.middleware("http")
+    async def request_id_middleware(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        payload = ApiResponse[dict](code="VALIDATION_ERROR", message="请求参数校验失败", data={"errors": exc.errors()}, request_id=request.state.request_id)
+        return JSONResponse(status_code=400, content=payload.model_dump())
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        payload = ApiResponse[dict](code="HTTP_ERROR", message=str(exc.detail), data={}, request_id=request.state.request_id)
+        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+
+    app.include_router(health_router)
+    return app
+
+
+app = create_app()
+
