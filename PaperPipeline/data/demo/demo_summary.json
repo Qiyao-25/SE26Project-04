@@ -1,0 +1,225 @@
+{
+  "generated_at": "2026-07-16T07:40:55.650544+00:00",
+  "mode": "no-key-sample",
+  "papers": 3,
+  "pipeline_ok": 3,
+  "qa_ok": 3,
+  "items": [
+    {
+      "sample": "P1",
+      "arxiv_id": "1706.03762",
+      "pipeline": {
+        "task_id": "tsk_c2b00955b6",
+        "idempotency_key": "17c936400e654dea",
+        "status": "qa_ready",
+        "attempts": 1,
+        "created_at": "2026-07-16T07:40:55.184880+00:00",
+        "updated_at": "2026-07-16T07:40:55.334433+00:00",
+        "input": {
+          "arxiv_id": "1706.03762",
+          "pipeline_ver": "v0",
+          "keyword": null,
+          "force": false
+        },
+        "stage_timings": [
+          {
+            "stage": "fetch",
+            "elapsed_s": 0.057,
+            "status": "ok",
+            "detail": ""
+          },
+          {
+            "stage": "parse",
+            "elapsed_s": 0.0613,
+            "status": "ok",
+            "detail": ""
+          },
+          {
+            "stage": "summarize",
+            "elapsed_s": 0.0303,
+            "status": "ok",
+            "detail": ""
+          }
+        ],
+        "result": {
+          "arxiv_id": "1706.03762",
+          "summary": "[1706.03762] Stub abstract for pipeline skeleton demo.",
+          "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+          "methods": "Methods sketched from 2 chunks.",
+          "pdf_path": "data/samples/1706.03762.pdf",
+          "chunk_count": 2,
+          "meta": {
+            "title": "Stub title for 1706.03762",
+            "authors": [
+              "Demo Author"
+            ]
+          }
+        },
+        "error": null,
+        "local_fallback": true
+      },
+      "qa": {
+        "arxiv_id": "1706.03762",
+        "question": "Multi-Head Attention 的作用？",
+        "ok": true,
+        "answer": "Multi-Head Attention lets the model attend to representation subspaces from different positions in parallel, as described in the cited section.",
+        "citations": [
+          {
+            "chunk_id": "p3_2",
+            "page_no": 3,
+            "section": "introduction"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0027,
+        "retrieval_s": 0.0026
+      }
+    },
+    {
+      "sample": "P2",
+      "arxiv_id": "1810.04805",
+      "pipeline": {
+        "task_id": "tsk_0c87f3b8ca",
+        "idempotency_key": "82b5d84257d2e525",
+        "status": "qa_ready",
+        "attempts": 1,
+        "created_at": "2026-07-16T07:40:55.338433+00:00",
+        "updated_at": "2026-07-16T07:40:55.489487+00:00",
+        "input": {
+          "arxiv_id": "1810.04805",
+          "pipeline_ver": "v0",
+          "keyword": null,
+          "force": false
+        },
+        "stage_timings": [
+          {
+            "stage": "fetch",
+            "elapsed_s": 0.0575,
+            "status": "ok",
+            "detail": ""
+          },
+          {
+            "stage": "parse",
+            "elapsed_s": 0.0613,
+            "status": "ok",
+            "detail": ""
+          },
+          {
+            "stage": "summarize",
+            "elapsed_s": 0.0308,
+            "status": "ok",
+            "detail": ""
+          }
+        ],
+        "result": {
+          "arxiv_id": "1810.04805",
+          "summary": "[1810.04805] Stub abstract for pipeline skeleton demo.",
+          "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+          "methods": "Methods sketched from 2 chunks.",
+          "pdf_path": "data/samples/1810.04805.pdf",
+          "chunk_count": 2,
+          "meta": {
+            "title": "Stub title for 1810.04805",
+            "authors": [
+              "Demo Author"
+            ]
+          }
+        },
+        "error": null,
+        "local_fallback": true
+      },
+      "qa": {
+        "arxiv_id": "1810.04805",
+        "question": "BERT 预训练任务有哪些？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0021,
+        "retrieval_s": 0.0021
+      }
+    },
+    {
+      "sample": "P7",
+      "arxiv_id": "2005.11401",
+      "pipeline": {
+        "task_id": "tsk_6dffdc586b",
+        "idempotency_key": "99ecc4e41954a2a4",
+        "status": "qa_ready",
+        "attempts": 1,
+        "created_at": "2026-07-16T07:40:55.493494+00:00",
+        "updated_at": "2026-07-16T07:40:55.645543+00:00",
+        "input": {
+          "arxiv_id": "2005.11401",
+          "pipeline_ver": "v0",
+          "keyword": null,
+          "force": false
+        },
+        "stage_timings": [
+          {
+            "stage": "fetch",
+            "elapsed_s": 0.0582,
+            "status": "ok",
+            "detail": ""
+          },
+          {
+            "stage": "parse",
+            "elapsed_s": 0.0612,
+            "status": "ok",
+            "detail": ""
+          },
+          {
+            "stage": "summarize",
+            "elapsed_s": 0.0317,
+            "status": "ok",
+            "detail": ""
+          }
+        ],
+        "result": {
+          "arxiv_id": "2005.11401",
+          "summary": "[2005.11401] Stub abstract for pipeline skeleton demo.",
+          "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+          "methods": "Methods sketched from 2 chunks.",
+          "pdf_path": "data/samples/2005.11401.pdf",
+          "chunk_count": 2,
+          "meta": {
+            "title": "Stub title for 2005.11401",
+            "authors": [
+              "Demo Author"
+            ]
+          }
+        },
+        "error": null,
+        "local_fallback": true
+      },
+      "qa": {
+        "arxiv_id": "2005.11401",
+        "question": "RAG 结合哪两类能力？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.002,
+        "retrieval_s": 0.002
+      }
+    }
+  ]
+}

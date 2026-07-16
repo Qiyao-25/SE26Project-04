@@ -1,0 +1,72 @@
+{
+  "sample": "P2",
+  "arxiv_id": "1810.04805",
+  "pipeline": {
+    "task_id": "tsk_0c87f3b8ca",
+    "idempotency_key": "82b5d84257d2e525",
+    "status": "qa_ready",
+    "attempts": 1,
+    "created_at": "2026-07-16T07:40:55.338433+00:00",
+    "updated_at": "2026-07-16T07:40:55.489487+00:00",
+    "input": {
+      "arxiv_id": "1810.04805",
+      "pipeline_ver": "v0",
+      "keyword": null,
+      "force": false
+    },
+    "stage_timings": [
+      {
+        "stage": "fetch",
+        "elapsed_s": 0.0575,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "parse",
+        "elapsed_s": 0.0613,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "summarize",
+        "elapsed_s": 0.0308,
+        "status": "ok",
+        "detail": ""
+      }
+    ],
+    "result": {
+      "arxiv_id": "1810.04805",
+      "summary": "[1810.04805] Stub abstract for pipeline skeleton demo.",
+      "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+      "methods": "Methods sketched from 2 chunks.",
+      "pdf_path": "data/samples/1810.04805.pdf",
+      "chunk_count": 2,
+      "meta": {
+        "title": "Stub title for 1810.04805",
+        "authors": [
+          "Demo Author"
+        ]
+      }
+    },
+    "error": null,
+    "local_fallback": true
+  },
+  "qa": {
+    "arxiv_id": "1810.04805",
+    "question": "BERT 预训练任务有哪些？",
+    "ok": true,
+    "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
+    "citations": [
+      {
+        "chunk_id": "p1_0",
+        "page_no": 1,
+        "section": "body"
+      }
+    ],
+    "rejected": false,
+    "error": null,
+    "mode": "sample",
+    "elapsed_s": 0.0021,
+    "retrieval_s": 0.0021
+  }
+}

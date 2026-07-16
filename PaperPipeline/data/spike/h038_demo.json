@@ -1,0 +1,127 @@
+{
+  "ok_task": {
+    "task_id": "tsk_5933efee22",
+    "idempotency_key": "17c936400e654dea",
+    "status": "qa_ready",
+    "attempts": 1,
+    "created_at": "2026-07-15T02:51:01.914908+00:00",
+    "updated_at": "2026-07-15T02:51:02.062295+00:00",
+    "input": {
+      "arxiv_id": "1706.03762",
+      "pipeline_ver": "v0",
+      "keyword": null,
+      "force": false
+    },
+    "stage_timings": [
+      {
+        "stage": "fetch",
+        "elapsed_s": 0.0543,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "parse",
+        "elapsed_s": 0.061,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "summarize",
+        "elapsed_s": 0.0308,
+        "status": "ok",
+        "detail": ""
+      }
+    ],
+    "result": {
+      "arxiv_id": "1706.03762",
+      "summary": "[1706.03762] Stub abstract for pipeline skeleton demo.",
+      "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+      "methods": "Methods sketched from 2 chunks.",
+      "pdf_path": "data/samples/1706.03762.pdf",
+      "chunk_count": 2,
+      "meta": {
+        "title": "Stub title for 1706.03762",
+        "authors": [
+          "Demo Author"
+        ]
+      }
+    },
+    "error": null,
+    "local_fallback": true
+  },
+  "fail_task": {
+    "task_id": "tsk_76557c35d0",
+    "idempotency_key": "ae5160a3cbed9e5e",
+    "status": "fetch_failed",
+    "attempts": 1,
+    "created_at": "2026-07-15T02:51:01.914908+00:00",
+    "updated_at": "2026-07-15T02:51:02.124294+00:00",
+    "input": {
+      "arxiv_id": "9999.99999",
+      "pipeline_ver": "v0",
+      "keyword": null,
+      "force": false
+    },
+    "stage_timings": [
+      {
+        "stage": "fetch",
+        "elapsed_s": 0.0614,
+        "status": "failed",
+        "detail": "fetch_failed: invalid or unavailable id"
+      }
+    ],
+    "result": null,
+    "error": "fetch_failed: invalid or unavailable id",
+    "local_fallback": false
+  },
+  "idempotent": {
+    "task_id": "tsk_5933efee22",
+    "idempotency_key": "17c936400e654dea",
+    "status": "qa_ready",
+    "attempts": 1,
+    "created_at": "2026-07-15T02:51:01.914908+00:00",
+    "updated_at": "2026-07-15T02:51:02.062295+00:00",
+    "input": {
+      "arxiv_id": "1706.03762",
+      "pipeline_ver": "v0",
+      "keyword": null,
+      "force": false
+    },
+    "stage_timings": [
+      {
+        "stage": "fetch",
+        "elapsed_s": 0.0543,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "parse",
+        "elapsed_s": 0.061,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "summarize",
+        "elapsed_s": 0.0308,
+        "status": "ok",
+        "detail": ""
+      }
+    ],
+    "result": {
+      "arxiv_id": "1706.03762",
+      "summary": "[1706.03762] Stub abstract for pipeline skeleton demo.",
+      "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+      "methods": "Methods sketched from 2 chunks.",
+      "pdf_path": "data/samples/1706.03762.pdf",
+      "chunk_count": 2,
+      "meta": {
+        "title": "Stub title for 1706.03762",
+        "authors": [
+          "Demo Author"
+        ]
+      }
+    },
+    "error": null,
+    "local_fallback": true
+  }
+}
