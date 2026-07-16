@@ -154,3 +154,17 @@ python -m pytest --capture=no
     harness         固定命令、场景编排和验收输出
 
 Harness 只编排和验证，不复制 service 业务规则；后续论文导入、解析和检索都应沿用这一边界。
+
+## 6. 前端联调接口
+
+后端现在提供固定样例论文的 HTTP API，供 React 前端在 `VITE_USE_MOCK=false` 时调用：
+
+```text
+POST /api/papers/search
+GET  /api/papers/{paper_id}
+GET  /api/papers/{paper_id}/content
+GET  /api/papers/{paper_id}/summary
+POST /api/papers/{paper_id}/qa
+```
+
+启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。当前 repository 使用固定样例数据，后续可替换为 SQLAlchemy 数据库查询而不改变前端接口。

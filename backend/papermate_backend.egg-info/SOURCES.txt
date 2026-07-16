@@ -1,9 +1,11 @@
 README.md
 pyproject.toml
 app/__init__.py
+app/data.py
 app/main.py
 app/api/__init__.py
 app/api/health.py
+app/api/papers.py
 app/core/__init__.py
 app/core/config.py
 app/core/database.py
@@ -12,10 +14,15 @@ app/model/base.py
 app/model/entities.py
 app/repository/__init__.py
 app/repository/health.py
+app/repository/paper.py
 app/schema/__init__.py
 app/schema/common.py
+app/schema/paper.py
+app/schema/qa.py
 app/service/__init__.py
 app/service/health.py
+app/service/paper.py
+app/service/qa.py
 harness/__init__.py
 harness/__main__.py
 papermate_backend.egg-info/PKG-INFO
@@ -25,3 +32,4 @@ papermate_backend.egg-info/requires.txt
 papermate_backend.egg-info/top_level.txt
 tests/test_health.py
 tests/test_orm.py
+tests/test_papers_api.py

@@ -1,3 +1,5 @@
+import apiClient from './apiClient';
+import { USE_MOCK } from './runtimeConfig';
 import { PAPERS, PAPER_LIST } from '../data/papers';
 import detailMock from '../mocks/paper-detail.json';
 import contentMock from '../mocks/paper-content.json';
@@ -57,7 +59,7 @@ function createCompatibleDetail(paper) {
   };
 }
 
-export async function searchPapers({
+async function searchMockPapers({
   query = '',
   searchType = 'keyword',
   categories = [],
@@ -67,13 +69,11 @@ export async function searchPapers({
 } = {}) {
   const startedAt = performance.now();
   await delay();
-
   const normalizedQuery = query.trim().toLowerCase();
 
   let items = PAPER_LIST.map(toPaperListItem).filter((paper) => {
     const matchesCategory =
       categories.length === 0 || categories.includes(paper.primaryCategory);
-
     if (!matchesCategory) return false;
     if (!normalizedQuery) return true;
 
@@ -86,9 +86,7 @@ export async function searchPapers({
       ...paper.authors,
       ...paper.keywords,
       ...paper.conceptTags
-    ]
-      .join(' ')
-      .toLowerCase();
+    ].join(' ').toLowerCase();
 
     return searchableText.includes(normalizedQuery);
   });
@@ -98,14 +96,12 @@ export async function searchPapers({
   }
 
   const start = (page - 1) * pageSize;
-  const total = items.length;
-
   return {
-    searchId: `search-${Date.now()}`,
+    searchId: `mock-search-${Date.now()}`,
     query,
     searchType,
     sortBy,
-    total,
+    total: items.length,
     page,
     pageSize,
     searchTimeMs: Math.max(1, Math.round(performance.now() - startedAt)),
@@ -113,27 +109,20 @@ export async function searchPapers({
   };
 }
 
-export async function getPaperDetail(paperId) {
+async function getMockPaperDetail(paperId) {
   await delay(150);
-
   if (paperId === detailMock.data.paperId) {
     return createCompatibleDetail(detailMock.data);
   }
-
   const paper = PAPERS[paperId];
   return paper ? createCompatibleDetail(paper) : null;
 }
 
-export async function getPaperContent(paperId) {
+async function getMockPaperContent(paperId) {
   await delay(150);
-
-  if (paperId === contentMock.data.paperId) {
-    return contentMock.data;
-  }
-
-  const detail = await getPaperDetail(paperId);
+  if (paperId === contentMock.data.paperId) return contentMock.data;
+  const detail = await getMockPaperDetail(paperId);
   if (!detail) return null;
-
   return {
     paperId,
     contentType: 'pdf',
@@ -145,16 +134,11 @@ export async function getPaperContent(paperId) {
   };
 }
 
-export async function getPaperSummary(paperId) {
+async function getMockPaperSummary(paperId) {
   await delay(150);
-
-  if (paperId === summaryMock.data.paperId) {
-    return summaryMock.data;
-  }
-
+  if (paperId === summaryMock.data.paperId) return summaryMock.data;
   const paper = PAPERS[paperId];
   if (!paper) return null;
-
   return {
     paperId,
     parseStatus: paper.parseStatus || 'completed',
@@ -165,22 +149,36 @@ export async function getPaperSummary(paperId) {
       description: `${name} 是该论文结构化解析得到的核心概念。`
     })),
     methods: [
-      {
-        order: 1,
-        title: '研究问题定义',
-        description: `围绕“${paper.direction}”方向明确研究问题与任务目标。`
-      },
-      {
-        order: 2,
-        title: '模型与方法设计',
-        description: '分析论文提出的模型结构、训练方式和关键技术模块。'
-      },
-      {
-        order: 3,
-        title: '实验验证',
-        description: '使用实验结果和评价指标验证所提方法的有效性。'
-      }
+      { order: 1, title: '研究问题定义', description: `围绕“${paper.direction}”方向明确研究问题与任务目标。` },
+      { order: 2, title: '模型与方法设计', description: '分析论文提出的模型结构、训练方式和关键技术模块。' },
+      { order: 3, title: '实验验证', description: '使用实验结果和评价指标验证所提方法的有效性。' }
     ],
-    limitations: ['当前为前端 Mock 解析结果，完整局限性将在后端解析接口接入后返回。']
+    limitations: ['当前为前端 Mock 解析结果，可通过 VITE_USE_MOCK=false 切换到后端接口。']
   };
+}
+
+export async function searchPapers(params = {}) {
+  if (USE_MOCK) return searchMockPapers(params);
+  const data = await apiClient.post('/papers/search', params);
+  return { ...data, items: (data.items || []).map(toPaperListItem) };
+}
+
+export async function getPaperDetail(paperId) {
+  if (USE_MOCK) return getMockPaperDetail(paperId);
+  try {
+    return createCompatibleDetail(await apiClient.get(`/papers/${paperId}`));
+  } catch (error) {
+    if (error.message.includes('论文不存在')) return null;
+    throw error;
+  }
+}
+
+export async function getPaperContent(paperId) {
+  if (USE_MOCK) return getMockPaperContent(paperId);
+  return apiClient.get(`/papers/${paperId}/content`);
+}
+
+export async function getPaperSummary(paperId) {
+  if (USE_MOCK) return getMockPaperSummary(paperId);
+  return apiClient.get(`/papers/${paperId}/summary`);
 }
