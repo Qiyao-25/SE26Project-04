@@ -18,6 +18,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="PaperMate Backend API", description="PaperMate 技术原型迭代二后端 API", version=settings.version, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
     app.state.settings = settings
     app.state.engine = create_engine_for(settings)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -50,3 +51,4 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 app = create_app()
+

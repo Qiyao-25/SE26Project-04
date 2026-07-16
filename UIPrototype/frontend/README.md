@@ -18,8 +18,6 @@ npm run dev
 
 浏览器访问终端提示的本地地址（默认 `http://localhost:5173`）。
 
-默认请求本地后端 `http://127.0.0.1:8000`。只演示前端原型时，可在 `.env.local` 设置 `VITE_USE_MOCK=true`；联调时保持默认值，先启动后端并执行 `python -m scripts.seed`。
-
 ## 工程分层
 
 ```
@@ -78,12 +76,10 @@ Copy-Item .env.example .env.development
 2. 默认 `VITE_USE_MOCK=false`，前端会请求 FastAPI：
 
 ```text
-GET  /api/papers?keyword=attention&page=1&page_size=12
-POST /api/papers/batch
+POST /api/papers/search
 GET  /api/papers/{paperId}
 GET  /api/papers/{paperId}/content
 GET  /api/papers/{paperId}/summary
-GET  /api/papers/{paperId}/wiki
 POST /api/papers/{paperId}/qa
 ```
 

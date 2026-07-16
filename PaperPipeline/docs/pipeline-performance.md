@@ -1,6 +1,6 @@
 # PaperMate 管线性能报告（H087/H088）
 
-> 生成方式：`python test/pipeline/run_benchmark.py` + `python test/pipeline/run_full_demo.py`
+> 生成方式：`python test/pipeline/run_benchmark.py` + `python test/pipeline/run_full_demo.py`  
 > 模式：**无 Key 样例模式**（本地检索 + 规则摘要，不调用付费 LLM）
 
 ## 1. 测试环境

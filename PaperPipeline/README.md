@@ -1,6 +1,6 @@
 # PaperPipeline — 论文处理流水线（成员 D）
 
-对应项目交付：**arXiv 抓取 → PDF 解析 → 结构化 Wiki → 出处问答**。
+对应项目交付：**arXiv 抓取 → PDF 解析 → 结构化 Wiki → 出处问答**。  
 对齐 `backend` ORM 与 `UIPrototype` mock 契约。
 
 > 原名 `PartD` / `Arxiv` 已按功能更名为 **PaperPipeline**（与 `backend`、`UIPrototype` 并列）。
