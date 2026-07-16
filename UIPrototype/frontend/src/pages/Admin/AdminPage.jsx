@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Card, Tabs, Row, Col, Statistic, List, Tag, Table, Progress, Select, Button,
-  Input, Modal, Typography, message, Alert
+  Input, Modal, Typography, message
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -226,7 +226,6 @@ export default function AdminPage() {
 
   return (
     <div>
-      <Alert message="管理员专用 · 系统管理端" description="正式环境仅管理员账户可见" type="info" showIcon style={{ marginBottom: 16 }} />
       <Card className="section-card"><Tabs activeKey={tab} onChange={setTab} items={items} /></Card>
     </div>
   );

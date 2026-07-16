@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     database_url: str = "sqlite:///./data/dev.db"
     echo_sql: bool = False
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -20,6 +21,10 @@ class Settings(BaseSettings):
     @property
     def is_test(self) -> bool:
         return self.environment == "test"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
 
 @lru_cache

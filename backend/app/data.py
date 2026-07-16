@@ -1,0 +1,178 @@
+"""PaperMate 技术原型固定样例数据。
+
+这一层是后端的可重复演示数据源，不等同于前端 Mock。
+前端关闭 VITE_USE_MOCK 后，会通过 HTTP 调用这些后端接口。
+后续接入数据库时，可保持 API/schema/service 不变，仅替换 repository 实现。
+"""
+
+PAPERS = {
+    "attention": {
+        "paperId": "attention",
+        "title": "Attention Is All You Need",
+        "authors": ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit"],
+        "primaryCategory": "cs.CL",
+        "categories": ["cs.CL", "cs.LG"],
+        "arxivId": "1706.03762",
+        "doi": "10.48550/arXiv.1706.03762",
+        "publishedAt": "2017-06-12",
+        "updatedAt": "2023-08-02",
+        "abstract": "The Transformer is a sequence transduction model based entirely on attention mechanisms.",
+        "summary": "提出 Transformer 架构，完全基于注意力机制，在机器翻译任务中取得优秀效果。",
+        "keywords": ["Transformer", "Self-Attention", "Machine Translation", "Seq2Seq"],
+        "researchDirection": "序列建模 / 神经机器翻译",
+        "conceptTags": ["Multi-Head Attention", "Positional Encoding", "Encoder-Decoder"],
+        "pdfUrl": "https://arxiv.org/pdf/1706.03762",
+        "sourceUrl": "https://arxiv.org/abs/1706.03762",
+        "codeUrl": "https://github.com/tensorflow/tensor2tensor",
+        "parseStatus": "completed",
+        "isFavorite": False,
+    },
+    "bert": {
+        "paperId": "bert",
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers",
+        "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+        "primaryCategory": "cs.CL",
+        "categories": ["cs.CL"],
+        "arxivId": "1810.04805",
+        "doi": "10.48550/arXiv.1810.04805",
+        "publishedAt": "2018-10-11",
+        "updatedAt": "2019-05-24",
+        "abstract": "BERT introduces deep bidirectional pre-training for language understanding.",
+        "summary": "双向预训练语言表示模型，奠定预训练—微调范式。",
+        "keywords": ["BERT", "Pre-training", "Bidirectional", "NLU"],
+        "researchDirection": "预训练语言模型 / NLP",
+        "conceptTags": ["Masked LM", "Pre-training", "Fine-tuning"],
+        "pdfUrl": "https://arxiv.org/pdf/1810.04805",
+        "sourceUrl": "https://arxiv.org/abs/1810.04805",
+        "codeUrl": "https://github.com/google-research/bert",
+        "parseStatus": "completed",
+        "isFavorite": True,
+    },
+    "gpt3": {
+        "paperId": "gpt3",
+        "title": "Language Models are Few-Shot Learners",
+        "authors": ["Tom Brown", "Benjamin Mann", "Nick Ryder"],
+        "primaryCategory": "cs.CL",
+        "categories": ["cs.CL", "cs.LG"],
+        "arxivId": "2005.14165",
+        "doi": "10.48550/arXiv.2005.14165",
+        "publishedAt": "2020-05-28",
+        "updatedAt": "2020-07-22",
+        "abstract": "Large autoregressive language models demonstrate strong few-shot performance.",
+        "summary": "规模化语言模型展示少样本学习能力与涌现特性。",
+        "keywords": ["GPT-3", "Few-Shot", "In-Context Learning", "Scaling"],
+        "researchDirection": "大语言模型 / 生成式 AI",
+        "conceptTags": ["Emergent Ability", "In-Context Learning", "Autoregressive LM"],
+        "pdfUrl": "https://arxiv.org/pdf/2005.14165",
+        "sourceUrl": "https://arxiv.org/abs/2005.14165",
+        "codeUrl": None,
+        "parseStatus": "completed",
+        "isFavorite": False,
+    },
+    "lora": {
+        "paperId": "lora",
+        "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+        "authors": ["Edward Hu", "Yelong Shen", "Phillip Wallis"],
+        "primaryCategory": "cs.CL",
+        "categories": ["cs.CL", "cs.LG"],
+        "arxivId": "2106.09685",
+        "doi": "10.48550/arXiv.2106.09685",
+        "publishedAt": "2021-06-17",
+        "updatedAt": "2021-10-16",
+        "abstract": "LoRA injects trainable low-rank matrices into Transformer layers.",
+        "summary": "低秩适配实现参数高效微调，适用于大模型。",
+        "keywords": ["LoRA", "PEFT", "Fine-tuning", "Low-Rank"],
+        "researchDirection": "参数高效微调 / 大模型适配",
+        "conceptTags": ["Low-Rank Adaptation", "PEFT", "Adapter"],
+        "pdfUrl": "https://arxiv.org/pdf/2106.09685",
+        "sourceUrl": "https://arxiv.org/abs/2106.09685",
+        "codeUrl": "https://github.com/microsoft/LoRA",
+        "parseStatus": "completed",
+        "isFavorite": False,
+    },
+    "rag": {
+        "paperId": "rag",
+        "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+        "authors": ["Patrick Lewis", "Ethan Perez", "Aleksandra Piktus"],
+        "primaryCategory": "cs.CL",
+        "categories": ["cs.CL"],
+        "arxivId": "2005.11401",
+        "doi": "10.48550/arXiv.2005.11401",
+        "publishedAt": "2020-05-22",
+        "updatedAt": "2021-04-12",
+        "abstract": "RAG combines parametric generation with non-parametric retrieval.",
+        "summary": "检索增强生成架构，结合外部知识库提升知识密集型任务质量。",
+        "keywords": ["RAG", "Retrieval", "Knowledge-Intensive", "QA"],
+        "researchDirection": "检索增强生成 / 知识密集型 NLP",
+        "conceptTags": ["Retrieval-Augmented Generation", "Dense Passage Retrieval", "Knowledge Base"],
+        "pdfUrl": "https://arxiv.org/pdf/2005.11401",
+        "sourceUrl": "https://arxiv.org/abs/2005.11401",
+        "codeUrl": None,
+        "parseStatus": "completed",
+        "isFavorite": False,
+    },
+    "vlm": {
+        "paperId": "vlm",
+        "title": "Vision-Language Models for Scientific Document Understanding",
+        "authors": ["Li", "Zhang", "Wang"],
+        "primaryCategory": "cs.CV",
+        "categories": ["cs.CV", "cs.CL"],
+        "arxivId": "2607.01001",
+        "doi": None,
+        "publishedAt": "2026-07-07",
+        "updatedAt": "2026-07-07",
+        "abstract": "A prototype sample for multimodal scientific document understanding.",
+        "summary": "多模态模型用于科学文档解析与理解。",
+        "keywords": ["VLM", "Multimodal", "Scientific Document", "OCR"],
+        "researchDirection": "多模态理解 / 科学文献解析",
+        "conceptTags": ["Vision-Language Model", "Document Understanding", "Multimodal Fusion"],
+        "pdfUrl": "https://arxiv.org/pdf/2607.01001",
+        "sourceUrl": "https://arxiv.org/abs/2607.01001",
+        "codeUrl": None,
+        "parseStatus": "completed",
+        "isFavorite": False,
+    },
+}
+
+PAPER_CONTENT = {
+    paper_id: {
+        "paperId": paper_id,
+        "contentType": "pdf",
+        "pdfUrl": paper["pdfUrl"],
+        "htmlUrl": f"https://ar5iv.labs.arxiv.org/html/{paper['arxivId']}",
+        "pageCount": 15 if paper_id == "attention" else None,
+        "defaultPage": 1,
+        "sections": [
+            {"sectionId": "abstract", "title": "Abstract", "pageStart": 1, "pageEnd": 1},
+            {"sectionId": "introduction", "title": "Introduction", "pageStart": 1, "pageEnd": 2},
+            {"sectionId": "methods", "title": "Method", "pageStart": 3, "pageEnd": 7},
+        ],
+    }
+    for paper_id, paper in PAPERS.items()
+}
+
+PAPER_SUMMARIES = {
+    paper_id: {
+        "paperId": paper_id,
+        "parseStatus": paper["parseStatus"],
+        "summary": paper["summary"],
+        "concepts": [
+            {
+                "conceptId": f"{paper_id}-concept-{index}",
+                "name": concept,
+                "description": f"{concept} 是《{paper['title']}》中的核心概念。",
+            }
+            for index, concept in enumerate(paper["conceptTags"], start=1)
+        ],
+        "methods": [
+            {"order": 1, "title": "问题定义", "description": f"围绕“{paper['researchDirection']}”明确研究目标。"},
+            {"order": 2, "title": "方法设计", "description": "构建模型结构并说明关键模块、训练方式与实现流程。"},
+            {"order": 3, "title": "实验验证", "description": "通过基准数据集和评价指标验证方法有效性。"},
+        ],
+        "limitations": [
+            "当前后端返回固定样例解析结果，后续可替换为真实解析 Agent 输出。",
+            "引用页码和章节仍需由 PDF 解析流水线进一步校准。",
+        ],
+    }
+    for paper_id, paper in PAPERS.items()
+}
