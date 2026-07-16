@@ -1,4 +1,5 @@
 import { PAPERS, PAPER_LIST } from '../data/papers';
+import { isApiEnabled, requestApi } from './apiClient';
 import detailMock from '../mocks/paper-detail.json';
 import contentMock from '../mocks/paper-content.json';
 import summaryMock from '../mocks/paper-summary.json';
@@ -20,17 +21,17 @@ function normalizeAuthors(authors) {
 
 function toPaperListItem(paper) {
   return {
-    paperId: paper.paperId || paper.id,
+    paperId: paper.paperId || paper.paper_id || paper.id,
     title: paper.title,
     authors: normalizeAuthors(paper.authors),
-    primaryCategory: paper.primaryCategory || paper.tag || '未分类',
-    arxivId: paper.arxivId || paper.arxiv || '',
-    publishedAt: paper.publishedAt || paper.date || '',
+    primaryCategory: paper.primaryCategory || paper.primary_category || paper.tag || '未分类',
+    arxivId: paper.arxivId || paper.arxiv_id || paper.arxiv || '',
+    publishedAt: paper.publishedAt || paper.published_at || paper.date || '',
     summary: paper.summary || paper.abstract || '',
     keywords: paper.keywords || [],
     researchDirection: paper.researchDirection || paper.direction || '',
     conceptTags: paper.conceptTags || [],
-    parseStatus: paper.parseStatus || 'completed',
+    parseStatus: paper.parseStatus || paper.parse_status || 'completed',
     isFavorite: Boolean(paper.isFavorite)
   };
 }
@@ -57,7 +58,7 @@ function createCompatibleDetail(paper) {
   };
 }
 
-export async function searchPapers({
+async function searchPapersMock({
   query = '',
   searchType = 'keyword',
   categories = [],
@@ -113,7 +114,39 @@ export async function searchPapers({
   };
 }
 
+export async function searchPapers(options = {}) {
+  if (!isApiEnabled()) return searchPapersMock(options);
+
+  const { query = '', categories = [], page = 1, pageSize = 12 } = options;
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (query.trim()) params.set('keyword', query.trim());
+  if (categories[0]) params.set('category', categories[0]);
+  const data = await requestApi(`/papers?${params.toString()}`);
+  return {
+    searchId: `search-${Date.now()}`,
+    query,
+    total: data.total,
+    page: data.page,
+    pageSize: data.page_size,
+    searchTimeMs: 0,
+    items: data.items.map(toPaperListItem)
+  };
+}
+
 export async function getPaperDetail(paperId) {
+  if (isApiEnabled() && /^\d+$/.test(String(paperId))) {
+    const data = await requestApi(`/papers/${paperId}`);
+    return createCompatibleDetail({
+      ...data,
+      paperId: data.paper_id,
+      primaryCategory: data.primary_category,
+      arxivId: data.arxiv_id,
+      publishedAt: data.published_at,
+      parseStatus: data.parse_status,
+      pdfUrl: data.pdf_url,
+      sourceUrl: data.source_url
+    });
+  }
   await delay(150);
 
   if (paperId === detailMock.data.paperId) {
@@ -125,6 +158,11 @@ export async function getPaperDetail(paperId) {
 }
 
 export async function getPaperContent(paperId) {
+  if (isApiEnabled() && /^\d+$/.test(String(paperId))) {
+    const detail = await getPaperDetail(paperId);
+    if (!detail) return null;
+    return { paperId: detail.paperId, contentType: 'pdf', pdfUrl: detail.pdfUrl, htmlUrl: null, pageCount: null, defaultPage: 1, sections: [] };
+  }
   await delay(150);
 
   if (paperId === contentMock.data.paperId) {
@@ -146,6 +184,10 @@ export async function getPaperContent(paperId) {
 }
 
 export async function getPaperSummary(paperId) {
+  if (isApiEnabled() && /^\d+$/.test(String(paperId))) {
+    const data = await requestApi(`/papers/${paperId}/wiki`);
+    return { ...data, paperId: data.paper_id, parseStatus: data.parse_status };
+  }
   await delay(150);
 
   if (paperId === summaryMock.data.paperId) {

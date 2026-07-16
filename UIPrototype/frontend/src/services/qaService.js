@@ -1,5 +1,6 @@
 import qaMock from '../mocks/paper-qa.json';
 import { PAPERS } from '../data/papers';
+import { isApiEnabled, requestApi } from './apiClient';
 
 const delay = (ms = 500) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -9,6 +10,18 @@ export async function askPaper({
   question,
   history = []
 }) {
+  if (isApiEnabled() && /^\d+$/.test(String(paperId))) {
+    const data = await requestApi(`/papers/${paperId}/qa`, {
+      method: 'POST',
+      body: JSON.stringify({ question, history })
+    });
+    return {
+      ...data,
+      conversationId: data.conversation_id,
+      messageId: data.message_id,
+      createdAt: data.created_at
+    };
+  }
   await delay();
 
   const normalizedQuestion = question?.trim();

@@ -3,9 +3,11 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
+from app.api.papers import router as papers_router
 from app.core.config import Settings, get_settings
 from app.core.database import create_engine_for
 from app.schema.common import ApiResponse
@@ -16,6 +18,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="PaperMate Backend API", description="PaperMate 技术原型迭代二后端 API", version=settings.version, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
     app.state.settings = settings
     app.state.engine = create_engine_for(settings)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
@@ -36,8 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
 
     app.include_router(health_router)
+    app.include_router(papers_router)
     return app
 
 
 app = create_app()
-
