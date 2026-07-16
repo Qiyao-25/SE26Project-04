@@ -3,111 +3,107 @@
 | 项 | 内容 |
 |----|------|
 | 任务 | **H017**（上午）+ **H018**（下午） |
-| 日期 | 2026-07-15 |
+| 日期 | 2026-07-15（**2026-07-16 按 backend ORM 修订**） |
 | 负责人 | 成员 D |
-| 脚本 | `SE26Project-04/Arxiv/scripts/spike_one_paper.py` |
+| 脚本 | `Arxiv/scripts/spike_one_paper.py` |
 | 依赖 | `pypdf`（见 `requirements-spike.txt`） |
+| Backend | `SE26Project-04/backend/app/model/entities.py`（H015/H016 骨架） |
 | 样例 | **P1** `1706.03762`（Attention Is All You Need） |
-| 同步源 | `ppp/TechPrototype/`（2026-07-14 同步） |
+| 同步 | 自 `ppp/TechPrototype` · 2026-07-16 backend 对齐 |
+
+---
+
+## 0. 与 backend 对齐（本次修订）
+
+Spike **仍独立跑 arXiv**（不调用 FastAPI）；输出增加 `backend_paper` / `backend_upsert`，字段对齐 ORM。
+
+| Spike 字段 | Backend ORM |
+|------------|-------------|
+| `paper.arxiv_id`（去版本后缀） | `Paper.arxiv_id` |
+| `title` / `abstract` / `categories[0]` | `Paper.title` / `abstract` / `primary_category` |
+| `pdf_url` / abs | `Paper.pdf_url` / `source_url` |
+| `authors[]` | `Author` + `PaperAuthor.author_order` |
+| `pdf_path` | `PaperContent.storage_path` |
+| `structured.{summary,concept,methods}` | `StructuredResult.content_json`（`result_type=wiki_triple`） |
+| 管线 run | `ParseTask`（`full_pipeline` + `idempotency_key`） |
+
+**当前 backend 仅** `GET /health`；入库路由待 C（H045+）。
 
 ---
 
 ## 1. 可复现命令
 
-在 `SE26Project-04/Arxiv/` 目录执行：
+在 `SE26Project-04/Arxiv/`：
 
 ```powershell
-# 安装依赖（一次性）
 pip install -r requirements-spike.txt
-
-# H017：按关键词抓取 1 篇元数据
 $env:PYTHONIOENCODING='utf-8'
 python scripts/spike_one_paper.py fetch --keyword "attention is all you need"
-
-# H018：P1 全链路（抓取 → 下载 PDF → 解析 → 摘要）
 python scripts/spike_one_paper.py pipeline --arxiv-id 1706.03762
 ```
 
-**产物路径**（本目录）：
-
 | 类型 | 路径 |
 |------|------|
-| H017 原始输出 | `data/h017_fetch.json` |
-| H018 原始输出 | `data/h018_pipeline.json` |
-| 运行归档 | `data/runs/run_20260714T070727Z.json`（首次含下载耗时） |
-| PDF | `data/pdfs/1706.03762v7.pdf`（亦有 `PDF/` 样例存档） |
+| H017 | `data/h017_fetch.json` |
+| H018 | `data/h018_pipeline.json` |
+| 归档 | `data/runs/run_*.json`（含 `run_20260716T030426Z.json`） |
 
 ---
 
-## 2. H017 结果（关键词抓取）
+## 2. H017 结果
 
 | 项 | 值 |
 |----|-----|
 | 关键词 | `attention is all you need` |
-| 耗时 | **1.62s**（元数据 API） |
+| 耗时 | **1.62s** |
 | 状态 | `ok` |
-| 返回字段 | arxiv_id、title、authors、abstract、categories、pdf_url、abs_url |
+| Spike 字段 | arxiv_id、title、authors、abstract、categories、pdf_url、abs_url |
+| Backend 映射 | 输出含 `backend_paper`（`ingest_status=metadata_only` 等） |
 
-> 关键词检索命中首条为 `2105.02723v1`（与 P1 不同属正常）。H018 贯通使用冻结样例 **P1** 固定 ID，避免样例漂移。
+> 关键词首条可能非 P1；H018 用冻结 ID `1706.03762`。
 
 ---
 
-## 3. H018 结果（P1 全链路）
+## 3. H018 结果（P1）
 
-**论文**：Attention Is All You Need · `1706.03762v7` · 15 页 · 正文 **39,611** 字符
-
-### 3.1 各阶段耗时（首次冷启动 run）
-
-| 阶段 | 耗时 | 阈值 | 状态 | 说明 |
-|------|------|------|------|------|
-| fetch_metadata | 2.12s | ≤10s | `ok` | arXiv Atom API |
-| download_pdf | **28.40s** | ≤60s | `ok` | 约 2.1MB PDF |
-| parse_pdf | 2.17s | ≤90s | `ok` | pypdf 全文提取 |
-| summarize | &lt;0.01s | ≤60s | `ok` | 抽取式摘要（无 LLM Key） |
-| **端到端** | **~32.7s** | — | `summarized` | 四阶段全部通过 |
-
-### 3.2 结构化输出（三件套）
-
-| 字段 | 非空 | 说明 |
+| 阶段 | 耗时 | 状态 |
 |------|------|------|
-| `summary` | ✅ | 以 abstract + 引言高分句拼接 |
-| `concept` | ✅ | 含 Transformer / Self-attention / Multi-Head 要点 |
-| `methods` | ✅ | 从正文 methods/architecture 段抽取 |
+| fetch_metadata | 2.12s | ok |
+| download_pdf | 28.40s | ok |
+| parse_pdf | 2.17s | ok |
+| summarize | &lt;0.01s | ok |
+| **端到端** | **~32.7s** | `summarized` → 映射 `ParseTask.status=succeeded` |
 
-完整 JSON 见 `data/runs/run_20260714T070727Z.json` 的 `structured` 字段。
+三件套非空 → `StructuredResult.content_json`。产物含 `backend_upsert`。
 
-### 3.3 已知限制（Spike 记录，非阻塞）
+### 已知限制
 
-| # | 现象 | 影响 | 后续 |
-|---|------|------|------|
-| 1 | PDF 作者行含特殊 Unicode（如 ∗） | Windows 控制台 GBK 打印报错 | 已用 `PYTHONIOENCODING=utf-8`；结果写 JSON 文件 |
-| 2 | 摘要为**抽取式**非 LLM | 质量低于最终产品 | H067 起接 Top-K + 生成；本日仅验证管线可贯通 |
-| 3 | arXiv 返回 ID 带版本后缀 `v7` | 与清单 `1706.03762` 等价 | 入库时规范化为 base id |
-
----
-
-## 4. 跑分表回填（P1）
-
-| SpikeID | 实际耗时 | 实际状态 | Pass/Fail | 备注 |
-|---------|----------|----------|-----------|------|
-| S1-P1 | 30.5s（元数据+PDF） | `fetched` | **Pass** | 首次冷启动 |
-| S2-P1 | 2.17s | `parsed` | **Pass** | 39k 字符 |
-| S3-P1 | &lt;0.01s | `summarized` | **Pass** | 抽取式三件套 |
-
-已同步至 [技术Spike清单.md](./技术Spike清单.md) 跑分表。
+| # | 现象 | 后续 |
+|---|------|------|
+| 1 | 抽取式摘要非 LLM | H067 接生成 |
+| 2 | ID 可能带 `v7` | 映射时规范为 base id |
+| 3 | 未调 backend API | C 提供入库路由后接 `PAPERMATE_API_BASE` |
 
 ---
 
-## 5. 验收结论
+## 4. 跑分（P1）
 
-| 任务 | DoD | 结论 |
-|------|-----|------|
-| H017 | 命令可复现；返回 ID/标题/作者/摘要/PDF 地址 | **通过** |
-| H018 | 至少 1 篇贯通；记录耗时与失败点 | **通过**（P1，无失败阶段） |
+| SpikeID | 耗时 | 状态 | Pass |
+|---------|------|------|------|
+| S1-P1 | 30.5s | fetched | Pass |
+| S2-P1 | 2.17s | parsed | Pass |
+| S3-P1 | &lt;0.01s | summarized | Pass |
 
 ---
 
-## 6. 明日入口（H027）
+## 5. 验收
 
-- 将本管线步骤画入活动图（fetch → download → parse → summarize → 入库占位）
-- 序列图补充：超时、重试、失败状态名与 Spike 清单对齐
+| 任务 | 结论 |
+|------|------|
+| H017 | **通过**（含 backend_paper 映射） |
+| H018 | **通过**（含 backend_upsert 映射） |
+
+## 6. 下游
+
+- H027/H028 UML：**V1.1** 已按 ORM 命名（`ParseTask` / `TextChunk.page_no`）
+- H048：seed 降级 → 待 `POST /papers/batch` 或 worker upsert
