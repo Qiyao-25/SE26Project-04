@@ -199,3 +199,4 @@ pending → fetching → fetched → parsing → parsed
 | 2026-07-14 | 在 `ppp/` 定稿并附 [H008_下午验收.md](./H008_下午验收.md)；文档级 DoD 验收通过 |
 | 2026-07-15 | H017–H018：P1 贯通跑通；回填 S1/S2/S3-P1；见 [fetch-parse-llm-spike.md](./fetch-parse-llm-spike.md) |
 | 2026-07-15 | 自 `ppp/TechPrototype` 回同步至 `SE26Project-04/Arxiv/`（文档 + 脚本 + 运行产物） |
+| 2026-07-16 | 按 `backend` ORM 修订 H017–H018（`backend_paper`/`backend_upsert`）与 H027–H028（ParseTask/TextChunk/ApiResponse）；见 `uml/` |

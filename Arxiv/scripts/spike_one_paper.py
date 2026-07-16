@@ -19,10 +19,14 @@ from pypdf import PdfReader
 
 ARXIV_API = "http://export.arxiv.org/api/query"
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
-# Arxiv/scripts/... → ROOT=Arxiv/; also works if run from TechPrototype/src/pipeline/
+# Arxiv/scripts → ROOT=Arxiv, data/; TechPrototype/src/pipeline → ROOT=TechPrototype, data/spike/
 _HERE = Path(__file__).resolve().parent
-ROOT = _HERE.parent if _HERE.name == "scripts" else _HERE.parents[1]
-DATA_DIR = ROOT / "data" if (_HERE.name == "scripts") else (ROOT / "data" / "spike")
+if _HERE.name == "scripts":
+    ROOT = _HERE.parent
+    DATA_DIR = ROOT / "data"
+else:
+    ROOT = _HERE.parents[1]
+    DATA_DIR = ROOT / "data" / "spike"
 PDF_DIR = DATA_DIR / "pdfs"
 OUT_DIR = DATA_DIR / "runs"
 
@@ -186,6 +190,61 @@ def run_stage(name: str, fn) -> tuple[object | None, StageResult]:
         return None, StageResult(stage=name, status="failed", elapsed_s=round(elapsed, 2), detail=str(exc))
 
 
+def to_backend_paper(meta: PaperMeta) -> dict:
+    """Map spike PaperMeta → backend Paper ORM fields (entities.Paper)."""
+    base_id = re.sub(r"v\d+$", "", meta.arxiv_id)
+    primary = meta.categories[0] if meta.categories else None
+    return {
+        "arxiv_id": base_id,
+        "title": meta.title,
+        "abstract": meta.abstract,
+        "published_at": None,
+        "primary_category": primary,
+        "pdf_url": f"https://arxiv.org/pdf/{base_id}.pdf",
+        "source_url": f"https://arxiv.org/abs/{base_id}",
+        "ingest_status": "metadata_only",
+        "authors": [{"display_name": a, "author_order": i + 1} for i, a in enumerate(meta.authors)],
+    }
+
+
+def to_backend_payload(
+    meta: PaperMeta | None,
+    pdf_path: Path | str | None,
+    structured: dict | None,
+    *,
+    page_count: int = 0,
+    status: str = "qa_ready",
+) -> dict | None:
+    """Shape for future upsert into ParseTask / PaperContent / StructuredResult / TextChunk."""
+    if not meta:
+        return None
+    paper = to_backend_paper(meta)
+    if status in {"summarized", "qa_ready", "parsed"}:
+        paper["ingest_status"] = "qa_ready" if status == "qa_ready" else status
+    return {
+        "parse_task": {
+            "task_type": "full_pipeline",
+            "status": "succeeded" if structured else "failed",
+            "attempt": 1,
+            "idempotency_key": f"sha1({paper['arxiv_id']}:v0)",
+            "error_code": None if structured else "summarize_failed",
+        },
+        "paper": paper,
+        "paper_content": {
+            "storage_path": str(pdf_path) if pdf_path else None,
+            "mime_type": "application/pdf",
+            "checksum": None,
+        },
+        "structured_result": {
+            "result_type": "wiki_triple",
+            "version": 1,
+            "content_json": structured or {},
+            "source_locator": {"page_count": page_count, "source": "spike_extractive"},
+        },
+        "api_note": "Backend currently exposes GET /health only; upsert routes pending member C (H045+).",
+    }
+
+
 def cmd_fetch(keyword: str) -> int:
     meta, stage = run_stage("fetch_metadata", lambda: search_by_keyword(keyword, max_results=1)[0])
     payload = {
@@ -193,6 +252,7 @@ def cmd_fetch(keyword: str) -> int:
         "keyword": keyword,
         "stages": [asdict(stage)],
         "paper": asdict(meta) if meta else None,
+        "backend_paper": to_backend_paper(meta) if meta else None,
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2), flush=True)
     return 0 if meta else 1
@@ -228,26 +288,32 @@ def cmd_pipeline(arxiv_id: str, keyword: str | None) -> int:
     summary, s = run_stage("summarize", lambda: summarize_extractive(meta, body))
     stages.append(s)
 
+    status = "summarized" if summary and all(summary.values()) else "summarize_failed"
+    spike_status = "qa_ready" if status == "summarized" else status
+    backend = to_backend_payload(
+        meta, pdf_path, summary, page_count=page_count, status=spike_status
+    )
     output = {
         "task": "H017+H018",
         "run_id": run_id,
-        "sample": "P1" if meta.arxiv_id == "1706.03762" else meta.arxiv_id,
+        "sample": "P1" if meta.arxiv_id.startswith("1706.03762") else meta.arxiv_id,
         "paper": asdict(meta),
         "pdf_path": str(pdf_path),
         "page_count": page_count,
         "body_chars": len(body),
         "body_preview": body[:500],
         "structured": summary if summary else None,
+        "backend_upsert": backend,
         "stages": [asdict(x) for x in stages],
-        "status": "summarized" if summary and all(summary.values()) else "summarize_failed",
+        "status": status,
     }
-    out_file = _save_run(run_id, meta, stages, str(pdf_path), body, summary)
+    out_file = _save_run(run_id, meta, stages, str(pdf_path), body, summary, backend)
     output["artifact"] = str(out_file)
     print(json.dumps(output, ensure_ascii=False, indent=2), flush=True)
     return 0 if output["status"] == "summarized" else 1
 
 
-def _save_run(run_id, meta, stages, pdf_path, body, structured) -> Path:
+def _save_run(run_id, meta, stages, pdf_path, body, structured, backend=None) -> Path:
     payload = {
         "run_id": run_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -255,6 +321,7 @@ def _save_run(run_id, meta, stages, pdf_path, body, structured) -> Path:
         "pdf_path": pdf_path,
         "body_chars": len(body) if body else 0,
         "structured": structured,
+        "backend_upsert": backend,
         "stages": [asdict(x) for x in stages],
     }
     out_file = OUT_DIR / f"run_{run_id}.json"
