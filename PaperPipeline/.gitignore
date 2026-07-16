@@ -1,0 +1,8 @@
+# 运行产物（不入库）
+data/logs/
+**/pdfs/
+*.pyc
+__pycache__/
+.venv/
+.env
+*.pdf

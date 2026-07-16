@@ -154,3 +154,19 @@ python -m pytest --capture=no
     harness         固定命令、场景编排和验收输出
 
 Harness 只编排和验证，不复制 service 业务规则；后续论文导入、解析和检索都应沿用这一边界。
+
+## 6. 前端联调接口
+
+后端提供数据库论文 API，并兼容固定样例论文 API，供 React 前端在 `VITE_USE_MOCK=false` 时调用：
+
+```text
+GET  /api/papers?keyword=attention&page=1&page_size=12
+POST /api/papers/batch
+GET  /api/papers/{paper_id}
+GET  /api/papers/{paper_id}/content
+GET  /api/papers/{paper_id}/summary
+GET  /api/papers/{paper_id}/wiki
+POST /api/papers/{paper_id}/qa
+```
+
+数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

@@ -1,0 +1,61 @@
+{
+  "sample": "P6",
+  "arxiv_id": "2010.11929",
+  "title": "ViT",
+  "generated_at": "2026-07-15T03:03:16.557344+00:00",
+  "status": "parsed",
+  "parse": {
+    "status": "parsed",
+    "pdf_path": "C:\\Users\\19103\\Desktop\\软工原\\project\\SE26Project-04\\PaperPipeline\\data\\samples\\pdfs\\2010.11929v2.pdf",
+    "page_count": 22,
+    "char_count": 41430,
+    "paragraph_count": 24,
+    "paragraphs_preview": [
+      {
+        "para_id": "p1_0",
+        "page": 1,
+        "section": "body",
+        "text": "Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, Neil Houlsby∗,† ∗equal technical contribution,†equal advising Google Research, Brain Team {adosovitskiy, neilhoulsby}@google.com ABSTRACT While the Transformer architecture has become the de-facto standard for natural language processing tasks, its applications to computer vision remain limited. In vision, attention is either applied in conjunction with convolutional networks, or used to replace certain components of convolutional networks while keeping their overall structure in place. We show that this reliance on CNNs is not necessary and a pure transformer applied directly to sequences of image patches can perform very well on image classiﬁcation tasks. When pre-trained on large amounts of data and transferred to multiple mid-sized or small image recognition benchmarks (ImageNet, CIFAR-100, VTAB, etc.), Vision Transformer (ViT) attains excellent results compared to state-of-the-art convolutional networks while requiring sub- stantially fewer computational resources to train.1 1 I NTRODUCTION Self-attention-based architectures, in particular Transformers (Vaswani et al., 2017), have become the model of choice in natural language processing (NLP). The dominant approach is to pre-train on a large text corpus and then ﬁne-tune on a smaller task-speciﬁc dataset (Devlin et al., 2019). Thanks to Transformers’ computational efﬁciency and scalability, it has become possible to train models of unprecedented size, with over 100B parameters (Brown et al., 2020; Lepikhin et al., 2020). With the models and datasets growing, there is still no sign of saturating performance. In computer vision, however, convolutional architectures remain dominant (LeCun et al., 1"
+      },
+      {
+        "para_id": "p2_1",
+        "page": 2,
+        "section": "body",
+        "text": "Published as a conference paper at ICLR 2021 inherent to CNNs, such as translation equivariance and locality, and therefore do not generalize well when trained on insufﬁcient amounts of data. However, the picture changes if the models are trained on larger datasets (14M-300M images). We ﬁnd that large scale training trumps inductive bias. Our Vision Transformer (ViT) attains excellent results when pre-trained at sufﬁcient scale and transferred to tasks with fewer datapoints. When pre-trained on the public ImageNet-21k dataset or the in-house JFT-300M dataset, ViT approaches or beats state of the art on multiple image recognition benchmarks. In particular, the best model reaches the accuracy of 88.55% on ImageNet, 90.72% on ImageNet-ReaL, 94.55% on CIFAR-100, and 77.63% on the VTAB suite of 19 tasks. 2 R ELATED WORK Transformers were proposed by Vaswani et al. (2017) for machine translation, and have since be- come the state of the art method in many NLP tasks. Large Transformer-based models are often pre-trained on large corpora and then ﬁne-tuned for the task at hand: BERT (Devlin et al., 2019) uses a denoising self-supervised pre-training task, while the GPT line of work uses language mod- eling as its pre-training task (Radford et al., 2018; 2019; Brown et al., 2020). Naive application of self-attention to images would require that each pixel attends to every other pixel. With quadratic cost in the number of pixels, this does not scale to realistic input sizes. Thus, to apply Transformers in the context of image processing, several approximations have been tried in the past. Parmar et al. (2018) applied the self-attention only in local neighborhoods for each query pixel instead of globally. Such local multi-head dot-product self attention blocks can completely replace convolutions (Hu et al., 2019; Ramachandran et al., 2019; Zhao et al., 2020). In a different line of work, Sparse Transformers (Child et al., 2019) employ scalable approximations to global self- att"
+      },
+      {
+        "para_id": "p3_2",
+        "page": 3,
+        "section": "body",
+        "text": "Published as a conference paper at ICLR 2021 Transformer Encoder MLP Head Vision Transformer (ViT) * Linear Projection of Flattened Patches *"
+      },
+      {
+        "para_id": "p3_3",
+        "page": 3,
+        "section": "body",
+        "text": "embedding 1 2 3 4 5 6 7 8 9 0 Patch + Position Embedding Class Bird Ball Car ... Embedded Patches Multi-Head Attention Norm MLP Norm + L"
+      },
+      {
+        "para_id": "p3_4",
+        "page": 3,
+        "section": "body",
+        "text": "x + Transformer Encoder Figure 1: Model overview. We split an image into ﬁxed-size patches, linearly embed each of them, add position embeddings, and feed the resulting sequence of vectors to a standard Transformer encoder. In order to perform classiﬁcation, we use the standard approach of adding an extra learnable “classiﬁcation token” to the sequence. The illustration of the Transformer encoder was inspired by Vaswani et al. (2017). 3 M ETHOD In model design we follow the original Transformer (Vaswani et al., 2017) as closely as possible. An advantage of this intentionally simple setup is that scalable NLP Transformer architectures – and their efﬁcient implementations – can be used almost out of the box. 3.1 V ISION TRANSFORMER (V IT) An overview of the model is depicted in Figure 1. The standard Transformer receives as input a 1D sequence of token embeddings. To handle 2D images, we reshape the image x∈ RH×W×C into a sequence of ﬂattened 2D patches xp∈ RN×(P 2·C), where (H,W ) is the resolution of the original image,C is the number of channels,(P,P ) is the resolution of each image patch, andN =HW/P 2 is the resulting number of patches, which also serves as the effective input sequence length for the Transformer. The Transformer uses constant latent vector size D through all of its layers, so we ﬂatten the patches and map to D dimensions with a trainable linear projection (Eq. 1). We refer to the output of this projection as the patch embeddings. Similar to BERT’s[class] token, we prepend a learnable embedding to the sequence of embed- ded patches (z0 0 = xclass), whose state at the output of the Transformer encoder ( z0 L) serves as the image representation y (Eq. 4). Both during pre-training and ﬁne-tuning, a classiﬁcation head is at- tached to z0 L. The classiﬁcation head is implemented by a MLP with one hidden layer at pre-training time and by a single linear layer at ﬁne-tuning time. Position embeddings are added to the patch embeddings to retain positional "
+      }
+    ],
+    "elapsed_s": 1.262
+  },
+  "structured": {
+    "arxiv_id": "2010.11929",
+    "summary": "Paper: ViT. Large Transformer-based models are often pre-trained on large corpora and then ﬁne-tuned for the task at hand: BERT (Devlin et al., 2019) uses a denoising self-supervised pre-training task, while the GPT line of work uses language mod- eling as its pre-training task (Radford et al., 2018; 2019; Brown et al., 2020). Published as a conference paper at ICLR 2021 Model Layers Hidden size D MLP size Heads Params ViT-Base 12 768 3072 12 86M ViT-Large 24 1024 4096 16 307M ViT-Huge 32 1280 5120 16 632M Table 1: Details of Vision Transformer model variants.",
+    "concept": "Large Transformer-based models are often pre-trained on large corpora and then ﬁne-tuned for the task at hand: BERT (Devlin et al., 2019) uses a denoising self-supervised pre-training task, while the GPT line of work uses language mod- eling as its pre-training task (Radford et al., 2018; 2019; Brown et al., 2020). Published as a conference paper at ICLR 2021 Model Layers Hidden size D MLP size Heads Params ViT-Base 12 768 3072 12 86M ViT-Large 24 1024 4096 16 307M ViT-Huge 32 1280 5120 16 632M Table 1: Details of Vision Transformer model variants. However, we note that pre-training efﬁciency may be affected not only by the architecture choice, but also other pa- rameters, such as training schedule, optimizer, weight decay, etc. Published as a conference paper at ICLR 2021 Transformer Encoder MLP Head Vision Transformer (ViT) * Linear Projection of Flattened Patches *",
+    "methods": "102 103 90 95Transfer accuracy [%] Average-5 Transformer (ViT) ResNet (BiT) Hybrid 102 10375 80 85 90 ImageNet Transformer (ViT) ResNet (BiT) Hybrid Total pre-training compute [exaFLOPs] Figure 5: Performance versus pre-training compute for different architectures: Vision Transformers, ResNets, and hybrids. With self-supervised pre-training, our smaller ViT-B/16 model achieves 79.9% accuracy on ImageNet, a signiﬁcant improvement of 2% to training from scratch, but still 4% behind supervised pre-training. Published as a conference paper at ICLR 2021 Model Layers Hidden size D MLP size Heads Params ViT-Base 12 768 3072 12 86M ViT-Large 24 1024 4096 16 307M ViT-Huge 32 1280 5120 16 632M Table 1: Details of Vision Transformer model variants.",
+    "ok": true,
+    "source_para_ids": [
+      "p1_0",
+      "p2_1",
+      "p5_6",
+      "p6_7"
+    ]
+  },
+  "required_fields_ok": true
+}

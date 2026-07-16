@@ -66,3 +66,31 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## 前后端联调与 Mock 切换
+
+1. 复制环境变量：
+
+```powershell
+Copy-Item .env.example .env.development
+```
+
+2. 默认 `VITE_USE_MOCK=false`，前端会请求 FastAPI：
+
+```text
+GET  /api/papers?keyword=attention&page=1&page_size=12
+POST /api/papers/batch
+GET  /api/papers/{paperId}
+GET  /api/papers/{paperId}/content
+GET  /api/papers/{paperId}/summary
+GET  /api/papers/{paperId}/wiki
+POST /api/papers/{paperId}/qa
+```
+
+3. 需要脱离后端演示时，将 `.env.development` 改为：
+
+```env
+VITE_USE_MOCK=true
+```
+
+4. 启动顺序：先在 `backend` 启动 Uvicorn，再在 `UIPrototype/frontend` 执行 `npm run dev`。

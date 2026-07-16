@@ -48,6 +48,6 @@ def test_openapi_contains_paper_contract() -> None:
 
     app = create_app(Settings(environment="test", database_url="sqlite:///:memory:"))
     paths = app.openapi()["paths"]
-    assert "/papers" in paths
-    assert "/papers/{paper_id}" in paths
-    assert "/papers/{paper_id}/wiki" in paths
+    assert "/api/papers" in paths
+    assert "/api/papers/{paper_id}" in paths
+    assert "/api/papers/{paper_id}/wiki" in paths

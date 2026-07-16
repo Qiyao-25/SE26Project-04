@@ -1,0 +1,22 @@
+[
+  {"id": "Q01", "sample": "P1", "arxiv_id": "1706.03762", "kind": "fact", "question": "Transformer 是否依赖 CNN/RNN？"},
+  {"id": "Q02", "sample": "P1", "arxiv_id": "1706.03762", "kind": "method", "question": "Multi-Head Attention 的作用？"},
+  {"id": "Q03", "sample": "P2", "arxiv_id": "1810.04805", "kind": "fact", "question": "BERT 预训练任务有哪些？"},
+  {"id": "Q04", "sample": "P2", "arxiv_id": "1810.04805", "kind": "method", "question": "双向编码器如何体现？"},
+  {"id": "Q05", "sample": "P3", "arxiv_id": "1806.07366", "kind": "fact", "question": "Neural ODE 把网络深度看成什么？"},
+  {"id": "Q06", "sample": "P3", "arxiv_id": "1806.07366", "kind": "method", "question": "训练时如何反向传播？"},
+  {"id": "Q07", "sample": "P4", "arxiv_id": "2106.09685", "kind": "fact", "question": "LoRA 更新什么矩阵？"},
+  {"id": "Q08", "sample": "P4", "arxiv_id": "2106.09685", "kind": "method", "question": "相对全量微调参数量如何？"},
+  {"id": "Q09", "sample": "P5", "arxiv_id": "2303.18223", "kind": "fact", "question": "Survey 主要覆盖哪类模型？"},
+  {"id": "Q10", "sample": "P5", "arxiv_id": "2303.18223", "kind": "method", "question": "文中主题如何划分？（概括）"},
+  {"id": "Q11", "sample": "P6", "arxiv_id": "2010.11929", "kind": "fact", "question": "ViT 如何切分图像？"},
+  {"id": "Q12", "sample": "P6", "arxiv_id": "2010.11929", "kind": "method", "question": "与 CNN 归纳偏置差异？"},
+  {"id": "Q13", "sample": "P7", "arxiv_id": "2005.11401", "kind": "fact", "question": "RAG 结合哪两类能力？"},
+  {"id": "Q14", "sample": "P7", "arxiv_id": "2005.11401", "kind": "method", "question": "检索器与生成器如何协作？"},
+  {"id": "Q15", "sample": "P8", "arxiv_id": "2005.14165", "kind": "fact", "question": "GPT-3 参数量级？"},
+  {"id": "Q16", "sample": "P8", "arxiv_id": "2005.14165", "kind": "method", "question": "few-shot 指什么？"},
+  {"id": "Q17", "sample": "P1", "arxiv_id": "1706.03762", "kind": "fact", "question": "Transformer encoder 有多少层？"},
+  {"id": "Q18", "sample": "P7", "arxiv_id": "2005.11401", "kind": "method", "question": "RAG 如何减少幻觉？"},
+  {"id": "Q19", "sample": "P9", "arxiv_id": "9999.99999", "kind": "reject", "question": "这篇论文的主要贡献是什么？"},
+  {"id": "Q20", "sample": "P10", "arxiv_id": "0000.00001", "kind": "reject", "question": "作者提出了什么方法？"}
+]

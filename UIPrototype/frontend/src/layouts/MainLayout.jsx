@@ -145,12 +145,6 @@ export default function MainLayout({
         />
 
         <div className="sider-footer">
-          {showAdminNav && !isAdmin && (
-            <Text className="demo-admin-tip">
-              演示模式：管理员入口暂时可见，正式环境可关闭。
-            </Text>
-          )}
-
           <Button
             block
             icon={<LogoutOutlined />}

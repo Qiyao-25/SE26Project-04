@@ -15,5 +15,5 @@ def test_openapi_exposes_health_endpoint() -> None:
     app = create_app(Settings(environment="test", database_url="sqlite:///:memory:"))
     openapi = app.openapi()
     assert "/health" in openapi["paths"]
-    assert "/papers" in openapi["paths"]
+    assert "/api/papers" in openapi["paths"]
     assert openapi["info"]["title"] == "PaperMate Backend API"
