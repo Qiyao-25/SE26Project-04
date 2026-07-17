@@ -23,7 +23,10 @@ def parse_status(paper: Paper) -> str:
     return {
         "metadata_only": "pending",
         "downloaded": "pending",
+        "queued": "queued",
+        "parsing": "parsing",
         "parsed": "completed",
+        "qa_ready": "qa_ready",
         "failed": "failed",
     }.get(paper.ingest_status, "pending")
 
@@ -42,6 +45,8 @@ def to_item(paper: Paper) -> PaperItem:
         source_url=paper.source_url,
         ingest_status=paper.ingest_status,
         parse_status=parse_status(paper),
+        chunk_count=paper.chunk_count,
+        qa_ready=paper.ingest_status == "qa_ready" and paper.chunk_count > 0,
     )
 
 
@@ -112,6 +117,8 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
         limitations=(by_type.get("limitations").content_json.get("items", []) if by_type.get("limitations") else []),
         validation_flags=validation_flags,
         source_locator=(wiki.source_locator if wiki else (summary.source_locator if summary else {})),
+        chunk_count=paper.chunk_count,
+        qa_ready=paper.ingest_status == "qa_ready" and paper.chunk_count > 0,
     )
 
 

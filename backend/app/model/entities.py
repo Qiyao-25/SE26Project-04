@@ -23,6 +23,7 @@ class Paper(TimestampMixin, Base):
     pdf_url: Mapped[str | None] = mapped_column(Text)
     source_url: Mapped[str | None] = mapped_column(Text)
     ingest_status: Mapped[str] = mapped_column(String(32), nullable=False, default="metadata_only", server_default="metadata_only")
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     authors: Mapped[list["PaperAuthor"]] = relationship(back_populates="paper", cascade="all, delete-orphan")
     parse_tasks: Mapped[list["ParseTask"]] = relationship(back_populates="paper", cascade="all, delete-orphan")

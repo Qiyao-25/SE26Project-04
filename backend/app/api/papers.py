@@ -139,6 +139,8 @@ def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
             experiments=wiki.experiments,
             limitations=wiki.limitations,
             validationFlags=wiki.validation_flags,
+            chunkCount=wiki.chunk_count,
+            qaReady=wiki.qa_ready,
         )
         return ApiResponse(data=data, request_id=request.state.request_id)
     try:

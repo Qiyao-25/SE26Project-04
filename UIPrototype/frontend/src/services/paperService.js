@@ -25,6 +25,8 @@ function toPaperListItem(paper) {
     researchDirection: paper.researchDirection || paper.direction || '',
     conceptTags: paper.conceptTags || [],
     parseStatus: paper.parseStatus || paper.parse_status || 'completed',
+    chunkCount: paper.chunkCount ?? paper.chunk_count ?? 0,
+    qaReady: Boolean(paper.qaReady ?? paper.qa_ready),
     isFavorite: Boolean(paper.isFavorite)
   };
 }

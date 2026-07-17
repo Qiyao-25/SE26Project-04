@@ -1,9 +1,12 @@
 from app.core.config import Settings
 from app.core.database import create_engine_for
-from app.model import Base
-from app.schema.papers import PaperUpsert, ParseRequest, StructuredResultBatch, StructuredResultInput, TaskUpdate
+from app.model import Base, ParseTask
+from datetime import timedelta
+
+from app.schema.papers import PaperUpsert, StructuredResultBatch, StructuredResultInput, TaskUpdate, TextChunkBatch, TextChunkInput
+from app.repository.chunks import upsert_chunks
 from app.service.papers import batch_upsert_papers, get_wiki
-from app.service.tasks import create_task, get_task, list_tasks, save_results, update_task
+from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, recover_stale_tasks, retry_task, save_results, update_task
 from sqlalchemy.orm import Session
 
 
@@ -55,3 +58,54 @@ def test_task_stage_is_persisted() -> None:
         updated = update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
         assert updated.stage == "parse"
         assert get_task(session, task.task_id).stage == "parse"
+
+
+def test_paper_becomes_qa_ready_only_after_chunks_are_persisted() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="qa-ready-paper", title="QA Ready Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "qa-ready-task")
+        upsert_chunks(
+            session,
+            paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(chunk_id="chunk-1", page_no=1, content="Evidence text.")]),
+        )
+        save_results(
+            session,
+            task.task_id,
+            StructuredResultBatch(results=[StructuredResultInput(result_type="summary", content_json={"summary": "summary"})]),
+        )
+        wiki = get_wiki(session, paper_id)
+        assert wiki.qa_ready is True
+        assert wiki.chunk_count == 1
+
+
+def test_failed_task_can_be_retried_once() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="retry-paper", title="Retry Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "retry-task")
+        update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
+        update_task(session, task.task_id, TaskUpdate(status="failed", error_code="PARSE_FAILED", stage="failed"))
+        retried = retry_task(session, task.task_id)
+        assert retried.status == "queued"
+        assert retried.attempt == 2
+
+
+def test_stale_running_task_is_recovered() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="stale-paper", title="Stale Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "stale-task")
+        update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
+        record = session.get(ParseTask, task.task_id)
+        record.started_at = record.started_at - timedelta(hours=1)
+        session.commit()
+        recovered = recover_stale_tasks(session, stale_after_seconds=60)
+        assert [item.task_id for item in recovered] == [task.task_id]
+        assert get_task(session, task.task_id).status == "timed_out"
+
+
+def test_metadata_only_papers_can_be_enqueued() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="pending-paper", title="Pending Paper")]).items[0].paper_id
+        queued = enqueue_pending_tasks(session, limit=10)
+        assert queued and queued[0].paper_id == paper_id
+        assert get_task(session, queued[0].task_id).status == "queued"

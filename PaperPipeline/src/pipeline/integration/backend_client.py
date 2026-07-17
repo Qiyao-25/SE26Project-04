@@ -53,6 +53,13 @@ class BackendClient:
             body["stage"] = stage[:32]
         return self._request(f"/api/tasks/{task_id}", "PATCH", body)
 
+    def retry_task(self, task_id: int) -> dict:
+        return self._request(f"/api/tasks/{task_id}/retry", "POST")
+
+    def recover_stale_tasks(self, timeout_seconds: int = 900) -> dict:
+        query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
+        return self._request(f"/api/tasks/recover-stale?{query}", "POST")
+
     def save_structured_results(self, task_id: int, results: list[dict[str, Any]]) -> dict:
         return self._request(f"/api/tasks/{task_id}/results", "POST", {"results": results})
 

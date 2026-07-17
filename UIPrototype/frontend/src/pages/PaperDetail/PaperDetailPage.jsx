@@ -36,6 +36,7 @@ function getParseStatusLabel(status) {
     running: '解析中',
     succeeded: '解析完成',
     completed: '已完成',
+    qa_ready: '可问答',
     failed: '解析失败'
   };
 
@@ -224,11 +225,11 @@ export default function PaperDetailPage() {
             <Tag color="blue">{paper.primaryCategory || paper.tag}</Tag>
             <Tag>arXiv:{paper.arxivId || paper.arxiv}</Tag>
             <Tag>{paper.publishedAt || paper.date}</Tag>
-            <Tag color={paper.parseStatus === 'completed' ? 'success' : 'warning'}>
+            <Tag color={['completed', 'qa_ready'].includes(paper.parseStatus) ? 'success' : 'warning'}>
               解析状态：{getParseStatusLabel(paper.parseStatus)}
             </Tag>
             <Button size="small" loading={parseLoading} onClick={handleParse}>
-              {paper.parseStatus === 'completed' ? '重新解析' : '开始解析'}
+              {['completed', 'qa_ready'].includes(paper.parseStatus) ? '重新解析' : '开始解析'}
             </Button>
           </Space>
 
@@ -302,7 +303,7 @@ export default function PaperDetailPage() {
         <div>
           <Space size={6} wrap style={{ marginBottom: 12 }}>
             <Tag
-              color={summaryData?.parseStatus === 'completed' ? 'success' : 'warning'}
+              color={['completed', 'qa_ready'].includes(summaryData?.parseStatus) ? 'success' : 'warning'}
             >
               解析状态：{getParseStatusLabel(summaryData?.parseStatus)}
             </Tag>

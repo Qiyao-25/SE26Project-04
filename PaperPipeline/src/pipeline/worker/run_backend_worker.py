@@ -48,6 +48,11 @@ def main() -> int:
         html_dir=args.html_dir,
         prefer_html=args.prefer_html,
     )
+    try:
+        recovered = worker.client.recover_stale_tasks()
+        logging.info("stale_tasks_recovered count=%s", recovered.get("recovered", 0))
+    except Exception:  # noqa: BLE001
+        logging.exception("stale_task_recovery_failed")
 
     while True:
         result = worker.run_once()

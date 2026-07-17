@@ -1,6 +1,6 @@
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.model import Paper, TextChunk
@@ -27,7 +27,8 @@ def _tokens(value: str) -> set[str]:
 
 
 def upsert_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> int:
-    if session.get(Paper, paper_id) is None:
+    paper = session.get(Paper, paper_id)
+    if paper is None:
         raise ValueError("PAPER_NOT_FOUND")
     for item in payload.chunks:
         chunk = session.scalar(select(TextChunk).where(TextChunk.paper_id == paper_id, TextChunk.chunk_id == item.chunk_id))
@@ -37,6 +38,9 @@ def upsert_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> i
         chunk.page_no = item.page_no
         chunk.section = item.section
         chunk.content = item.content
+    paper.chunk_count = session.scalar(
+        select(func.count(TextChunk.id)).where(TextChunk.paper_id == paper_id)
+    ) or 0
     session.commit()
     return len(payload.chunks)
 

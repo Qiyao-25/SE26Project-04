@@ -43,6 +43,8 @@ class PaperItem(BaseModel):
     source_url: str | None
     ingest_status: str
     parse_status: str
+    chunk_count: int = 0
+    qa_ready: bool = False
 
 
 class PaperPage(BaseModel):
@@ -86,6 +88,10 @@ class TaskUpdate(BaseModel):
     status: Literal["running", "failed", "timed_out"]
     error_code: str | None = Field(default=None, max_length=64)
     stage: str | None = Field(default=None, max_length=32)
+
+
+class ParsePendingRequest(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
 
 
 class StructuredResultInput(BaseModel):
@@ -165,6 +171,8 @@ class WikiData(BaseModel):
     limitations: list[str]
     validation_flags: list[str]
     source_locator: dict
+    chunk_count: int = 0
+    qa_ready: bool = False
 
 
 class QaRequest(BaseModel):
