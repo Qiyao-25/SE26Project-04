@@ -25,6 +25,7 @@ import {
 } from '../../services/paperService';
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
+import PaperGraphPanel from '../../components/paper/detail/PaperGraphPanel';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -419,19 +420,7 @@ export default function PaperDetailPage() {
     {
       key: 'graph',
       label: 'c · 知识图谱&脉络',
-      children: (
-        <div className="graph-placeholder">
-          <Tag>{paper.title.split(':')[0]}</Tag>
-          {(paper.conceptTags || []).map((concept) => (
-            <Tag key={concept} color="processing" style={{ margin: 8 }}>
-              {concept}
-            </Tag>
-          ))}
-          <Paragraph type="secondary" style={{ marginTop: 16 }}>
-            知识图谱属于 P1。本轮保留论文节点和核心概念节点，后续接入关系边接口。
-          </Paragraph>
-        </div>
-      )
+      children: <PaperGraphPanel paperId={paperId} paperTitle={paper.title} />
     }
   ];
 
