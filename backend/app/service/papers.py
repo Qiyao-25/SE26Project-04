@@ -8,7 +8,16 @@ from sqlalchemy.orm import Session
 from app.model import Paper
 from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
-from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, PaperItem, PaperPage, PaperUpsert, QaResponse, WikiData
+from app.schema.papers import (
+    BatchUpsertResponse,
+    ChunkSearchRequest,
+    PaperItem,
+    PaperPage,
+    PaperUpsert,
+    QaResponse,
+    SmartSearchResponse,
+    WikiData,
+)
 
 
 class PaperServiceError(Exception):
@@ -55,6 +64,92 @@ def search_papers(session: Session, **filters) -> PaperPage:
     page_size = filters["page_size"]
     papers, total = list_papers(session, **filters)
     return PaperPage(items=[to_item(paper) for paper in papers], total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0)
+
+
+def smart_search_papers(
+    session: Session,
+    *,
+    query: str,
+    page: int = 1,
+    page_size: int = 12,
+    category: str | None = None,
+    settings=None,
+) -> SmartSearchResponse:
+    from app.agents.search_agent import SearchAgent
+    from app.core.config import get_settings
+
+    settings = settings or get_settings()
+    agent = SearchAgent(settings)
+    plan = agent.plan(query)
+
+    category_filter = category or (plan.category_hints[0] if plan.category_hints else None)
+    papers, total = list_papers(
+        session,
+        keyword=plan.rewritten_query or query,
+        keywords=plan.keywords or [query],
+        author=None,
+        category=category_filter,
+        published_from=None,
+        published_to=None,
+        page=page,
+        page_size=page_size,
+    )
+    # If category hint over-filters to empty, retry without category
+    if total == 0 and category_filter and not category:
+        papers, total = list_papers(
+            session,
+            keyword=plan.rewritten_query or query,
+            keywords=plan.keywords or [query],
+            author=None,
+            category=None,
+            published_from=None,
+            published_to=None,
+            page=page,
+            page_size=page_size,
+        )
+        category_filter = None
+
+    # Still empty: fall back to raw query single keyword
+    if total == 0 and plan.keywords:
+        papers, total = list_papers(
+            session,
+            keyword=query,
+            keywords=None,
+            author=None,
+            category=None,
+            published_from=None,
+            published_to=None,
+            page=page,
+            page_size=page_size,
+        )
+
+    items = [to_item(paper) for paper in papers]
+    paper_payload = [
+        {
+            "title": item.title,
+            "authors": item.authors,
+            "primary_category": item.primary_category,
+            "abstract": item.abstract,
+            "arxiv_id": item.arxiv_id,
+        }
+        for item in items
+    ]
+    search_answer = agent.answer(query=query, plan=plan, papers=paper_payload, total=total)
+    return SmartSearchResponse(
+        query=query,
+        rewritten_query=plan.rewritten_query or query,
+        keywords=plan.keywords,
+        intent=plan.intent,
+        answer=search_answer.answer,
+        highlights=search_answer.highlights,
+        plan_source=plan.source,
+        answer_source=search_answer.source,
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=ceil(total / page_size) if total else 0,
+    )
 
 
 def batch_upsert_papers(session: Session, payloads: list[PaperUpsert]) -> BatchUpsertResponse:
