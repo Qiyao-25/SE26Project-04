@@ -318,7 +318,7 @@ export default function PaperDetailPage() {
               type="info"
               showIcon
               message="Summarize Agent 生成中"
-              description="正在调用 DeepSeek 生成摘要、概念、方法、实验与局限性，完成后会自动刷新本页。"
+              description="正在调用 Summarize Agent 生成摘要、概念、方法、实验与局限性，完成后会自动刷新本页。"
               style={{ marginBottom: 16 }}
             />
           )}

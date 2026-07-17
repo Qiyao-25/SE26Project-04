@@ -1,4 +1,4 @@
-"""Minimal OpenAI-compatible DeepSeek chat client (stdlib only)."""
+"""OpenAI-compatible chat client for PaperMate agents (provider-agnostic)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import urllib.request
 from typing import Any
 
 
-class DeepSeekError(RuntimeError):
+class LlmError(RuntimeError):
     pass
 
 
@@ -20,17 +20,20 @@ def chat_completion(
     messages: list[dict[str, str]],
     timeout_s: float = 90.0,
     temperature: float = 0.2,
+    json_mode: bool = False,
 ) -> str:
     if not api_key.strip():
-        raise DeepSeekError("DeepSeek API key 未配置（PAPERMATE_DEEPSEEK_API_KEY）")
+        raise LlmError("LLM API key 未配置（PAPERMATE_LLM_API_KEY）")
 
     url = f"{api_base.rstrip('/')}/chat/completions"
-    body = {
+    body: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
-        "response_format": {"type": "json_object"},
     }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
@@ -46,14 +49,17 @@ def chat_completion(
             payload: dict[str, Any] = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:500]
-        raise DeepSeekError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
+        raise LlmError(f"LLM HTTP {exc.code}: {detail}") from exc
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        raise DeepSeekError(f"DeepSeek 调用失败: {exc}") from exc
+        raise LlmError(f"LLM 调用失败: {exc}") from exc
 
     try:
         content = payload["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
-        raise DeepSeekError(f"DeepSeek 响应格式异常: {payload!r}") from exc
+        raise LlmError(f"LLM 响应格式异常: {payload!r}") from exc
     if not isinstance(content, str) or not content.strip():
-        raise DeepSeekError("DeepSeek 返回空内容")
+        raise LlmError("LLM 返回空内容")
     return content
+
+
+__all__ = ["LlmError", "chat_completion"]
