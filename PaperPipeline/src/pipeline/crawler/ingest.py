@@ -98,14 +98,16 @@ def _write_seed(path: Path, papers: list[dict], *, source: str) -> None:
     logger.info("seed_written path=%s count=%s source=%s", path, len(papers), source)
 
 
-def _post_batch(api_base: str, papers: list[dict], *, timeout_s: float) -> tuple[bool, list[dict], str]:
-    """POST /api/papers/batch — body papers[] aligned with backend API."""
+def _post_batch(
+    api_base: str, papers: list[dict], *, timeout_s: float
+) -> tuple[bool, list[dict], str, int, int]:
+    """POST /api/papers/batch — prefer JSON array; also accept {papers:[...]} on server."""
     url = f"{api_base}/api/papers/batch"
-    body = json.dumps({"papers": papers}).encode("utf-8")
+    body = json.dumps(papers).encode("utf-8")  # list[PaperUpsert]
     req = urllib.request.Request(
         url,
         data=body,
-        headers={"Content-Type": "application/json", "User-Agent": "PaperMate-Ingest/0.2"},
+        headers={"Content-Type": "application/json", "User-Agent": "PaperMate-Ingest/0.3"},
         method="POST",
     )
     try:
