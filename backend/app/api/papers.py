@@ -11,6 +11,7 @@ from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseReque
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_wiki, search_papers, smart_search_papers
+from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
 
@@ -103,8 +104,8 @@ def parse(
         return _db_error(request, PaperServiceError("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409))
 
     settings = request.app.state.settings
-    # 新排队任务且已配置 Summarize Agent 时，由 backend 后台执行（无需外挂 Worker）
-    if created and data.status == "queued" and settings.parse_agent_ready:
+    # 排队且尚未开始的任务：调度 Summarize Agent（含服务重启后重新点「解析」的僵死 queued）
+    if settings.parse_agent_ready and data.status == "queued" and data.started_at is None:
         background_tasks.add_task(run_parse_agent_job, request.app.state.engine, data.task_id, settings)
     return ApiResponse(data=data, request_id=request.state.request_id)
 

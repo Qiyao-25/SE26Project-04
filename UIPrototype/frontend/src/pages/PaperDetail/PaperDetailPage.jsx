@@ -13,8 +13,8 @@ import {
   Typography,
   message
 } from 'antd';
-import { FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
-import { useParams } from 'react-router-dom';
+import { ArrowLeftOutlined, FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   getPaperContent,
@@ -45,7 +45,8 @@ function getParseStatusLabel(status) {
 
 export default function PaperDetailPage() {
   const { paperId } = useParams();
-  const { userId, setCompareForPaper } = useApp();
+  const navigate = useNavigate();
+  const { userId, setCompareForPaper, setLockedPaperId, exitLockedPaper } = useApp();
 
   const [paper, setPaper] = useState(null);
   const [content, setContent] = useState(null);
@@ -61,6 +62,11 @@ export default function PaperDetailPage() {
   useEffect(() => {
     if (paperId) setCompareForPaper(paperId);
   }, [paperId, setCompareForPaper]);
+
+  // 进入详情即锁定工作空间到本篇；切换学习/设置后再点工作空间仍回来
+  useEffect(() => {
+    if (paperId) setLockedPaperId(String(paperId));
+  }, [paperId, setLockedPaperId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,17 +165,23 @@ export default function PaperDetailPage() {
     });
   }, [paper, paperId, userId]);
 
+  const handleExitPaper = () => {
+    exitLockedPaper();
+    navigate('/workspace');
+  };
+
   const handleParse = async () => {
     if (parseLoading) return;
     if (!isPersistedPaperId(paperId)) {
-      message.info('当前为演示论文，切换到检索结果中的数据库论文后可启动解析');
+      message.warning('当前论文尚未入库，无法启动解析');
       return;
     }
     setParseLoading(true);
     setLoadError('');
     setMainTab('summary');
     try {
-      const force = ['completed', 'qa_ready', 'failed'].includes(paper.parseStatus);
+      // queued/running 也可能是重启后遗留的僵死任务，允许强制新建
+      const force = ['completed', 'qa_ready', 'failed', 'queued', 'running', 'pending'].includes(paper.parseStatus);
       const task = await createParseTask(paperId, { force });
       setParseTask(task);
       if (task.status === 'succeeded') {
@@ -199,20 +211,30 @@ export default function PaperDetailPage() {
 
   if (loadError) {
     return (
-      <Alert
-        type="error"
-        showIcon
-        message="论文加载失败"
-        description={loadError}
-      />
+      <div className="page-paper-detail">
+        <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper} style={{ marginBottom: 12 }}>
+          退出论文
+        </Button>
+        <Alert
+          type="error"
+          showIcon
+          message="论文加载失败"
+          description={loadError}
+        />
+      </div>
     );
   }
 
   if (!paper) {
     return (
-      <Card className="section-card">
-        <Empty description={`论文不存在：${paperId}`} />
-      </Card>
+      <div className="page-paper-detail">
+        <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper} style={{ marginBottom: 12 }}>
+          退出论文
+        </Button>
+        <Card className="section-card">
+          <Empty description={`论文不存在：${paperId}`} />
+        </Card>
+      </div>
     );
   }
 
@@ -415,6 +437,25 @@ export default function PaperDetailPage() {
 
   return (
     <div className="page-paper-detail">
+      <Card
+        size="small"
+        className="section-card"
+        style={{ marginBottom: 12 }}
+        bodyStyle={{ padding: '10px 16px' }}
+      >
+        <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
+          <Space wrap>
+            <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper}>
+              退出论文
+            </Button>
+            <Text type="secondary">可切换学习空间 / 设置等；再点工作空间仍回到本篇。退出后恢复检索首页</Text>
+          </Space>
+          <Text ellipsis style={{ maxWidth: 420 }} strong>
+            {paper.title}
+          </Text>
+        </Space>
+      </Card>
+
       <Row gutter={16} align="stretch">
         <Col xs={24} lg={15}>
           <Card className="section-card paper-main-card">
