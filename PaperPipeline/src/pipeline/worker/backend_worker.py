@@ -24,12 +24,14 @@ class BackendParseWorker:
         client: BackendClient,
         pdf_dir: Path,
         *,
+        worker_id: str = "papermate-worker",
         max_pages: int | None = None,
         min_chars: int = 500,
         html_dir: Path | None = None,
         prefer_html: bool = False,
     ) -> None:
         self.client = client
+        self.worker_id = worker_id
         self.pdf_dir = pdf_dir
         self.max_pages = max_pages
         self.min_chars = min_chars
@@ -38,10 +40,10 @@ class BackendParseWorker:
         self.agent = ChatAgent(AgentConfig.from_env())
 
     def run_once(self) -> dict[str, Any] | None:
-        tasks = self.client.list_tasks(status="queued", limit=1)
-        if not tasks:
+        task = self.client.claim_task(self.worker_id)
+        if task is None:
             return None
-        return self.process_task(tasks[0])
+        return self.process_task(task)
 
     def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         task_id = int(task["task_id"])

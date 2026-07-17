@@ -1,0 +1,108 @@
+{
+  "generated_at": "2026-07-17T06:29:07.103487+00:00",
+  "api_base": "http://127.0.0.1:8000",
+  "arxiv_id": "1706.03762",
+  "steps": {
+    "health": {
+      "ok": true,
+      "data": {
+        "status": "ok",
+        "database": "ok",
+        "environment": "dev",
+        "version": "0.1.0",
+        "component_versions": {
+          "api": "0.1.0",
+          "service": "0.1.0",
+          "orm": "sqlalchemy-2",
+          "migration": "alembic-1"
+        }
+      }
+    },
+    "ingest": {
+      "ok": true,
+      "upsert": {
+        "items": [
+          {
+            "paper_id": 1,
+            "arxiv_id": "1706.03762",
+            "title": "Attention Is All You Need",
+            "authors": [
+              "Ashish Vaswani",
+              "Noam Shazeer",
+              "Niki Parmar",
+              "Jakob Uszkoreit",
+              "Llion Jones",
+              "Aidan N. Gomez",
+              "Lukasz Kaiser",
+              "Illia Polosukhin"
+            ],
+            "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.",
+            "published_at": "2017-06-12T17:57:34",
+            "primary_category": "cs.CL",
+            "pdf_url": "https://arxiv.org/pdf/1706.03762.pdf",
+            "source_url": "https://arxiv.org/abs/1706.03762",
+            "ingest_status": "metadata_only",
+            "parse_status": "pending",
+            "chunk_count": 22,
+            "qa_ready": false
+          }
+        ],
+        "created": 0,
+        "updated": 1
+      },
+      "paper_id": 1,
+      "arxiv_id": "1706.03762"
+    },
+    "parse_task": {
+      "ok": true,
+      "task": {
+        "task_id": 1,
+        "paper_id": 1,
+        "task_type": "full_parse",
+        "status": "succeeded",
+        "attempt": 1,
+        "idempotency_key": "6b896b95bd741bba",
+        "requested_at": "2026-07-17T06:24:18",
+        "started_at": "2026-07-17T06:24:18.271070",
+        "finished_at": "2026-07-17T06:24:55.925099",
+        "error_code": null,
+        "stage": "completed",
+        "retryable": false
+      }
+    },
+    "worker": {
+      "ok": true,
+      "result": {
+        "task_id": 1,
+        "paper_id": 1,
+        "status": "succeeded",
+        "stage": "completed",
+        "source_type": "pdf",
+        "chunks": 22,
+        "validation_flags": []
+      }
+    },
+    "wiki": {
+      "ok": true,
+      "parse_status": "qa_ready",
+      "chunk_count": 22,
+      "qa_ready": true,
+      "summary_preview": "Paper: Attention Is All You Need. The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The"
+    },
+    "search_chunks": {
+      "ok": true,
+      "n": 3,
+      "sample": [
+        {
+          "paper_id": 1,
+          "chunk_id": "p15_21",
+          "page_no": 15,
+          "section": "references",
+          "content": "Input-Input Layer5 The Law will never be perfect , but its application should be just - this is what we are missing , in my opinion . <EOS> <pad> The Law will never be perfect , but its application should be just - this is what we are missing , in my opinion . <EOS> <pad> Input-Input Layer5 The Law will never be perfect , but its application should be just - this is what we are missing , in my opinion . <EOS> <pad> The Law will never be perfect , but its application should be just - this is what we are missing , in my opinion . <EOS> <pad> Figure 5: Many of the attention heads exhibit behaviour that seems related to the structure of the sentence. We give two such examples above, from two different heads from the encoder self-attention at layer 5 of 6. The heads clearly learned to perform different tasks. 15",
+          "score": 1.5
+        }
+      ]
+    }
+  },
+  "ok": true
+}

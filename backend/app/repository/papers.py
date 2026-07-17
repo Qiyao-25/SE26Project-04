@@ -51,11 +51,23 @@ def list_papers(
     published_to: datetime | None,
     page: int,
     page_size: int,
+    keywords: list[str] | None = None,
 ) -> tuple[list[Paper], int]:
     filters = [Paper.deleted_at.is_(None)]
-    if keyword:
-        pattern = f"%{keyword.strip()}%"
-        filters.append(or_(Paper.title.ilike(pattern), Paper.abstract.ilike(pattern), Paper.arxiv_id.ilike(pattern)))
+    keyword_terms = [item.strip() for item in (keywords or []) if item and item.strip()]
+    if not keyword_terms and keyword and keyword.strip():
+        keyword_terms = [keyword.strip()]
+    if keyword_terms:
+        term_filters = []
+        for term in keyword_terms[:12]:
+            pattern = f"%{term}%"
+            term_filters.extend([
+                Paper.title.ilike(pattern),
+                Paper.abstract.ilike(pattern),
+                Paper.arxiv_id.ilike(pattern),
+                Paper.primary_category.ilike(pattern),
+            ])
+        filters.append(or_(*term_filters))
     if author:
         author_pattern = f"%{author.strip()}%"
         filters.append(Paper.authors.any(PaperAuthor.author.has(Author.display_name.ilike(author_pattern))))
@@ -68,6 +80,19 @@ def list_papers(
 
     count_stmt = select(func.count(Paper.id)).where(*filters)
     total = session.scalar(count_stmt) or 0
+    if keyword_terms:
+        fetch_size = min(max(page * page_size * 3, page_size * 2), 120)
+        stmt = (
+            select(Paper)
+            .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
+            .where(*filters)
+            .order_by(Paper.published_at.desc().nullslast(), Paper.id.desc())
+            .limit(fetch_size)
+        )
+        papers = list(session.scalars(stmt).unique())
+        papers = _rank_papers(papers, keyword_terms)
+        start = (page - 1) * page_size
+        return papers[start : start + page_size], total
     stmt = (
         select(Paper)
         .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
@@ -77,6 +102,18 @@ def list_papers(
         .limit(page_size)
     )
     return list(session.scalars(stmt).unique()), total
+
+
+def _rank_papers(papers: list[Paper], keywords: list[str]) -> list[Paper]:
+    lowered = [keyword.casefold() for keyword in keywords if keyword]
+
+    def score(paper: Paper) -> tuple[int, int]:
+        blob = " ".join([paper.title or "", paper.abstract or "", paper.arxiv_id or "", paper.primary_category or ""]).casefold()
+        hits = sum(1 for keyword in lowered if keyword in blob)
+        title_hits = sum(1 for keyword in lowered if keyword in (paper.title or "").casefold())
+        return (title_hits * 3 + hits, len(paper.abstract or ""))
+
+    return sorted(papers, key=score, reverse=True)
 
 
 def get_paper(session: Session, paper_id: int) -> Paper | None:

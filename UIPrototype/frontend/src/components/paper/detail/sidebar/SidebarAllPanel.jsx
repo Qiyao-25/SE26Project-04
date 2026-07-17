@@ -1,4 +1,4 @@
-import { Card, Tag, Typography, Button, Space } from 'antd';
+import { Alert, Card, Tag, Typography, Button, Space } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import { useApp } from '../../../../context/AppContext';
 import { MODE_ASSIST } from '../../../../data/papers';
@@ -81,6 +81,7 @@ export default function SidebarAllPanel({
   qaStatus
 }) {
   const { persona } = useApp();
+  const parsed = ['completed', 'qa_ready'].includes(paper.parseStatus);
 
   const sections = [
     {
@@ -94,9 +95,18 @@ export default function SidebarAllPanel({
       title: '辅助阅读',
       extra: <Tag>{persona}模式</Tag>,
       content: (
-        <Paragraph style={{ fontSize: 12, margin: 0, whiteSpace: 'pre-wrap' }}>
-          {MODE_ASSIST[persona](paper)}
-        </Paragraph>
+        parsed ? (
+          <Paragraph style={{ fontSize: 12, margin: 0, whiteSpace: 'pre-wrap' }}>
+            {MODE_ASSIST[persona](paper)}
+          </Paragraph>
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            message="完成解析后可用"
+            description="论文解析完成后，这里才会生成辅助阅读内容。"
+          />
+        )
       )
     },
     {

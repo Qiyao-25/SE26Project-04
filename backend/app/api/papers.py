@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
-from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperItem, PaperPage, PaperUpsert, TaskResponse, TextChunkBatch, WikiData
+from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperItem, PaperPage, PaperUpsert, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
-from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_wiki, search_papers
+from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_wiki, search_papers, smart_search_papers
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
 
@@ -58,6 +58,19 @@ def papers(
     page_size: int = Query(default=12, ge=1, le=100),
 ):
     data = search_papers(db, keyword=keyword, author=author, category=category, published_from=published_from, published_to=published_to, page=page, page_size=page_size)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/smart-search", response_model=ApiResponse[SmartSearchResponse], summary="智能论文检索（查询改写+模糊匹配+生成回答）")
+def smart_search(payload: SmartSearchRequest, request: Request, db: Session = Depends(db_session)):
+    data = smart_search_papers(
+        db,
+        query=payload.query.strip(),
+        page=payload.page,
+        page_size=payload.page_size,
+        category=payload.category,
+        settings=request.app.state.settings,
+    )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
@@ -163,7 +176,14 @@ def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
 def qa(paper_id: str, payload: AskPaperRequest, request: Request, db: Session = Depends(db_session)):
     if paper_id.isdigit():
         try:
-            result = answer_question(db, int(paper_id), payload.question, [item.model_dump() for item in payload.history])
+            result = answer_question(
+                db,
+                int(paper_id),
+                payload.question,
+                history=[item.model_dump() for item in payload.history],
+                conversation_id=payload.conversationId,
+                settings=request.app.state.settings,
+            )
         except PaperServiceError as exc:
             return _db_error(request, exc)
         data = _qa_payload(result, len(payload.history))

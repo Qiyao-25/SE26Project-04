@@ -1,29 +1,9 @@
-import re
-
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.model import Paper, TextChunk
 from app.schema.papers import ChunkSearchRequest, TextChunkBatch
-
-
-_EN_STOPWORDS = {
-    "a", "an", "and", "are", "be", "by", "can", "do", "does", "for", "from",
-    "how", "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
-    "was", "what", "when", "where", "which", "who", "why", "with",
-}
-
-
-def _tokens(value: str) -> set[str]:
-    normalized = value.casefold()
-    english = {
-        token for token in re.findall(r"[a-z0-9]+", normalized)
-        if len(token) > 1 and token not in _EN_STOPWORDS
-    }
-    chinese = set()
-    for run in re.findall(r"[\u4e00-\u9fff]{2,}", normalized):
-        chinese.update(run[index:index + 2] for index in range(len(run) - 1))
-    return english | chinese
+from app.service.qa_citations import score_chunk
 
 
 def upsert_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> int:
@@ -54,7 +34,7 @@ def _write_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> i
         chunk.content = item.content
     paper.chunk_count = session.scalar(
         select(func.count(TextChunk.id)).where(TextChunk.paper_id == paper_id)
-    ) or 0
+    ) or len(payload.chunks)
     return len(payload.chunks)
 
 
@@ -70,15 +50,23 @@ def search_chunks(session: Session, request: ChunkSearchRequest):
     if paper_ids:
         stmt = stmt.where(TextChunk.paper_id.in_(paper_ids))
     candidates = session.scalars(stmt).all()
-    query_tokens = _tokens(request.query)
     scored = []
     for chunk in candidates:
-        content_tokens = _tokens(chunk.content)
-        overlap = len(query_tokens & content_tokens)
-        score = overlap / max(len(query_tokens), 1)
-        if request.query.casefold() in chunk.content.casefold():
-            score += 0.5
+        score = score_chunk(request.query, chunk.content or "")
         if score > 0:
             scored.append((score, chunk))
-    scored.sort(key=lambda item: (item[0], item[1].id), reverse=True)
-    return [(chunk, round(score, 6)) for score, chunk in scored[: request.top_k]]
+    scored.sort(key=lambda item: (item[0], len(item[1].content or ""), item[1].id), reverse=True)
+    if scored:
+        return [(chunk, round(score, 6)) for score, chunk in scored[: request.top_k]]
+
+    weak = sorted(
+        candidates,
+        key=lambda chunk: (-len(chunk.content or ""), chunk.id),
+    )
+    weak = [
+        chunk for chunk in weak
+        if len(chunk.content or "") >= 80
+        and "permission to reproduce" not in (chunk.content or "").lower()
+        and "arxiv:" not in (chunk.content or "").lower()
+    ][: request.top_k]
+    return [(chunk, 0.01) for chunk in weak]

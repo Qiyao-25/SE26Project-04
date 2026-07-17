@@ -35,6 +35,7 @@ python -m pipeline.qa.run_eval
 
 ```powershell
 $env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"
+$env:PAPERMATE_WORKER_TOKEN = "本地内部令牌"
 python -m pipeline.crawler.run_crawl --target 20
 ```
 
@@ -54,6 +55,7 @@ python -m pipeline.crawler.run_crawl --target 20
 cd SE26Project-04/PaperPipeline
 $env:PYTHONPATH = "src"
 $env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"
+$env:PAPERMATE_WORKER_TOKEN = "本地内部令牌"
 python -m pipeline.worker.run_backend_worker
 ```
 

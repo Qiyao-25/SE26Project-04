@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,13 @@ from app.schema.papers import (
 
 TASK_STATUSES = {"queued", "running", "succeeded", "failed", "timed_out"}
 MAX_ATTEMPTS = 3
+ALLOWED_TRANSITIONS = {
+    "queued": {"running"},
+    "running": {"running", "failed", "timed_out"},
+    "succeeded": set(),
+    "failed": set(),
+    "timed_out": set(),
+}
 
 
 def _now() -> datetime:
@@ -85,6 +92,40 @@ def list_tasks(session: Session, status: str | None = None, limit: int = 20) -> 
     return [to_task(task) for task in session.scalars(stmt).all()]
 
 
+def claim_task(session: Session, worker_id: str) -> TaskResponse | None:
+    """Atomically claim the oldest queued task for one Worker."""
+    if not worker_id.strip():
+        raise ValueError("WORKER_ID_INVALID")
+    for _ in range(3):
+        task_id = session.scalar(
+            select(ParseTask.id)
+            .where(ParseTask.status == "queued")
+            .order_by(ParseTask.requested_at.asc(), ParseTask.id.asc())
+            .limit(1)
+        )
+        if task_id is None:
+            return None
+
+        now = _now()
+        result = session.execute(
+            update(ParseTask)
+            .where(ParseTask.id == task_id, ParseTask.status == "queued")
+            .values(status="running", started_at=now, stage="fetch", error_code=None)
+        )
+        if result.rowcount != 1:
+            session.rollback()
+            continue
+
+        task = session.get(ParseTask, task_id)
+        paper = session.get(Paper, task.paper_id) if task else None
+        if paper is not None:
+            paper.ingest_status = "parsing"
+        session.commit()
+        session.refresh(task)
+        return to_task(task)
+    return None
+
+
 def queue_stats(session: Session, stale_after_seconds: int = 900) -> dict:
     counts = {
         status: session.scalar(select(func.count(ParseTask.id)).where(ParseTask.status == status)) or 0
@@ -119,6 +160,8 @@ def update_task(session: Session, task_id: int, payload: TaskUpdate) -> TaskResp
     task = session.get(ParseTask, task_id)
     if task is None:
         raise ValueError("TASK_NOT_FOUND")
+    if payload.status not in ALLOWED_TRANSITIONS.get(task.status, set()):
+        raise ValueError("TASK_STATE_CONFLICT")
     if payload.status == "running" and task.status == "queued":
         task.started_at = task.started_at or _now()
     if payload.stage:

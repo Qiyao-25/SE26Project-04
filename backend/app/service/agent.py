@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from typing import Any
 
 from app.core.config import Settings
@@ -10,6 +11,12 @@ from app.core.config import Settings
 
 class AgentCallError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class AgentAnswer:
+    answer: str
+    citation_ids: list[str]
 
 
 class AgentClient:
@@ -75,6 +82,14 @@ class AgentClient:
             answer = str(result.get("answer") or "").strip()
             if not answer:
                 raise ValueError("empty answer")
-            return answer
+            citation_ids = result.get("citation_ids")
+            if isinstance(citation_ids, str):
+                citation_ids = [citation_ids]
+            if not isinstance(citation_ids, list):
+                raise ValueError("citation_ids must be a list")
+            return AgentAnswer(
+                answer=answer,
+                citation_ids=list(dict.fromkeys(str(item).strip() for item in citation_ids if str(item).strip())),
+            )
         except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise AgentCallError(f"agent returned invalid answer: {exc}") from exc

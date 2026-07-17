@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, Header, Query, Request
+import secrets
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schema.common import ApiResponse
-from app.schema.papers import ParseResultCommit, StructuredResultBatch, TaskQueueStats, TaskResponse, TaskUpdate
-from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
+from app.schema.papers import ParseResultCommit, StructuredResultBatch, TaskClaimRequest, TaskQueueStats, TaskResponse, TaskUpdate
+from app.service.tasks import claim_task, create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -28,9 +30,20 @@ def map_error(request: Request, error: ValueError):
         "TASK_CONFLICT": ("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409),
         "TASK_RETRY_CONFLICT": ("TASK_RETRY_CONFLICT", "当前任务状态不允许重试", 409),
         "TASK_RETRY_EXHAUSTED": ("TASK_RETRY_EXHAUSTED", "解析任务已达到最大重试次数", 409),
+        "TASK_STATE_CONFLICT": ("TASK_STATE_CONFLICT", "解析任务状态不允许该操作", 409),
+        "WORKER_ID_INVALID": ("WORKER_ID_INVALID", "Worker 标识不能为空", 400),
     }
     code, message, status_code = mapping.get(str(error), ("INTERNAL_ERROR", "任务处理失败", 500))
     return error_response(request, code, message, status_code)
+
+
+def require_worker_access(
+    request: Request,
+    worker_token: str | None = Header(default=None, alias="X-Worker-Token"),
+) -> None:
+    expected = request.app.state.settings.worker_token
+    if not expected or not worker_token or not secrets.compare_digest(worker_token, expected):
+        raise HTTPException(status_code=403, detail="Worker 内部接口未授权")
 
 
 @router.get("/stats", response_model=ApiResponse[TaskQueueStats], summary="查询解析队列统计")
@@ -43,6 +56,17 @@ def task_stats(
         data=queue_stats(db, timeout_seconds),
         request_id=request.state.request_id,
     )
+
+
+@router.post("/claim", response_model=ApiResponse[TaskResponse | None], summary="Worker 原子领取解析任务")
+def task_claim(
+    payload: TaskClaimRequest,
+    request: Request,
+    _worker: None = Depends(require_worker_access),
+    db: Session = Depends(db_session),
+):
+    data = claim_task(db, payload.worker_id)
+    return ApiResponse(data=data, request_id=request.state.request_id)
 
 
 @router.get("/{task_id}", response_model=ApiResponse[TaskResponse], summary="查询解析任务")
@@ -71,6 +95,7 @@ def task_list(
 @router.post("/recover-stale", response_model=ApiResponse[dict], summary="恢复超时解析任务")
 def recover_stale(
     request: Request,
+    _worker: None = Depends(require_worker_access),
     db: Session = Depends(db_session),
     timeout_seconds: int = Query(default=900, ge=60, le=86400),
 ):
@@ -95,7 +120,7 @@ def enqueue_pending(
 
 
 @router.patch("/{task_id}", response_model=ApiResponse[TaskResponse], summary="更新解析任务状态")
-def task_update(task_id: int, payload: TaskUpdate, request: Request, db: Session = Depends(db_session)):
+def task_update(task_id: int, payload: TaskUpdate, request: Request, _worker: None = Depends(require_worker_access), db: Session = Depends(db_session)):
     try:
         data = update_task(db, task_id, payload)
     except ValueError as exc:
@@ -113,7 +138,7 @@ def task_retry(task_id: int, request: Request, db: Session = Depends(db_session)
 
 
 @router.post("/{task_id}/results", response_model=ApiResponse[TaskResponse], summary="写入结构化解析结果")
-def task_results(task_id: int, payload: StructuredResultBatch, request: Request, db: Session = Depends(db_session)):
+def task_results(task_id: int, payload: StructuredResultBatch, request: Request, _worker: None = Depends(require_worker_access), db: Session = Depends(db_session)):
     try:
         data = save_results(db, task_id, payload)
     except ValueError as exc:
@@ -122,7 +147,7 @@ def task_results(task_id: int, payload: StructuredResultBatch, request: Request,
 
 
 @router.post("/{task_id}/finalize", response_model=ApiResponse[TaskResponse], summary="一次性提交论文解析结果")
-def task_finalize(task_id: int, payload: ParseResultCommit, request: Request, db: Session = Depends(db_session)):
+def task_finalize(task_id: int, payload: ParseResultCommit, request: Request, _worker: None = Depends(require_worker_access), db: Session = Depends(db_session)):
     try:
         data = save_parse_result(db, task_id, payload)
     except ValueError as exc:

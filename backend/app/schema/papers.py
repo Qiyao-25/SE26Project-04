@@ -92,6 +92,10 @@ class TaskQueueStats(BaseModel):
     oldest_queued_at: datetime | None = None
 
 
+class TaskClaimRequest(BaseModel):
+    worker_id: str = Field(min_length=1, max_length=128)
+
+
 class TaskUpdate(BaseModel):
     status: Literal["running", "failed", "timed_out"]
     error_code: str | None = Field(default=None, max_length=64)
@@ -200,3 +204,26 @@ class QaResponse(BaseModel):
     answer: str
     created_at: datetime
     citations: list[dict]
+
+
+class SmartSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=12, ge=1, le=50)
+    category: str | None = Field(default=None, max_length=128)
+
+
+class SmartSearchResponse(BaseModel):
+    query: str
+    rewritten_query: str
+    keywords: list[str]
+    intent: str = ""
+    answer: str
+    highlights: list[str] = Field(default_factory=list)
+    plan_source: str = "heuristic"
+    answer_source: str = "template"
+    items: list[PaperItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
