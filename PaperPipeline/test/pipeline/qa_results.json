@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T08:00:17.134734+00:00",
+  "generated_at": "2026-07-17T01:26:18.430440+00:00",
   "mode": "sample",
   "api_base": null,
   "total": 20,
@@ -30,15 +30,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.003,
-        "retrieval_s": 0.0027
+        "elapsed_s": 0.0035,
+        "retrieval_s": 0.0032
       },
       "ui_qa": {
         "conversationId": "conversation-P1",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P1",
         "answer": "Based on the retrieved passage (chunk p1_0): Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam",
-        "createdAt": "2026-07-16T08:00:17.101950+00:00",
+        "createdAt": "2026-07-17T01:26:18.397434+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -79,15 +79,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0016,
-        "retrieval_s": 0.0016
+        "elapsed_s": 0.0018,
+        "retrieval_s": 0.0018
       },
       "ui_qa": {
         "conversationId": "conversation-P1",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P1",
         "answer": "Multi-Head Attention lets the model attend to representation subspaces from different positions in parallel, as described in the cited section.",
-        "createdAt": "2026-07-16T08:00:17.102950+00:00",
+        "createdAt": "2026-07-17T01:26:18.399437+00:00",
         "citations": [
           {
             "citationId": "citation-001-p3_2",
@@ -128,15 +128,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0023,
-        "retrieval_s": 0.0023
+        "elapsed_s": 0.0022,
+        "retrieval_s": 0.0021
       },
       "ui_qa": {
         "conversationId": "conversation-P2",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P2",
         "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
-        "createdAt": "2026-07-16T08:00:17.105950+00:00",
+        "createdAt": "2026-07-17T01:26:18.402434+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -182,10 +182,10 @@
       },
       "ui_qa": {
         "conversationId": "conversation-P2",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P2",
         "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
-        "createdAt": "2026-07-16T08:00:17.107955+00:00",
+        "createdAt": "2026-07-17T01:26:18.403434+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -226,15 +226,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0023,
-        "retrieval_s": 0.0022
+        "elapsed_s": 0.0019,
+        "retrieval_s": 0.0018
       },
       "ui_qa": {
         "conversationId": "conversation-P3",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P3",
         "answer": "Based on the retrieved passage (chunk p1_0): Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead",
-        "createdAt": "2026-07-16T08:00:17.109956+00:00",
+        "createdAt": "2026-07-17T01:26:18.405434+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -275,15 +275,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0017,
-        "retrieval_s": 0.0017
+        "elapsed_s": 0.0016,
+        "retrieval_s": 0.0015
       },
       "ui_qa": {
         "conversationId": "conversation-P3",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P3",
         "answer": "Based on the retrieved passage (chunk p1_0): Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead",
-        "createdAt": "2026-07-16T08:00:17.111967+00:00",
+        "createdAt": "2026-07-17T01:26:18.407433+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -324,15 +324,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0023,
-        "retrieval_s": 0.0023
+        "elapsed_s": 0.003,
+        "retrieval_s": 0.003
       },
       "ui_qa": {
         "conversationId": "conversation-P4",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P4",
         "answer": "Based on the retrieved passage (chunk p1_0): LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu",
-        "createdAt": "2026-07-16T08:00:17.114732+00:00",
+        "createdAt": "2026-07-17T01:26:18.410434+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -373,15 +373,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0018,
-        "retrieval_s": 0.0018
+        "elapsed_s": 0.0017,
+        "retrieval_s": 0.0016
       },
       "ui_qa": {
         "conversationId": "conversation-P4",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P4",
         "answer": "Based on the retrieved passage (chunk p1_0): LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu",
-        "createdAt": "2026-07-16T08:00:17.115731+00:00",
+        "createdAt": "2026-07-17T01:26:18.412437+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -422,15 +422,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0021,
-        "retrieval_s": 0.0021
+        "elapsed_s": 0.0018,
+        "retrieval_s": 0.0018
       },
       "ui_qa": {
         "conversationId": "conversation-P5",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P5",
         "answer": "Based on the retrieved passage (chunk p1_0): 1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Pe",
-        "createdAt": "2026-07-16T08:00:17.118736+00:00",
+        "createdAt": "2026-07-17T01:26:18.414434+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -471,15 +471,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0014,
+        "elapsed_s": 0.0015,
         "retrieval_s": 0.0014
       },
       "ui_qa": {
         "conversationId": "conversation-P5",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P5",
         "answer": "Based on the retrieved passage (chunk p1_0): 1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Pe",
-        "createdAt": "2026-07-16T08:00:17.119735+00:00",
+        "createdAt": "2026-07-17T01:26:18.416440+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -520,15 +520,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0018,
-        "retrieval_s": 0.0018
+        "elapsed_s": 0.0021,
+        "retrieval_s": 0.0021
       },
       "ui_qa": {
         "conversationId": "conversation-P6",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P6",
         "answer": "Based on the retrieved passage (chunk p1_0): Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg",
-        "createdAt": "2026-07-16T08:00:17.121739+00:00",
+        "createdAt": "2026-07-17T01:26:18.418443+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -569,15 +569,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0014,
-        "retrieval_s": 0.0013
+        "elapsed_s": 0.0012,
+        "retrieval_s": 0.0012
       },
       "ui_qa": {
         "conversationId": "conversation-P6",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P6",
         "answer": "Based on the retrieved passage (chunk p1_0): Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg",
-        "createdAt": "2026-07-16T08:00:17.123735+00:00",
+        "createdAt": "2026-07-17T01:26:18.419443+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -618,15 +618,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0021,
-        "retrieval_s": 0.0021
+        "elapsed_s": 0.0018,
+        "retrieval_s": 0.0017
       },
       "ui_qa": {
         "conversationId": "conversation-P7",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P7",
         "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
-        "createdAt": "2026-07-16T08:00:17.125735+00:00",
+        "createdAt": "2026-07-17T01:26:18.421435+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -667,15 +667,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0015,
-        "retrieval_s": 0.0015
+        "elapsed_s": 0.0014,
+        "retrieval_s": 0.0014
       },
       "ui_qa": {
         "conversationId": "conversation-P7",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P7",
         "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
-        "createdAt": "2026-07-16T08:00:17.127731+00:00",
+        "createdAt": "2026-07-17T01:26:18.423432+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -716,15 +716,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0021,
-        "retrieval_s": 0.0021
+        "elapsed_s": 0.0017,
+        "retrieval_s": 0.0017
       },
       "ui_qa": {
         "conversationId": "conversation-P8",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P8",
         "answer": "Based on the retrieved passage (chunk p1_0): Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh",
-        "createdAt": "2026-07-16T08:00:17.129734+00:00",
+        "createdAt": "2026-07-17T01:26:18.425435+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -765,15 +765,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0015,
-        "retrieval_s": 0.0015
+        "elapsed_s": 0.0014,
+        "retrieval_s": 0.0014
       },
       "ui_qa": {
         "conversationId": "conversation-P8",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P8",
         "answer": "Based on the retrieved passage (chunk p1_0): Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh",
-        "createdAt": "2026-07-16T08:00:17.131739+00:00",
+        "createdAt": "2026-07-17T01:26:18.426433+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -815,14 +815,14 @@
         "error": null,
         "mode": "sample",
         "elapsed_s": 0.0015,
-        "retrieval_s": 0.0015
+        "retrieval_s": 0.0014
       },
       "ui_qa": {
         "conversationId": "conversation-P1",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P1",
         "answer": "Based on the retrieved passage (chunk p1_0): Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam",
-        "createdAt": "2026-07-16T08:00:17.132736+00:00",
+        "createdAt": "2026-07-17T01:26:18.428439+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",
@@ -863,15 +863,15 @@
         "rejected": false,
         "error": null,
         "mode": "sample",
-        "elapsed_s": 0.0015,
-        "retrieval_s": 0.0015
+        "elapsed_s": 0.0016,
+        "retrieval_s": 0.0016
       },
       "ui_qa": {
         "conversationId": "conversation-P7",
-        "messageId": "assistant-20260716080017",
+        "messageId": "assistant-20260717012618",
         "paperId": "P7",
         "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
-        "createdAt": "2026-07-16T08:00:17.134734+00:00",
+        "createdAt": "2026-07-17T01:26:18.429439+00:00",
         "citations": [
           {
             "citationId": "citation-001-p1_0",

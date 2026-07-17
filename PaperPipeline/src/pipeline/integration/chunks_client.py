@@ -1,4 +1,8 @@
-"""Chunks retrieval — local sample fallback; remote stub for C POST /search/chunks."""
+"""Chunks retrieval — local sample fallback; remote stub for future chunk search.
+
+Backend today: TextChunk ORM exists but NO /search/chunks route yet.
+DB QA uses abstract stub only. Remote call is best-effort; always falls back local.
+"""
 
 from __future__ import annotations
 
@@ -36,38 +40,39 @@ class ChunksClient:
         return self._search_local(arxiv_id, query)
 
     def _search_remote(self, arxiv_id: str, query: str, *, timeout_s: float) -> list[TextChunkRef] | None:
-        """Target: POST {api_base}/search/chunks — pending C H065/H066."""
-        url = f"{self.api_base}/search/chunks"
-        body = json.dumps({"arxiv_id": arxiv_id, "query": query, "top_k": self.top_k}).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={"Content-Type": "application/json", "User-Agent": "PaperMate-QA/0.1"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            # Backend ApiResponse{code,message,data,request_id} or raw list
-            from .contracts import unwrap_api_response
+        """Future: POST {api_base}/api/search/chunks — not implemented in backend yet."""
+        from .contracts import unwrap_api_response
 
-            items = unwrap_api_response(data)
-            if isinstance(items, dict):
-                items = items.get("chunks", [])
-            out: list[TextChunkRef] = []
-            for c in items[: self.top_k]:
-                out.append(
-                    TextChunkRef(
-                        chunk_id=c.get("chunk_id") or c.get("sectionId") or "",
-                        page_no=c.get("page_no", c.get("pageNumber")),
-                        section=c.get("section") or c.get("sectionTitle"),
-                        content=c.get("content") or c.get("quote") or "",
-                        score=float(c.get("score", 0)),
+        for path in ("/api/search/chunks", "/search/chunks"):
+            url = f"{self.api_base}{path}"
+            body = json.dumps({"arxiv_id": arxiv_id, "query": query, "top_k": self.top_k}).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={"Content-Type": "application/json", "User-Agent": "PaperMate-QA/0.2"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                items = unwrap_api_response(data)
+                if isinstance(items, dict):
+                    items = items.get("chunks", [])
+                out: list[TextChunkRef] = []
+                for c in (items or [])[: self.top_k]:
+                    out.append(
+                        TextChunkRef(
+                            chunk_id=c.get("chunk_id") or c.get("sectionId") or "",
+                            page_no=c.get("page_no", c.get("pageNumber")),
+                            section=c.get("section") or c.get("sectionTitle"),
+                            content=c.get("content") or c.get("quote") or "",
+                            score=float(c.get("score", 0)),
+                        )
                     )
-                )
-            return out
-        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, KeyError, TypeError):
-            return None
+                return out
+            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, KeyError, TypeError):
+                continue
+        return None
 
     def _search_local(self, arxiv_id: str, query: str) -> list[TextChunkRef]:
         base = re.sub(r"v\d+$", "", arxiv_id)

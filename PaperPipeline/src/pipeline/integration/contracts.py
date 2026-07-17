@@ -1,9 +1,12 @@
-"""Contract adapters: PaperPipeline ↔ backend ORM ↔ UIPrototype mocks.
+"""Contract adapters: PaperPipeline ↔ backend API/ORM ↔ UIPrototype mocks.
 
-References:
-- backend/app/model/entities.py
-- backend/app/schema/common.py (ApiResponse: code/message/data/request_id)
-- UIPrototype/frontend/src/mocks/paper-*.json
+Aligned with (2026-07 backend):
+- POST /api/papers/batch  body = list[PaperUpsert]  (NOT wrapped in {"papers":...})
+- AuthorInput: {name, orcid?}
+- StructuredResult.result_type: summary | concepts | methods | limitations
+- Wiki GET /api/papers/{id}/wiki reads those types
+- QA POST /api/papers/{id}/qa  (AskPaperRequest)
+- ApiResponse{code, message, data, request_id}
 """
 
 from __future__ import annotations
@@ -13,10 +16,6 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-
-# ---------------------------------------------------------------------------
-# ParseTask status: pipeline-granular ↔ ORM-coarse
-# ---------------------------------------------------------------------------
 
 PIPELINE_TO_ORM_STATUS: dict[str, str] = {
     "pending": "queued",
@@ -32,6 +31,14 @@ PIPELINE_TO_ORM_STATUS: dict[str, str] = {
     "parse_failed": "failed",
     "parse_timeout": "failed",
     "summarize_failed": "failed",
+    "failed": "failed",
+}
+
+# backend ingest_status → UI parseStatus (see service.papers.parse_status)
+INGEST_TO_UI_PARSE: dict[str, str] = {
+    "metadata_only": "pending",
+    "downloaded": "pending",
+    "parsed": "completed",
     "failed": "failed",
 }
 
@@ -51,44 +58,52 @@ def orm_status_to_ui_parse(status: str) -> str:
     return ORM_TO_UI_PARSE_STATUS.get(status, "pending")
 
 
+def ingest_status_to_ui_parse(ingest_status: str) -> str:
+    return INGEST_TO_UI_PARSE.get(ingest_status, "pending")
+
+
 def make_idempotency_key(arxiv_id: str, pipeline_ver: str = "v0") -> str:
-    raw = f"{arxiv_id}:{pipeline_ver}"
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha1(f"{arxiv_id}:{pipeline_ver}".encode("utf-8")).hexdigest()[:16]
 
 
-# ---------------------------------------------------------------------------
-# PaperMeta → backend Paper ORM (entities.Paper + authors)
-# ---------------------------------------------------------------------------
+def _authors_for_upsert(authors: list[Any]) -> list[dict[str, Any]]:
+    """Map to backend AuthorInput {name, orcid?}."""
+    out: list[dict[str, Any]] = []
+    for a in authors or []:
+        if isinstance(a, dict):
+            name = a.get("name") or a.get("display_name") or ""
+            if name:
+                item: dict[str, Any] = {"name": name}
+                if a.get("orcid"):
+                    item["orcid"] = a["orcid"]
+                out.append(item)
+        elif isinstance(a, str) and a.strip():
+            out.append({"name": a.strip()})
+    return out
+
 
 def paper_meta_to_backend(meta: Any) -> dict[str, Any]:
-    """Map crawler PaperMeta → POST /papers/batch item (ORM-aligned)."""
+    """Map crawler PaperMeta → PaperUpsert dict for POST /api/papers/batch."""
     arxiv_id = re.sub(r"v\d+$", "", getattr(meta, "arxiv_id", "") or "")
     categories = getattr(meta, "categories", None) or []
     authors = getattr(meta, "authors", None) or []
     published = getattr(meta, "published", "") or ""
-    published_at = published if published else None
     return {
         "arxiv_id": arxiv_id,
         "title": getattr(meta, "title", "") or "",
         "abstract": getattr(meta, "abstract", None),
-        "published_at": published_at,
+        "published_at": published or None,
         "primary_category": categories[0] if categories else None,
         "pdf_url": getattr(meta, "pdf_url", None) or f"https://arxiv.org/pdf/{arxiv_id}.pdf",
         "source_url": getattr(meta, "abs_url", None) or f"https://arxiv.org/abs/{arxiv_id}",
         "ingest_status": "metadata_only",
-        "authors": [
-            {"display_name": name, "author_order": i + 1}
-            for i, name in enumerate(authors)
-            if name
-        ],
+        "authors": _authors_for_upsert(authors),
     }
 
 
 def paper_dict_to_backend(raw: dict[str, Any]) -> dict[str, Any]:
-    """Same mapping when input is already a dict (seed.json rows)."""
     arxiv_id = re.sub(r"v\d+$", "", raw.get("arxiv_id", "") or "")
     categories = raw.get("categories") or []
-    authors = raw.get("authors") or []
     return {
         "arxiv_id": arxiv_id,
         "title": raw.get("title") or "",
@@ -98,17 +113,85 @@ def paper_dict_to_backend(raw: dict[str, Any]) -> dict[str, Any]:
         "pdf_url": raw.get("pdf_url") or f"https://arxiv.org/pdf/{arxiv_id}.pdf",
         "source_url": raw.get("abs_url") or raw.get("source_url") or f"https://arxiv.org/abs/{arxiv_id}",
         "ingest_status": raw.get("ingest_status") or "metadata_only",
-        "authors": (
-            authors
-            if authors and isinstance(authors[0], dict)
-            else [{"display_name": a, "author_order": i + 1} for i, a in enumerate(authors)]
-        ),
+        "authors": _authors_for_upsert(raw.get("authors") or []),
     }
 
 
-# ---------------------------------------------------------------------------
-# Structured wiki → backend StructuredResult + UI paper-summary
-# ---------------------------------------------------------------------------
+def wiki_to_backend_structured_rows(
+    *,
+    summary: str,
+    concept: str,
+    methods: str,
+    limitations: list[str] | None = None,
+    page_count: int = 0,
+    source: str = "pipeline_extractive",
+    version: int = 1,
+) -> list[dict[str, Any]]:
+    """Produce StructuredResult rows matching backend get_wiki() expectations.
+
+    result_type values: summary | concepts | methods | limitations
+    content_json:
+      - summary → {"summary": "..."}
+      - concepts/methods/limitations → {"items": [...]}
+    """
+    locator = {"page_count": page_count, "source": source}
+    rows: list[dict[str, Any]] = [
+        {
+            "result_type": "summary",
+            "version": version,
+            "content_json": {"summary": summary},
+            "source_locator": locator,
+            "confidence": None,
+        }
+    ]
+    if concept:
+        rows.append(
+            {
+                "result_type": "concepts",
+                "version": version,
+                "content_json": {
+                    "items": [
+                        {
+                            "conceptId": "concept-core",
+                            "name": "Core Concept",
+                            "description": concept[:800],
+                        }
+                    ]
+                },
+                "source_locator": locator,
+                "confidence": None,
+            }
+        )
+    if methods:
+        rows.append(
+            {
+                "result_type": "methods",
+                "version": version,
+                "content_json": {
+                    "items": [
+                        {
+                            "order": 1,
+                            "title": "Method Overview",
+                            "description": methods[:800],
+                        }
+                    ]
+                },
+                "source_locator": locator,
+                "confidence": None,
+            }
+        )
+    if limitations:
+        rows.append(
+            {
+                "result_type": "limitations",
+                "version": version,
+                "content_json": {"items": list(limitations)},
+                "source_locator": locator,
+                "confidence": None,
+            }
+        )
+    return rows
+
 
 def wiki_to_backend_structured(
     *,
@@ -118,17 +201,16 @@ def wiki_to_backend_structured(
     page_count: int = 0,
     source: str = "pipeline_extractive",
 ) -> dict[str, Any]:
-    """ORM StructuredResult row shape (content_json + source_locator)."""
+    """Legacy single-blob helper; prefer wiki_to_backend_structured_rows for C write API."""
     return {
-        "result_type": "wiki_triple",
-        "version": 1,
-        "content_json": {
-            "summary": summary,
-            "concept": concept,
-            "methods": methods,
-        },
-        "source_locator": {"page_count": page_count, "source": source},
-        "confidence": None,
+        "rows": wiki_to_backend_structured_rows(
+            summary=summary,
+            concept=concept,
+            methods=methods,
+            page_count=page_count,
+            source=source,
+        ),
+        "note": "Backend wiki reads separate result_type rows, not a single wiki_triple.",
     }
 
 
@@ -141,7 +223,7 @@ def wiki_to_ui_summary(
     methods: str,
     parse_status: str = "completed",
 ) -> dict[str, Any]:
-    """UIPrototype paper-summary.json `data` shape."""
+    """UIPrototype / backend PaperSummary-compatible shape."""
     concepts = []
     if concept:
         concepts.append(
@@ -170,12 +252,7 @@ def wiki_to_ui_summary(
     }
 
 
-# ---------------------------------------------------------------------------
-# TextChunk / QA citations → UI citation cards
-# ---------------------------------------------------------------------------
-
 def chunk_to_backend(chunk: dict[str, Any], *, paper_id_hint: str = "") -> dict[str, Any]:
-    """Normalize local para / remote chunk → TextChunk ORM fields."""
     return {
         "chunk_id": chunk.get("chunk_id") or chunk.get("para_id") or "",
         "page_no": chunk.get("page_no", chunk.get("page")),
@@ -184,17 +261,21 @@ def chunk_to_backend(chunk: dict[str, Any], *, paper_id_hint: str = "") -> dict[
     }
 
 
+def paragraphs_to_text_chunks(paragraphs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Local parse paragraphs → TextChunk ORM rows (for future POST /api/papers/{id}/chunks)."""
+    return [chunk_to_backend(p) for p in paragraphs]
+
+
 def citation_to_ui(
     *,
     chunk_id: str,
     page_no: int | None,
     section: str | None,
     quote: str,
-    paper_id: str,
+    paper_id: str | int,
     paper_title: str = "",
     index: int = 1,
 ) -> dict[str, Any]:
-    """UIPrototype paper-qa.json citation card (ChatPanel fields)."""
     section_title = section or "body"
     return {
         "citationId": f"citation-{index:03d}-{chunk_id}",
@@ -204,7 +285,6 @@ def citation_to_ui(
         "sectionTitle": section_title.replace("_", " ").title() if section_title else "原文",
         "pageNumber": page_no,
         "quote": (quote or "")[:400],
-        # Backend / pipeline dual fields (for C API / PaperPipeline eval)
         "chunk_id": chunk_id,
         "page_no": page_no,
         "section": section,
@@ -216,25 +296,23 @@ def qa_result_to_ui(
     arxiv_id: str,
     answer: str,
     citations: list[dict[str, Any]],
-    paper_id: str | None = None,
+    paper_id: str | int | None = None,
     paper_title: str = "",
     conversation_id: str | None = None,
 ) -> dict[str, Any]:
-    """UIPrototype askPaper response `data` shape."""
-    pid = paper_id or arxiv_id
-    ui_cites = []
-    for i, c in enumerate(citations, start=1):
-        ui_cites.append(
-            citation_to_ui(
-                chunk_id=c.get("chunk_id", ""),
-                page_no=c.get("page_no"),
-                section=c.get("section"),
-                quote=c.get("quote") or c.get("content") or "",
-                paper_id=pid,
-                paper_title=paper_title,
-                index=i,
-            )
+    pid = paper_id if paper_id is not None else arxiv_id
+    ui_cites = [
+        citation_to_ui(
+            chunk_id=c.get("chunk_id", ""),
+            page_no=c.get("page_no"),
+            section=c.get("section"),
+            quote=c.get("quote") or c.get("content") or "",
+            paper_id=pid,
+            paper_title=paper_title,
+            index=i,
         )
+        for i, c in enumerate(citations, start=1)
+    ]
     return {
         "conversationId": conversation_id or f"conversation-{pid}",
         "messageId": f"assistant-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
@@ -246,7 +324,6 @@ def qa_result_to_ui(
 
 
 def unwrap_api_response(payload: Any) -> Any:
-    """Accept backend ApiResponse{code,message,data,request_id} or bare data."""
     if isinstance(payload, dict) and "data" in payload and ("code" in payload or "request_id" in payload):
         return payload["data"]
     return payload
