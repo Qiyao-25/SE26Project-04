@@ -115,7 +115,7 @@ def content(paper_id: str, request: Request, db: Session = Depends(db_session)):
             paper = get_paper_detail(db, int(paper_id))
         except PaperServiceError as exc:
             return _db_error(request, exc)
-        return ApiResponse(data=PaperContent(paperId=str(paper.paper_id), contentType="pdf", pdfUrl=paper.pdf_url, defaultPage=1, sections=[]), request_id=request.state.request_id)
+        return ApiResponse(data=PaperContent(paperId=str(paper.paper_id), contentType="pdf+html", pdfUrl=paper.pdf_url, htmlUrl=f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}", defaultPage=1, sections=[]), request_id=request.state.request_id)
     try:
         data = require_content(paper_id)
     except KeyError:
@@ -136,7 +136,11 @@ def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
             summary=wiki.summary or "",
             concepts=wiki.concepts,
             methods=wiki.methods,
+            experiments=wiki.experiments,
             limitations=wiki.limitations,
+            validationFlags=wiki.validation_flags,
+            chunkCount=wiki.chunk_count,
+            qaReady=wiki.qa_ready,
         )
         return ApiResponse(data=data, request_id=request.state.request_id)
     try:

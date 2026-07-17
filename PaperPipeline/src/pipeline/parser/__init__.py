@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 
 from .pdf_parse import Paragraph, ParseResult, ensure_pdf, extract_paragraphs, parse_pdf_file
+from .document import parse_document
 
 __all__ = [
     "Chunk",
@@ -16,6 +17,7 @@ __all__ = [
     "ensure_pdf",
     "extract_paragraphs",
     "parse_pdf_file",
+    "parse_document",
 ]
 
 

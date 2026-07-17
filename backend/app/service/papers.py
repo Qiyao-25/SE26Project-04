@@ -23,7 +23,10 @@ def parse_status(paper: Paper) -> str:
     return {
         "metadata_only": "pending",
         "downloaded": "pending",
+        "queued": "queued",
+        "parsing": "parsing",
         "parsed": "completed",
+        "qa_ready": "qa_ready",
         "failed": "failed",
     }.get(paper.ingest_status, "pending")
 
@@ -42,6 +45,8 @@ def to_item(paper: Paper) -> PaperItem:
         source_url=paper.source_url,
         ingest_status=paper.ingest_status,
         parse_status=parse_status(paper),
+        chunk_count=paper.chunk_count,
+        qa_ready=paper.ingest_status == "qa_ready" and paper.chunk_count > 0,
     )
 
 
@@ -91,14 +96,13 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
     summary = by_type.get("summary")
     concepts = by_type.get("concepts")
     methods = by_type.get("methods")
-    if wiki:
-        summary_content = wiki.content_json.get("summary")
-        concept_content = wiki.content_json.get("concepts", wiki.content_json.get("concept", ""))
-        method_content = wiki.content_json.get("methods", "")
-    else:
-        summary_content = summary.content_json.get("summary") if summary else None
-        concept_content = concepts.content_json.get("items", []) if concepts else []
-        method_content = methods.content_json.get("items", []) if methods else []
+    experiments = by_type.get("experiments")
+    validation = by_type.get("validation")
+    summary_content = summary.content_json.get("summary") if summary else (wiki.content_json.get("summary") if wiki else None)
+    concept_content = concepts.content_json.get("items", []) if concepts else (wiki.content_json.get("concepts", wiki.content_json.get("concept", "")) if wiki else [])
+    method_content = methods.content_json.get("items", []) if methods else (wiki.content_json.get("methods", "") if wiki else [])
+    experiment_content = experiments.content_json.get("items", []) if experiments else []
+    validation_flags = validation.content_json.get("flags", []) if validation else []
     if isinstance(concept_content, str):
         concept_content = [{"conceptId": f"{paper.id}-concept-1", "name": "Core Concept", "description": concept_content}]
     if isinstance(method_content, str):
@@ -109,8 +113,12 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
         summary=summary_content or paper.abstract,
         concepts=concept_content,
         methods=method_content,
+        experiments=experiment_content,
         limitations=(by_type.get("limitations").content_json.get("items", []) if by_type.get("limitations") else []),
+        validation_flags=validation_flags,
         source_locator=(wiki.source_locator if wiki else (summary.source_locator if summary else {})),
+        chunk_count=paper.chunk_count,
+        qa_ready=paper.ingest_status == "qa_ready" and paper.chunk_count > 0,
     )
 
 
@@ -135,23 +143,7 @@ def answer_question(session: Session, paper_id: int, question: str) -> QaRespons
         ]
         answer = "\n".join(excerpts)
     else:
-        if not paper.structured_results:
-            raise PaperServiceError("NO_EVIDENCE", "当前论文尚未完成解析，请先完成解析后再提问", 422)
-        wiki = get_wiki(session, paper_id)
-        if not wiki.summary:
-            raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据", 422)
-        answer = wiki.summary[:1200]
-        citations = [
-            {
-                "citationId": f"citation-{paper.id}-structured-summary",
-                "paperId": paper.id,
-                "paperTitle": paper.title,
-                "sectionId": "structured-summary",
-                "sectionTitle": "结构化摘要",
-                "pageNumber": None,
-                "quote": wiki.summary[:500],
-            }
-        ]
+        raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
     return QaResponse(
         conversation_id=f"conversation-{paper.id}",
         message_id=f"assistant-{uuid4()}",

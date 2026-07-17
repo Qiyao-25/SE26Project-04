@@ -121,7 +121,7 @@ def paper_dict_to_backend(raw: dict[str, Any]) -> dict[str, Any]:
             {"name": item.get("name") or item.get("display_name")}
             if isinstance(item, dict)
             else {"name": item}
-            for item in authors
+            for item in (raw.get("authors") or [])
         ],
     }
 
@@ -131,14 +131,16 @@ def wiki_to_backend_structured_rows(
     summary: str,
     concept: str,
     methods: str,
+    experiments: str = "",
     limitations: list[str] | None = None,
+    validation_flags: list[str] | None = None,
     page_count: int = 0,
     source: str = "pipeline_extractive",
     version: int = 1,
 ) -> list[dict[str, Any]]:
     """Produce StructuredResult rows matching backend get_wiki() expectations.
 
-    result_type values: summary | concepts | methods | limitations
+    result_type values: summary | concepts | methods | experiments | limitations | validation
     content_json:
       - summary → {"summary": "..."}
       - concepts/methods/limitations → {"items": [...]}
@@ -153,8 +155,8 @@ def wiki_to_backend_structured_rows(
             "confidence": None,
         }
     ]
-    if concept:
-        rows.append(
+    rows.extend(
+        [
             {
                 "result_type": "concepts",
                 "version": version,
@@ -166,13 +168,12 @@ def wiki_to_backend_structured_rows(
                             "description": concept[:800],
                         }
                     ]
+                    if concept
+                    else [],
                 },
                 "source_locator": locator,
                 "confidence": None,
-            }
-        )
-    if methods:
-        rows.append(
+            },
             {
                 "result_type": "methods",
                 "version": version,
@@ -184,21 +185,44 @@ def wiki_to_backend_structured_rows(
                             "description": methods[:800],
                         }
                     ]
+                    if methods
+                    else [],
                 },
                 "source_locator": locator,
                 "confidence": None,
-            }
-        )
-    if limitations:
-        rows.append(
+            },
+            {
+                "result_type": "experiments",
+                "version": version,
+                "content_json": {
+                    "items": [
+                        {
+                            "title": "Experiments and Results",
+                            "description": experiments[:800],
+                        }
+                    ]
+                    if experiments
+                    else [],
+                },
+                "source_locator": locator,
+                "confidence": None,
+            },
             {
                 "result_type": "limitations",
                 "version": version,
-                "content_json": {"items": list(limitations)},
+                "content_json": {"items": list(limitations or [])},
                 "source_locator": locator,
                 "confidence": None,
-            }
-        )
+            },
+            {
+                "result_type": "validation",
+                "version": version,
+                "content_json": {"flags": list(validation_flags or [])},
+                "source_locator": locator,
+                "confidence": None,
+            },
+        ]
+    )
     return rows
 
 
@@ -207,6 +231,9 @@ def wiki_to_backend_structured(
     summary: str,
     concept: str,
     methods: str,
+    experiments: str = "",
+    limitations: list[str] | None = None,
+    validation_flags: list[str] | None = None,
     page_count: int = 0,
     source: str = "pipeline_extractive",
 ) -> dict[str, Any]:
@@ -216,6 +243,9 @@ def wiki_to_backend_structured(
             summary=summary,
             concept=concept,
             methods=methods,
+            experiments=experiments,
+            limitations=limitations,
+            validation_flags=validation_flags,
             page_count=page_count,
             source=source,
         ),
@@ -230,6 +260,9 @@ def wiki_to_ui_summary(
     summary: str,
     concept: str,
     methods: str,
+    experiments: str = "",
+    limitations: list[str] | None = None,
+    validation_flags: list[str] | None = None,
     parse_status: str = "completed",
 ) -> dict[str, Any]:
     """UIPrototype / backend PaperSummary-compatible shape."""
@@ -257,7 +290,9 @@ def wiki_to_ui_summary(
         "summary": summary,
         "concepts": concepts,
         "methods": method_items,
-        "limitations": [],
+        "experiments": [{"title": "Experiments and Results", "description": experiments}] if experiments else [],
+        "limitations": limitations or [],
+        "validationFlags": validation_flags or [],
     }
 
 

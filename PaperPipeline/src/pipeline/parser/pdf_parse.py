@@ -8,15 +8,32 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from pypdf import PdfReader
-
 logger = logging.getLogger("pipeline.parser")
 
 _SECTION = re.compile(
     r"(?im)^\s*(\d+(?:\.\d+)*\.?\s+)?(abstract|introduction|related work|background|"
     r"method|methods|approach|architecture|experiment|experiments|results|"
-    r"discussion|conclusion|references|acknowledg)\b.*"
+    r"evaluation|training|discussion|conclusion|references|acknowledg)\b.*"
 )
+_UNNUMBERED_SECTIONS = {
+    "abstract",
+    "introduction",
+    "background",
+    "method",
+    "methods",
+    "approach",
+    "architecture",
+    "experiment",
+    "experiments",
+    "results",
+    "evaluation",
+    "training",
+    "discussion",
+    "conclusion",
+    "references",
+    "acknowledgments",
+    "acknowledgements",
+}
 _SPACE = re.compile(r"[ \t]+")
 
 
@@ -39,6 +56,7 @@ class ParseResult:
     paragraphs: list[Paragraph] = field(default_factory=list)
     error: str | None = None
     elapsed_s: float = 0.0
+    source_type: str = "pdf"
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -89,35 +107,49 @@ def clean_line(text: str) -> str:
 
 
 def extract_paragraphs(pdf_path: Path, *, max_pages: int | None = None) -> tuple[list[Paragraph], int]:
+    from pypdf import PdfReader
+
     reader = PdfReader(str(pdf_path))
     n_pages = len(reader.pages)
     pages = reader.pages[: max_pages or n_pages]
     paras: list[Paragraph] = []
     section = "body"
+    top_level_section = section
     pid = 0
     for page_idx, page in enumerate(pages, start=1):
         raw = page.extract_text() or ""
-        for block in re.split(r"\n\s*\n", raw):
-            lines = [clean_line(x) for x in block.splitlines()]
-            lines = [x for x in lines if x]
-            if not lines:
+        blocks: list[tuple[str, list[str]]] = []
+        current: list[str] = []
+        for raw_line in raw.splitlines():
+            line = clean_line(raw_line)
+            heading = _SECTION.match(line) if line and len(line) < 80 else None
+            if heading and not (heading.group(1) or "") and line.lower().rstrip(".") not in _UNNUMBERED_SECTIONS:
+                heading = None
+            if heading:
+                if current:
+                    blocks.append((section, current))
+                    current = []
+                marker = (heading.group(1) or "").strip()
+                heading_text = re.sub(r"^\d+(\.\d+)*\.?\s*", "", line, flags=re.I).lower()[:64]
+                if marker and "." in marker.rstrip("."):
+                    section = top_level_section
+                else:
+                    section = heading_text
+                    top_level_section = section
                 continue
-            head = lines[0]
-            if _SECTION.match(head) and len(head) < 80:
-                section = re.sub(r"^\d+(\.\d+)*\.?\s*", "", head, flags=re.I).lower()[:64]
-                body = clean_line(" ".join(lines[1:]))
-            else:
-                body = clean_line(" ".join(lines))
+            if line:
+                current.append(line)
+            elif current:
+                blocks.append((section, current))
+                current = []
+        if current:
+            blocks.append((section, current))
+
+        for block_section, lines in blocks:
+            body = clean_line(" ".join(lines))
             if len(body) < 40:
                 continue
-            paras.append(
-                Paragraph(
-                    para_id=f"p{page_idx}_{pid}",
-                    page=page_idx,
-                    section=section,
-                    text=body[:2000],
-                )
-            )
+            paras.append(Paragraph(f"p{page_idx}_{pid}", page_idx, block_section, body[:2000]))
             pid += 1
     return paras, n_pages
 

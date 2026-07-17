@@ -20,7 +20,7 @@ _SRC = Path(__file__).resolve().parents[2]
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from pipeline.parser.pdf_parse import ensure_pdf, parse_pdf_file  # noqa: E402
+from pipeline.parser.document import parse_document  # noqa: E402
 from pipeline.summarizer.struct_summary import build_structured  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -52,6 +52,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Parse+structure 10 samples ()")
     parser.add_argument("--out-dir", type=Path, default=ROOT / "data" / "samples")
     parser.add_argument("--pdf-dir", type=Path, default=ROOT / "data" / "samples" / "pdfs")
+    parser.add_argument("--html-dir", type=Path, default=ROOT / "data" / "samples" / "html")
+    parser.add_argument("--prefer-html", action="store_true")
     parser.add_argument(
         "--extra-pdf-dir",
         type=Path,
@@ -105,9 +107,15 @@ def main() -> int:
                 path.write_text(json.dumps(art, ensure_ascii=False, indent=2), encoding="utf-8")
                 row["artifact"] = str(path)
             else:
-                pdf = ensure_pdf(arxiv_id, args.pdf_dir, search_dirs=extra, timeout_s=120)
                 max_pages = args.max_pages_long if arxiv_id in LONG_IDS else None
-                parsed = parse_pdf_file(arxiv_id, pdf, max_pages=max_pages)
+                parsed = parse_document(
+                    arxiv_id,
+                    args.pdf_dir,
+                    args.html_dir,
+                    pdf_search_dirs=extra,
+                    max_pages=max_pages,
+                    prefer_html=args.prefer_html,
+                )
                 wiki = build_structured(arxiv_id, parsed.paragraphs, title=title)
                 req_ok = parsed.ok and wiki.required_ok()
                 status = parsed.status if parsed.ok else parsed.status
@@ -132,6 +140,7 @@ def main() -> int:
                     "parse": {
                         "status": parsed.status,
                         "pdf_path": parsed.pdf_path,
+                        "source_type": parsed.source_type,
                         "page_count": parsed.page_count,
                         "char_count": parsed.char_count,
                         "paragraph_count": len(parsed.paragraphs),

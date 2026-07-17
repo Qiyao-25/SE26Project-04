@@ -45,17 +45,37 @@ class BackendClient:
     def get_paper(self, paper_id: int) -> dict:
         return self._request(f"/api/papers/{paper_id}", "GET")
 
-    def update_task(self, task_id: int, status: str, error_code: str | None = None) -> dict:
+    def update_task(self, task_id: int, status: str, error_code: str | None = None, stage: str | None = None) -> dict:
         body: dict[str, Any] = {"status": status}
         if error_code:
             body["error_code"] = error_code[:64]
+        if stage:
+            body["stage"] = stage[:32]
         return self._request(f"/api/tasks/{task_id}", "PATCH", body)
+
+    def retry_task(self, task_id: int) -> dict:
+        return self._request(f"/api/tasks/{task_id}/retry", "POST")
+
+    def recover_stale_tasks(self, timeout_seconds: int = 900) -> dict:
+        query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
+        return self._request(f"/api/tasks/recover-stale?{query}", "POST")
+
+    def get_queue_stats(self, timeout_seconds: int = 900) -> dict:
+        query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
+        return self._request(f"/api/tasks/stats?{query}", "GET")
 
     def save_structured_results(self, task_id: int, results: list[dict[str, Any]]) -> dict:
         return self._request(f"/api/tasks/{task_id}/results", "POST", {"results": results})
 
     def save_chunks(self, paper_id: int, chunks: list[dict[str, Any]]) -> dict:
         return self._request(f"/api/papers/{paper_id}/chunks", "POST", {"chunks": chunks})
+
+    def finalize_parse_result(self, task_id: int, chunks: list[dict[str, Any]], results: list[dict[str, Any]]) -> dict:
+        return self._request(
+            f"/api/tasks/{task_id}/finalize",
+            "POST",
+            {"chunks": chunks, "results": results},
+        )
 
 
 __all__ = ["BackendClient"]

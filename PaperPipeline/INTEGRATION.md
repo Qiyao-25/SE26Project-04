@@ -35,7 +35,10 @@
 | `GET /api/papers` | ✅ 已实现 | 数据库筛选、分页和详情 |
 | `POST /api/search/chunks` | ✅ 已实现 | `integration/chunks_client.py` |
 | `POST /api/papers/{paper_id}/parse` + `/api/tasks/{task_id}` | ✅ 已实现 | 解析任务状态与结构化结果入库 |
-| `POST /qa` | ⬜ 待实现 | 可选；本地 QA 已可演示 |
+| `POST /api/tasks/{task_id}/retry` / `recover-stale` | ✅ 已实现 | 失败重试与卡住任务恢复 |
+| `POST /api/tasks/enqueue-pending` | ✅ 已实现 | 将 metadata-only 论文批量加入解析队列 |
+| `POST /api/tasks/{task_id}/finalize` / `GET /api/tasks/stats` | ✅ 已实现 | 解析结果原子提交与队列观测 |
+| `POST /api/papers/{paper_id}/qa` | ✅ 已实现 | 数据库文本块 QA；无证据时拒答 |
 
 ### `POST /api/papers/batch` 请求体（PaperPipeline 已发送）
 
@@ -63,7 +66,7 @@
 
 成功响应 `data`: `{items, created, updated}`。
 
-`src/pipeline/integration/backend_client.py` 提供了解析任务创建、结构化结果和文本块写入客户端；解析器可使用 `wiki_to_backend_structured()` 和 `chunk_to_backend()` 生成请求体。
+`src/pipeline/integration/backend_client.py` 提供了解析任务创建、阶段状态、结构化结果和文本块写入客户端；解析器可使用 `wiki_to_backend_structured_rows()` 和 `chunk_to_backend()` 生成请求体。结构化结果包含 `summary`、`concepts`、`methods`、`experiments`、`limitations` 和 `validation`。
 
 ## 成员 B（前端）— 消费约定
 

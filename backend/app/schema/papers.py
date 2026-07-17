@@ -43,6 +43,8 @@ class PaperItem(BaseModel):
     source_url: str | None
     ingest_status: str
     parse_status: str
+    chunk_count: int = 0
+    qa_ready: bool = False
 
 
 class PaperPage(BaseModel):
@@ -79,11 +81,25 @@ class TaskResponse(BaseModel):
     started_at: datetime | None
     finished_at: datetime | None
     error_code: str | None
+    stage: str | None = None
+    retryable: bool = False
+
+
+class TaskQueueStats(BaseModel):
+    counts: dict[str, int]
+    retryable_failed: int
+    stale_running: int
+    oldest_queued_at: datetime | None = None
 
 
 class TaskUpdate(BaseModel):
     status: Literal["running", "failed", "timed_out"]
     error_code: str | None = Field(default=None, max_length=64)
+    stage: str | None = Field(default=None, max_length=32)
+
+
+class ParsePendingRequest(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
 
 
 class StructuredResultInput(BaseModel):
@@ -107,6 +123,11 @@ class TextChunkInput(BaseModel):
 
 class TextChunkBatch(BaseModel):
     chunks: list[TextChunkInput] = Field(min_length=1, max_length=5000)
+
+
+class ParseResultCommit(BaseModel):
+    chunks: list[TextChunkInput] = Field(min_length=1, max_length=5000)
+    results: list[StructuredResultInput] = Field(min_length=1, max_length=20)
 
 
 class ChunkSearchRequest(BaseModel):
@@ -159,8 +180,12 @@ class WikiData(BaseModel):
     summary: str | None
     concepts: list[dict]
     methods: list[dict]
+    experiments: list[dict]
     limitations: list[str]
+    validation_flags: list[str]
     source_locator: dict
+    chunk_count: int = 0
+    qa_ready: bool = False
 
 
 class QaRequest(BaseModel):

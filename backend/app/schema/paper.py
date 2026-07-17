@@ -14,7 +14,7 @@ class PaperListItem(BaseModel):
     keywords: list[str]
     researchDirection: str = ""
     conceptTags: list[str] = []
-    parseStatus: Literal["pending", "parsing", "completed", "failed"] = "completed"
+    parseStatus: Literal["pending", "queued", "parsing", "completed", "qa_ready", "failed"] = "completed"
     isFavorite: bool = False
 
 
@@ -78,10 +78,19 @@ class MethodItem(BaseModel):
     description: str
 
 
+class ExperimentItem(BaseModel):
+    title: str
+    description: str
+
+
 class PaperSummary(BaseModel):
     paperId: str
-    parseStatus: Literal["pending", "parsing", "completed", "failed"]
+    parseStatus: Literal["pending", "queued", "parsing", "completed", "qa_ready", "failed"]
     summary: str
     concepts: list[ConceptItem]
     methods: list[MethodItem]
-    limitations: list[str]
+    experiments: list[ExperimentItem] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    validationFlags: list[str] = Field(default_factory=list)
+    chunkCount: int = 0
+    qaReady: bool = False

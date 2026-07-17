@@ -23,6 +23,7 @@ class Paper(TimestampMixin, Base):
     pdf_url: Mapped[str | None] = mapped_column(Text)
     source_url: Mapped[str | None] = mapped_column(Text)
     ingest_status: Mapped[str] = mapped_column(String(32), nullable=False, default="metadata_only", server_default="metadata_only")
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     authors: Mapped[list["PaperAuthor"]] = relationship(back_populates="paper", cascade="all, delete-orphan")
     parse_tasks: Mapped[list["ParseTask"]] = relationship(back_populates="paper", cascade="all, delete-orphan")
@@ -72,6 +73,7 @@ class ParseTask(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(String(64))
+    stage: Mapped[str | None] = mapped_column(String(32))
     paper: Mapped[Paper] = relationship(back_populates="parse_tasks")
 
 
@@ -112,4 +114,3 @@ class UserAction(Base):
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     paper: Mapped[Paper] = relationship(back_populates="user_actions")
-
