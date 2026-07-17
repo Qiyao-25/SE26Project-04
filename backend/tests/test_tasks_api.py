@@ -44,10 +44,11 @@ def test_list_tasks_returns_oldest_queued_tasks_first() -> None:
         second, _ = create_task(session, paper_id, "full_parse", "queue-key-2")
         assert second.task_id == first.task_id
         forced, _ = create_task(session, paper_id, "full_parse", "queue-key-force", force=True)
-        assert forced.task_id == first.task_id
+        assert forced.task_id != first.task_id
+        assert get_task(session, first.task_id).error_code == "SUPERSEDED"
         queued = list_tasks(session, status="queued", limit=10)
-        assert [task.task_id for task in queued] == [first.task_id]
-        update_task(session, first.task_id, TaskUpdate(status="running"))
+        assert [task.task_id for task in queued] == [forced.task_id]
+        update_task(session, forced.task_id, TaskUpdate(status="running"))
         assert list_tasks(session, status="queued", limit=10) == []
 
 
