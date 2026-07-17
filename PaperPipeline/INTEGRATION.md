@@ -1,28 +1,24 @@
-# 对接说明 — 成员 D 管线
+# 对接说明 — PaperPipeline ↔ backend / UIPrototype
 
-对齐对象：
-- **backend** `app/model/entities.py`（ORM）+ `ApiResponse{code,message,data,request_id}`
-- **UIPrototype** `frontend/src/mocks/paper-*.json`（前端展示字段）
+对齐对象（以当前仓库为准）：
 
-管线默认本地自给。设置 `PAPERMATE_API_BASE` 后尝试调用成员 C API，失败自动回退。
+- **backend** `POST /api/papers/batch`、`GET /api/papers/{id}/wiki`、`POST /api/papers/{id}/qa`
+- **ORM** `entities.py`（`Paper` / `ParseTask` / `StructuredResult` / `TextChunk`）
+- **UIPrototype** mock 字段（camelCase 引用卡片）
 
-## 字段对照（易错点）
+管线默认本地自给。设置 `PAPERMATE_API_BASE=http://127.0.0.1:8000` 后尝试真实入库，失败自动回退 `data/seed.json`。
 
-| 管线 / ORM | UIPrototype mock | 说明 |
-|------------|------------------|------|
-| `arxiv_id` | `arxivId` / `paperId` | 前端用 camelCase |
-| `primary_category` | `primaryCategory` | 入库勿再传 `categories[]` |
-| `source_url` | `sourceUrl` | 勿用 `abs_url` |
-| `page_no` | `pageNumber` | QA 引用卡片 |
-| `section` | `sectionTitle` | QA 引用卡片 |
-| `content` / `quote` | `quote` | 引用原文片段 |
-| `chunk_id` | （前端暂不展示） | 保留供校验；UI 用 `citationId` |
-| `content_json.{summary,concept,methods}` | `summary` + `concepts[]` + `methods[]` | Wiki 摘要页 |
-| ParseTask `queued/running/succeeded/failed` | `parseStatus`: pending/parsing/completed/failed | 状态粗粒度映射 |
+## 已对齐（可联调）
 
-适配实现：`src/pipeline/integration/contracts.py`
+| PaperPipeline | backend | 说明 |
+|---------------|---------|------|
+| `ingest.py` | `POST /api/papers/batch` | **请求体 = JSON 数组** `list[PaperUpsert]` |
+| `paper_meta_to_backend` | `AuthorInput` | 作者字段为 `{name}`（非 `display_name`） |
+| `wiki_to_backend_structured_rows` | `get_wiki()` | 写出 `summary` / `concepts` / `methods` / `limitations` 多行 |
+| `QAResult.to_ui()` | `AskPaperResult` / mock | `pageNumber` / `sectionTitle` / `quote` |
+| 信封解析 | `ApiResponse` | `{code, message, data, request_id}` |
 
-## 环境变量
+### 批量入库示例
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
@@ -47,9 +43,9 @@
 {
   "papers": [{
     "arxiv_id": "1706.03762",
-    "title": "...",
+    "title": "Attention Is All You Need",
+    "authors": [{"name": "Ashish Vaswani"}],
     "abstract": "...",
-    "published_at": null,
     "primary_category": "cs.CL",
     "pdf_url": "https://arxiv.org/pdf/1706.03762.pdf",
     "source_url": "https://arxiv.org/abs/1706.03762",
@@ -65,27 +61,26 @@
 { "arxiv_id": "1706.03762", "query": "...", "top_k": 5 }
 ```
 
-响应接受 `ApiResponse.data.chunks[]`，字段：`chunk_id`, `page_no`, `section`, `content`, `score`。
+成功响应 `data`: `{items, created, updated}`。
 
 `src/pipeline/integration/backend_client.py` 提供了解析任务创建、结构化结果和文本块写入客户端；解析器可使用 `wiki_to_backend_structured()` 和 `chunk_to_backend()` 生成请求体。
 
 ## 成员 B（前端）— 消费约定
 
-PaperPipeline 可输出 UI 兼容形状（无需改前端 mock 字段名）：
+| 能力 | 状态 | 本地行为 |
+|------|------|----------|
+| `POST /api/search/chunks` | ❌ 无路由（表已有） | `ChunksClient` 搜 `data/samples` |
+| `ParseTask` 入队/Worker | ❌ 仅 ORM | `MemoryTaskQueue` |
+| 写入 `StructuredResult` / `TextChunk` | ❌ 无写 API | 产物在 samples / demo JSON；可用 `wiki_to_backend_structured_rows` / `paragraphs_to_text_chunks` 生成载荷 |
+| DB QA 真实 RAG | ⚠️ 现为摘要 stub | PaperPipeline QA 做引用校验演示 |
 
-```python
-from pipeline.qa.service import QAService
-result = QAService().ask("1706.03762", "Multi-Head Attention 的作用？")
-ui_payload = result.to_ui(paper_id="attention", paper_title="Attention Is All You Need")
-# ui_payload.citations[].pageNumber / sectionTitle / quote
-```
+## 环境变量
 
-Wiki 摘要：`wiki_to_ui_summary(...)` → 对齐 `paper-summary.json`。
-
-## 成员 A / E
-
-- **A**：ADR 冻结后更新 `schemas.py` + `contracts.py`
-- **E**：替换 `data/qa/questions.json` 后执行 `python -m pipeline.qa.run_eval`
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `PAPERMATE_API_BASE` | 空 | 如 `http://127.0.0.1:8000` |
+| `PAPERMATE_QA_MODE` | `sample` | `remote` 待接 LLM |
+| `PAPERMATE_SAMPLES_DIR` | `data/samples` | 本地分块 |
 
 ## 建议联调顺序
 

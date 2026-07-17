@@ -204,7 +204,7 @@ def to_backend_paper(meta: PaperMeta) -> dict:
         "pdf_url": f"https://arxiv.org/pdf/{base_id}.pdf",
         "source_url": f"https://arxiv.org/abs/{base_id}",
         "ingest_status": "metadata_only",
-        "authors": [{"display_name": a, "author_order": i + 1} for i, a in enumerate(meta.authors)],
+        "authors": [{"name": a} for i, a in enumerate(meta.authors)],
     }
 
 
