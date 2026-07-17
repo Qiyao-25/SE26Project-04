@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     qa_agent_enabled: bool = True
     qa_agent_timeout_s: float = 90.0
     qa_agent_top_k: int = 5
+    search_agent_enabled: bool = True
+    search_agent_timeout_s: float = 45.0
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -53,6 +55,10 @@ class Settings(BaseSettings):
     @property
     def qa_agent_ready(self) -> bool:
         return bool(self.qa_agent_enabled and self.llm_api_key.strip())
+
+    @property
+    def search_agent_ready(self) -> bool:
+        return bool(self.search_agent_enabled and self.llm_api_key.strip())
 
     @property
     def is_test(self) -> bool:

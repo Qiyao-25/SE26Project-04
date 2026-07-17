@@ -95,6 +95,50 @@ export async function searchPapers(params = {}) {
   return { searchId: `search-${Date.now()}`, query, searchType: 'keyword', sortBy: 'relevance', total: data.total, page: data.page, pageSize: data.page_size, searchTimeMs: 0, items: data.items.map(toPaperListItem) };
 }
 
+/** 工作台「智能论文检索」：LLM 查询改写 + 模糊匹配 + 生成回答 */
+export async function smartSearchPapers({ query = '', page = 1, pageSize = 12, category } = {}) {
+  if (USE_MOCK) {
+    const data = await searchMockPapers({ query, page, pageSize });
+    return {
+      ...data,
+      rewrittenQuery: query,
+      keywords: query ? [query] : [],
+      intent: '',
+      answer:
+        data.total > 0
+          ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。`
+          : `（Mock）未找到与“${query}”匹配的论文。`,
+      highlights: [],
+      planSource: 'mock',
+      answerSource: 'mock'
+    };
+  }
+  const data = await apiClient.post('/papers/smart-search', {
+    query,
+    page,
+    page_size: pageSize,
+    category: category || undefined
+  });
+  return {
+    searchId: `smart-search-${Date.now()}`,
+    query: data.query || query,
+    rewrittenQuery: data.rewritten_query || data.rewrittenQuery || query,
+    keywords: data.keywords || [],
+    intent: data.intent || '',
+    answer: data.answer || '',
+    highlights: data.highlights || [],
+    planSource: data.plan_source || data.planSource || '',
+    answerSource: data.answer_source || data.answerSource || '',
+    searchType: 'smart',
+    sortBy: 'relevance',
+    total: data.total || 0,
+    page: data.page || page,
+    pageSize: data.page_size || data.pageSize || pageSize,
+    searchTimeMs: 0,
+    items: (data.items || []).map(toPaperListItem)
+  };
+}
+
 export async function getPaperDetail(paperId) {
   if (USE_MOCK) return getMockPaperDetail(paperId);
   try { return createCompatibleDetail(await apiClient.get(`/papers/${paperId}`)); } catch (error) { if (error.message.includes('论文不存在')) return null; throw error; }

@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
-import { searchPapers } from '../../services/paperService';
+import { smartSearchPapers } from '../../services/paperService';
 import { ChatBox } from '../../components/common/ChatBox';
 import PaperCard from '../../components/paper/PaperCard';
 
@@ -24,7 +24,7 @@ const RECOMMENDED = ['bert', 'lora', 'rag'];
 const WELCOME_MESSAGE = {
   messageId: 'workspace-welcome',
   role: 'assistant',
-  content: '您好，可输入自然语言检索论文。当前 P0 原型支持标题、作者、摘要、关键词和研究方向匹配。',
+  content: '您好，可输入自然语言检索论文。系统会智能改写关键词、模糊匹配库内论文，并生成检索说明。',
   status: 'success',
   citations: []
 };
@@ -55,11 +55,8 @@ export default function WorkspacePage() {
     let cancelled = false;
     setSearchStatus('loading');
 
-    searchPapers({
+    smartSearchPapers({
       query: lastSearchQuery,
-      searchType: 'keyword',
-      categories: [],
-      sortBy: 'relevance',
       page: 1,
       pageSize: 12
     })
@@ -99,11 +96,8 @@ export default function WorkspacePage() {
     setSearchError('');
 
     try {
-      const data = await searchPapers({
+      const data = await smartSearchPapers({
         query: text,
-        searchType: 'keyword',
-        categories: [],
-        sortBy: 'relevance',
         page: 1,
         pageSize: 12
       });
@@ -112,15 +106,18 @@ export default function WorkspacePage() {
       setResultTotal(data.total);
       setSearchStatus(data.total > 0 ? 'success' : 'empty');
 
+      const keywordHint =
+        data.keywords?.length > 0 ? `（匹配词：${data.keywords.slice(0, 5).join('、')}）` : '';
       setMessages((current) => [
         ...current,
         {
           messageId: `workspace-assistant-${Date.now()}`,
           role: 'assistant',
-          content:
+          content: data.answer || (
             data.total > 0
-              ? `检索完成，共找到 ${data.total} 篇与“${text}”相关的论文。`
-              : `未找到与“${text}”匹配的论文，请尝试缩短关键词或更换研究方向。`,
+              ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}`
+              : `未找到与“${text}”匹配的论文，请尝试缩短关键词或更换研究方向。`
+          ),
           status: 'success',
           citations: []
         }
@@ -165,12 +162,12 @@ export default function WorkspacePage() {
         <ChatBox
           messages={messages}
           onSend={handleSearch}
-          placeholder="输入论文标题、作者、关键词或研究方向..."
+          placeholder="试试：有哪些关于注意力机制或 Transformer 的论文？"
           minHeight={140}
           loading={searchStatus === 'loading'}
         />
         <Text type="secondary" style={{ fontSize: 12 }}>
-          发送检索请求后，推荐区域将切换为检索结果；无匹配内容时显示明确空状态。
+          支持自然语言；系统会改写关键词并模糊匹配，再在对话中给出智能检索说明。
         </Text>
       </Card>
 
@@ -208,7 +205,7 @@ export default function WorkspacePage() {
         >
           {searchStatus === 'loading' && (
             <div style={{ textAlign: 'center', padding: 40 }}>
-              <Spin tip="正在检索论文..." />
+              <Spin tip="正在智能检索论文..." />
             </div>
           )}
 

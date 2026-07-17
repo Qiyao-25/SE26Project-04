@@ -13,6 +13,14 @@ from app.schema.papers import AuthorInput, PaperUpsert
 from app.service.papers import batch_upsert_papers
 
 
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    # Python 3.10 fromisoformat does not accept trailing Z
+    normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
+    return datetime.fromisoformat(normalized)
+
+
 def load_payload(seed_path: Path) -> list[PaperUpsert]:
     document = json.loads(seed_path.read_text(encoding="utf-8"))
     rows = document.get("papers", document)
@@ -28,7 +36,7 @@ def load_payload(seed_path: Path) -> list[PaperUpsert]:
                 title=row.get("title", ""),
                 authors=[AuthorInput(name=(author.get("name") or author.get("display_name")) if isinstance(author, dict) else author) for author in authors],
                 abstract=row.get("abstract"),
-                published_at=datetime.fromisoformat(row["published_at"]) if row.get("published_at") else (datetime.fromisoformat(row["published"]) if row.get("published") else None),
+                published_at=_parse_datetime(row.get("published_at") or row.get("published")),
                 primary_category=categories[0] if categories else row.get("primary_category"),
                 pdf_url=row.get("pdf_url"),
                 source_url=row.get("source_url") or row.get("abs_url"),
