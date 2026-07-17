@@ -1,4 +1,4 @@
-"""Field cleaning for crawled arXiv metadata (H047)."""
+"""Field cleaning for crawled arXiv metadata ()."""
 
 from __future__ import annotations
 

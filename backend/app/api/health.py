@@ -15,3 +15,7 @@ def health(request: Request) -> JSONResponse | ApiResponse[HealthData]:
         return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload.model_dump(), headers={"X-Request-ID": request.state.request_id})
     return payload
 
+
+@router.get("/api/health", response_model=ApiResponse[HealthData], include_in_schema=False)
+def api_health(request: Request) -> JSONResponse | ApiResponse[HealthData]:
+    return health(request)

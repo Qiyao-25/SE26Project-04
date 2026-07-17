@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H077/H078 — success / timeout / failure scenarios + task log export."""
+""" — success / timeout / failure scenarios + task log export."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _root() -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate stability demo (H077/H078)")
+    parser = argparse.ArgumentParser(description="PaperMate stability demo ()")
     parser.add_argument("--out", default="data/stability/scenarios.json")
     args = parser.parse_args()
 

@@ -8,6 +8,7 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userId, setUserId] = useState(() => localStorage.getItem('papermate.userId') || 'demo-user');
   const [persona, setPersona] = useState('研究');
   const [topics, setTopics] = useState(['cs.CL']);
   const [workspaceSearched, setWorkspaceSearched] = useState(false);
@@ -18,9 +19,12 @@ export function AppProvider({ children }) {
   const [compareActiveSlot, setCompareActiveSlot] = useState('a');
 
   const login = useCallback((email) => {
-    const admin = (email || '').trim().toLowerCase() === 'admin';
+    const resolvedUserId = (email || '').trim().toLowerCase() || 'demo-user';
+    const admin = resolvedUserId === 'admin';
     setLoggedIn(true);
     setIsAdmin(admin);
+    setUserId(resolvedUserId);
+    localStorage.setItem('papermate.userId', resolvedUserId);
   }, []);
 
   const logout = useCallback(() => {
@@ -35,6 +39,10 @@ export function AppProvider({ children }) {
   const getPaperNotes = useCallback((paperId) => {
     return paperNotes[paperId] || { notes: [], comments: [] };
   }, [paperNotes]);
+
+  const replacePaperNotes = useCallback((paperId, data) => {
+    setPaperNotes((prev) => ({ ...prev, [paperId]: data }));
+  }, []);
 
   const saveNote = useCallback((paperId, text) => {
     setPaperNotes((prev) => {
@@ -58,17 +66,17 @@ export function AppProvider({ children }) {
   }, []);
 
   const value = useMemo(() => ({
-    loggedIn, isAdmin, persona, topics, workspaceSearched, lastSearchQuery,
+    loggedIn, isAdmin, userId, persona, topics, workspaceSearched, lastSearchQuery,
     comparePaperA, comparePaperB, compareActiveSlot,
     showAdminNav,
     login, logout, setPersona, setTopics,
     setWorkspaceSearched, setLastSearchQuery,
     setComparePaperA, setComparePaperB, setCompareActiveSlot,
-    getPaperNotes, saveNote, addComment, setCompareForPaper
+    getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
   }), [
-    loggedIn, isAdmin, persona, topics, workspaceSearched, lastSearchQuery,
+    loggedIn, isAdmin, userId, persona, topics, workspaceSearched, lastSearchQuery,
     comparePaperA, comparePaperB, compareActiveSlot, showAdminNav,
-    login, logout, getPaperNotes, saveNote, addComment, setCompareForPaper
+    login, logout, getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

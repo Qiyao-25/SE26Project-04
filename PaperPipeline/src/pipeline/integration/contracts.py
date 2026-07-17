@@ -97,7 +97,11 @@ def paper_meta_to_backend(meta: Any) -> dict[str, Any]:
         "pdf_url": getattr(meta, "pdf_url", None) or f"https://arxiv.org/pdf/{arxiv_id}.pdf",
         "source_url": getattr(meta, "abs_url", None) or f"https://arxiv.org/abs/{arxiv_id}",
         "ingest_status": "metadata_only",
-        "authors": _authors_for_upsert(authors),
+        "authors": [
+            {"name": name}
+            for i, name in enumerate(authors)
+            if name
+        ],
     }
 
 
@@ -113,7 +117,12 @@ def paper_dict_to_backend(raw: dict[str, Any]) -> dict[str, Any]:
         "pdf_url": raw.get("pdf_url") or f"https://arxiv.org/pdf/{arxiv_id}.pdf",
         "source_url": raw.get("abs_url") or raw.get("source_url") or f"https://arxiv.org/abs/{arxiv_id}",
         "ingest_status": raw.get("ingest_status") or "metadata_only",
-        "authors": _authors_for_upsert(raw.get("authors") or []),
+        "authors": [
+            {"name": item.get("name") or item.get("display_name")}
+            if isinstance(item, dict)
+            else {"name": item}
+            for item in authors
+        ],
     }
 
 

@@ -1,4 +1,4 @@
-"""H058 · Extractive summary / concept / methods from parsed paragraphs."""
+""" · Extractive summary / concept / methods from parsed paragraphs."""
 
 from __future__ import annotations
 

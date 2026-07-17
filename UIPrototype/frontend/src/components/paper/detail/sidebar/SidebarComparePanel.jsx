@@ -1,10 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Select, Button, Typography, Tag, Row, Col, message } from 'antd';
 import { SwapOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../../context/AppContext';
 import { PAPER_LIST, PAPERS, shortPaperTitle } from '../../../../data/papers';
+import { getPaperDetail } from '../../../../services/paperService';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 const ROWS = [
   { key: 'title', label: '标题' },
@@ -16,16 +18,38 @@ const ROWS = [
   { key: 'summary', label: '摘要' }
 ];
 
-export default function SidebarComparePanel({ paperId }) {
+const EMPTY_PAPER = { title: '论文加载中', authors: [], keywords: [], conceptTags: [] };
+
+export default function SidebarComparePanel({ paperId, paper }) {
   const navigate = useNavigate();
   const {
     comparePaperA, comparePaperB, compareActiveSlot, setCompareActiveSlot,
     setComparePaperA, setComparePaperB
   } = useApp();
+  const [remotePapers, setRemotePapers] = useState({});
 
-  const paperA = PAPERS[comparePaperA];
-  const paperB = PAPERS[comparePaperB];
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [comparePaperA, comparePaperB].filter((id) => /^\d+$/.test(String(id)) && String(id) !== String(paperId));
+    if (!ids.length) return undefined;
+    Promise.all(ids.map(async (id) => [String(id), await getPaperDetail(id)]))
+      .then((entries) => {
+        if (!cancelled) setRemotePapers((current) => ({ ...current, ...Object.fromEntries(entries) }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [comparePaperA, comparePaperB, paperId]);
+
+  const resolvePaper = (id) => {
+    if (String(id) === String(paperId)) return paper || EMPTY_PAPER;
+    return PAPERS[id] || remotePapers[String(id)] || EMPTY_PAPER;
+  };
+  const paperA = resolvePaper(comparePaperA);
+  const paperB = resolvePaper(comparePaperB);
   const options = PAPER_LIST.map((p) => ({ value: p.id, label: shortPaperTitle(p.id) }));
+  if (/^\d+$/.test(String(paperId)) && !options.some((option) => String(option.value) === String(paperId))) {
+    options.unshift({ value: paperId, label: paper?.title || `论文 ${paperId}` });
+  }
 
   const setSlotPaper = (slot, id) => {
     if (slot === 'a') {

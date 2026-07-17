@@ -1,9 +1,10 @@
-import { Card, Tag, Typography, Button, Space, message } from 'antd';
-import { StarOutlined, LinkOutlined } from '@ant-design/icons';
+import { Card, Tag, Typography, Button, Space } from 'antd';
+import { LinkOutlined } from '@ant-design/icons';
 import { useApp } from '../../../../context/AppContext';
 import { MODE_ASSIST } from '../../../../data/papers';
 import SidebarNotesPreview from './SidebarNotesPreview';
 import { ChatBox } from '../../../common/ChatBox';
+import FavoriteButton from './FavoriteButton';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -20,7 +21,7 @@ function getAuthorText(authors, authorsText) {
   return authors || '作者信息待补充';
 }
 
-function InfoBlock({ paper, compact }) {
+function InfoBlock({ paper, paperId, compact }) {
   const category = paper.primaryCategory || paper.tag || '未分类';
   const arxivId = paper.arxivId || paper.arxiv || '待补充';
   const publishedAt = paper.publishedAt || paper.date || '待补充';
@@ -50,14 +51,7 @@ function InfoBlock({ paper, compact }) {
           <Paragraph style={{ fontSize: 13, marginTop: 12 }}>
             {paper.summary}
           </Paragraph>
-          <Button
-            block
-            icon={<StarOutlined />}
-            style={{ marginTop: 8 }}
-            onClick={() => message.success('已加入收藏（P1 Mock）')}
-          >
-            收藏
-          </Button>
+          <FavoriteButton paperId={paperId} block />
           <Button
             block
             icon={<LinkOutlined />}
@@ -72,14 +66,7 @@ function InfoBlock({ paper, compact }) {
       )}
 
       {compact && (
-        <Button
-          size="small"
-          icon={<StarOutlined />}
-          style={{ marginTop: 8 }}
-          onClick={() => message.success('已加入收藏（P1 Mock）')}
-        >
-          收藏
-        </Button>
+        <FavoriteButton paperId={paperId} size="small" />
       )}
     </div>
   );
@@ -100,7 +87,7 @@ export default function SidebarAllPanel({
       key: 'info',
       title: '论文信息',
       extra: '查看 →',
-      content: <InfoBlock paper={paper} compact />
+      content: <InfoBlock paper={paper} paperId={paperId} compact />
     },
     {
       key: 'assist',

@@ -1,4 +1,4 @@
-"""H048 ingest: POST /api/papers/batch (PaperUpsert list), else local seed.json."""
+""" ingest: try member-C API (ORM-aligned), else write/merge local seed.json."""
 
 from __future__ import annotations
 
@@ -98,12 +98,10 @@ def _write_seed(path: Path, papers: list[dict], *, source: str) -> None:
     logger.info("seed_written path=%s count=%s source=%s", path, len(papers), source)
 
 
-def _post_batch(
-    api_base: str, papers: list[dict], *, timeout_s: float
-) -> tuple[bool, list[dict], str, int, int]:
-    """POST /api/papers/batch — body is a JSON array of PaperUpsert (backend contract)."""
+def _post_batch(api_base: str, papers: list[dict], *, timeout_s: float) -> tuple[bool, list[dict], str]:
+    """POST /api/papers/batch — body papers[] aligned with backend API."""
     url = f"{api_base}/api/papers/batch"
-    body = json.dumps(papers).encode("utf-8")  # raw list, not {"papers": ...}
+    body = json.dumps({"papers": papers}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,

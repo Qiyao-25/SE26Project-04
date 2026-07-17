@@ -7,6 +7,7 @@
 - SQLAlchemy 2.x ORM 与 H005 核心实体
 - Alembic 首次迁移、升级和回滚
 - 统一响应模型与请求 ID
+- 论文元数据、解析任务、结构化结果、文本块检索和学习行为 API
 - python -m harness 可重复验收入口
 
 ## 1. 安装依赖
@@ -44,6 +45,7 @@ python -m harness health
 python -m harness orm
 python -m alembic upgrade head
 python -m alembic current
+python -m scripts.import_seed --seed ../PaperPipeline/data/seed.json
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -52,6 +54,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 启动后访问：
 
 - http://127.0.0.1:8000/health
+- http://127.0.0.1:8000/api/health
 - http://127.0.0.1:8000/docs
 - http://127.0.0.1:8000/openapi.json
 
@@ -155,6 +158,14 @@ python -m pytest --capture=no
 
 Harness 只编排和验证，不复制 service 业务规则；后续论文导入、解析和检索都应沿用这一边界。
 
+在后端目录执行空库验收和本地并发测试：
+
+```bash
+python -m scripts.verify_empty_db
+python -m scripts.benchmark_service --database-url sqlite:///./data/dev.db --concurrency 100 --requests 100
+python -m scripts.benchmark_api --base-url http://127.0.0.1:8000 --concurrency 100 --requests 100
+```
+
 ## 6. 前端联调接口
 
 后端提供数据库论文 API，并兼容固定样例论文 API，供 React 前端在 `VITE_USE_MOCK=false` 时调用：
@@ -167,6 +178,13 @@ GET  /api/papers/{paper_id}/content
 GET  /api/papers/{paper_id}/summary
 GET  /api/papers/{paper_id}/wiki
 POST /api/papers/{paper_id}/qa
+POST /api/papers/{paper_id}/parse
+GET  /api/tasks/{task_id}
+POST /api/tasks/{task_id}/results
+POST /api/papers/{paper_id}/chunks
+POST /api/search/chunks
+POST /api/learning/actions
+GET  /api/learning/actions?user_id=demo
 ```
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

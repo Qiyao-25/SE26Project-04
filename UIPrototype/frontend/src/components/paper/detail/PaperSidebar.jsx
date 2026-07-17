@@ -103,7 +103,9 @@ export default function PaperSidebar({ paperId, paper }) {
         {
           messageId: `paper-qa-error-${Date.now()}`,
           role: 'assistant',
-          content: '回答生成失败。',
+          content: error.message?.includes('没有可核验') || error.message?.includes('尚未完成解析')
+            ? '当前论文还没有完成解析，暂时无法进行带出处的问答。请先启动解析 Worker，等待解析完成后重试。'
+            : '回答生成失败。',
           status: 'failed',
           errorMessage: error.message || '未知错误',
           citations: []
@@ -158,7 +160,7 @@ export default function PaperSidebar({ paperId, paper }) {
     {
       key: 'compare',
       label: '对比',
-      children: <SidebarComparePanel paperId={paperId} />
+      children: <SidebarComparePanel paperId={paperId} paper={paper} />
     }
   ];
 

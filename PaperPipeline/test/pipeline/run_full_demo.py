@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H088 — 3-paper full pipeline demo (crawl→parse→wiki→qa), no-key mode."""
+""" — 3-paper full pipeline demo (crawl→parse→wiki→qa), no-key mode."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ DEMO_PAPERS = [
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate 3-paper demo (H088)")
+    parser = argparse.ArgumentParser(description="PaperMate 3-paper demo ()")
     parser.add_argument("--out-dir", default="data/demo")
     args = parser.parse_args()
 

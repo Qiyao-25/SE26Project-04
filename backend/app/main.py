@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
+from app.api.learning import router as learning_router
 from app.api.papers import router as papers_router
+from app.api.search import router as search_router
+from app.api.tasks import router as tasks_router
 from app.core.config import Settings, get_settings
 from app.core.database import create_engine_for
 from app.schema.common import ApiResponse
@@ -45,7 +48,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
 
     app.include_router(health_router)
+    app.include_router(learning_router)
     app.include_router(papers_router)
+    app.include_router(search_router)
+    app.include_router(tasks_router)
     return app
 
 

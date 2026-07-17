@@ -20,12 +20,28 @@
 
 ### 批量入库示例
 
-```http
-POST /api/papers/batch
-Content-Type: application/json
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `PAPERMATE_API_BASE` | 空 | C FastAPI 根地址（如 `http://127.0.0.1:8000`） |
+| `PAPERMATE_QA_MODE` | `sample` | `sample` 无 Key；`remote` 待 LLM |
+| `PAPERMATE_SAMPLES_DIR` | `data/samples` | 本地样例 JSON |
 
-[
-  {
+## 成员 C（后端）— 当前与规划
+
+| API | 状态 | PaperPipeline 用法 |
+|-----|------|------------|
+| `GET /health` | ✅ 已实现 | 联调探测 |
+| `POST /api/papers/batch` | ✅ 已实现 | `crawler/ingest.py`（100 条元数据批量去重入库） |
+| `GET /api/papers` | ✅ 已实现 | 数据库筛选、分页和详情 |
+| `POST /api/search/chunks` | ✅ 已实现 | `integration/chunks_client.py` |
+| `POST /api/papers/{paper_id}/parse` + `/api/tasks/{task_id}` | ✅ 已实现 | 解析任务状态与结构化结果入库 |
+| `POST /qa` | ⬜ 待实现 | 可选；本地 QA 已可演示 |
+
+### `POST /api/papers/batch` 请求体（PaperPipeline 已发送）
+
+```json
+{
+  "papers": [{
     "arxiv_id": "1706.03762",
     "title": "Attention Is All You Need",
     "authors": [{"name": "Ashish Vaswani"}],
@@ -33,14 +49,23 @@ Content-Type: application/json
     "primary_category": "cs.CL",
     "pdf_url": "https://arxiv.org/pdf/1706.03762.pdf",
     "source_url": "https://arxiv.org/abs/1706.03762",
-    "ingest_status": "metadata_only"
-  }
-]
+    "ingest_status": "metadata_only",
+    "authors": [{"display_name": "...", "author_order": 1}]
+  }]
+}
+```
+
+### `POST /api/search/chunks` 期望
+
+```json
+{ "arxiv_id": "1706.03762", "query": "...", "top_k": 5 }
 ```
 
 成功响应 `data`: `{items, created, updated}`。
 
-## 尚未由 backend 提供（PaperPipeline 本地兜底）
+`src/pipeline/integration/backend_client.py` 提供了解析任务创建、结构化结果和文本块写入客户端；解析器可使用 `wiki_to_backend_structured()` 和 `chunk_to_backend()` 生成请求体。
+
+## 成员 B（前端）— 消费约定
 
 | 能力 | 状态 | 本地行为 |
 |------|------|----------|
@@ -59,10 +84,9 @@ Content-Type: application/json
 
 ## 建议联调顺序
 
-1. `GET /health`
-2. `python -m pipeline.crawler.run_crawl` + `PAPERMATE_API_BASE` → 验证 batch 入库
-3. 成员 C：增加「解析结果写入」API（StructuredResult + TextChunk + 更新 `ingest_status=parsed`）
-4. 成员 C：`POST /api/search/chunks` → PaperPipeline QA 切远程检索
-5. 替换 backend QA stub 为基于 chunks 的检索；UI 关掉 mock
-
-详见 `ppp/成员D_职责与集成方案.md`。
+1. `GET /api/health`（已可用）
+2. `POST /api/papers/batch` → 切换真实 ingest
+3. 解析写入 `StructuredResult` 与 `TextChunk` → 关闭仅依赖 `paragraphs_preview`
+4. `POST /api/search/chunks` → QA 远程检索
+5. 前端 `qaService` / `paperService` 接真实 HTTP（字段已对齐 mock）
+6. E 黄金题 + A ADR → contract V1

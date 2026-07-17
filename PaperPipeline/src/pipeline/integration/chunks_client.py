@@ -40,8 +40,20 @@ class ChunksClient:
         return self._search_local(arxiv_id, query)
 
     def _search_remote(self, arxiv_id: str, query: str, *, timeout_s: float) -> list[TextChunkRef] | None:
-        """Future: POST {api_base}/api/search/chunks — not implemented in backend yet."""
-        from .contracts import unwrap_api_response
+        """POST {api_base}/api/search/chunks."""
+        url = f"{self.api_base}/api/search/chunks"
+        body = json.dumps({"arxiv_id": arxiv_id, "query": query, "top_k": self.top_k}).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json", "User-Agent": "PaperMate-QA/0.1"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            # Backend ApiResponse{code,message,data,request_id} or raw list
+            from .contracts import unwrap_api_response
 
         for path in ("/api/search/chunks", "/search/chunks"):
             url = f"{self.api_base}{path}"

@@ -1,4 +1,4 @@
-"""Crawler package: stub (H038) + real arXiv client (H047)."""
+"""Crawler package: stub () + real arXiv client ()."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class FetchOutput:
 
 
 def fetch_paper(arxiv_id: str, *, fail: bool = False, sleep_s: float = 0.05) -> FetchOutput:
-    """Stub used by memory-queue demo (H038). Real bulk crawl: run_crawl.py."""
+    """Stub used by memory-queue demo (). Real bulk crawl: run_crawl.py."""
     time.sleep(sleep_s)
     if fail or arxiv_id in {"9999.99999", "0000.00001"}:
         return FetchOutput(

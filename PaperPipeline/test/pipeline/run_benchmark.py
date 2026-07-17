@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H087 — benchmark crawl/parse/summarize/qa stage timings."""
+""" — benchmark crawl/parse/summarize/qa stage timings."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def _bench_one(arxiv_id: str, *, samples_dir: Path, question: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate pipeline benchmark (H087)")
+    parser = argparse.ArgumentParser(description="PaperMate pipeline benchmark ()")
     parser.add_argument("--out", default="test/pipeline/benchmark.json")
     args = parser.parse_args()
 

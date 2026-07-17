@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H017/H018 Spike: arXiv fetch → PDF parse → extractive summarize."""
+"""Spike: arXiv fetch, PDF parse and extractive summarization."""
 
 from __future__ import annotations
 
@@ -278,7 +278,6 @@ def to_backend_payload(
 def cmd_fetch(keyword: str) -> int:
     meta, stage = run_stage("fetch_metadata", lambda: search_by_keyword(keyword, max_results=1)[0])
     payload = {
-        "task": "H017",
         "keyword": keyword,
         "stages": [asdict(stage)],
         "paper": asdict(meta) if meta else None,
@@ -324,7 +323,6 @@ def cmd_pipeline(arxiv_id: str, keyword: str | None) -> int:
         meta, pdf_path, summary, page_count=page_count, status=spike_status
     )
     output = {
-        "task": "H017+H018",
         "run_id": run_id,
         "sample": "P1" if meta.arxiv_id.startswith("1706.03762") else meta.arxiv_id,
         "paper": asdict(meta),
@@ -360,13 +358,13 @@ def _save_run(run_id, meta, stages, pdf_path, body, structured, backend=None) ->
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate arXiv spike (H017/H018)")
+    parser = argparse.ArgumentParser(description="PaperMate arXiv spike")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_fetch = sub.add_parser("fetch", help="H017: keyword search, return 1 paper metadata")
+    p_fetch = sub.add_parser("fetch", help="Keyword search returning one paper's metadata")
     p_fetch.add_argument("--keyword", default="attention is all you need", help="arXiv search keyword")
 
-    p_pipe = sub.add_parser("pipeline", help="H017+H018: fetch → download → parse → summarize")
+    p_pipe = sub.add_parser("pipeline", help="Fetch, download, parse and summarize")
     p_pipe.add_argument("--arxiv-id", default="1706.03762", help="Frozen sample ID (default P1)")
     p_pipe.add_argument("--keyword", default=None, help="Use keyword search instead of fixed ID")
 

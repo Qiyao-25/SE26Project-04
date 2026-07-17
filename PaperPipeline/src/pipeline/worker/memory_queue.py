@@ -1,6 +1,6 @@
-"""H038 · In-memory task queue: create → execute → success/failure.
+""" · In-memory task queue: create → execute → success/failure.
 
-Logs task_id and per-stage elapsed time (Spike/H028 aligned).
+Logs task_id and per-stage elapsed time (Spike/ aligned).
 """
 
 from __future__ import annotations
