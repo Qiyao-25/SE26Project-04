@@ -60,22 +60,34 @@ export default function MainLayout({
     topics,
     isAdmin,
     showAdminNav,
+    lockedPaperId,
   } = useApp();
 
-  const pathKey = location.pathname.startsWith('/paper')
-    ? '/workspace'
-    : location.pathname;
+  const onPaperDetail = location.pathname.startsWith('/paper/');
+  // 论文详情归属工作空间页签
+  const pathKey = onPaperDetail ? '/workspace' : location.pathname;
 
-  const meta = PAGE_TITLES[pathKey] || {
-    title: 'PaperMate',
-    sub: '',
-  };
+  const workspaceMeta = lockedPaperId
+    ? {
+        title: onPaperDetail ? '论文详情' : PAGE_TITLES['/workspace'].title,
+        sub: onPaperDetail
+          ? '工作空间 · 阅读中（可切换其他页签，返回工作空间仍保留本篇）'
+          : '工作空间仍保留正在阅读的论文 · 点「工作空间」可回到详情',
+      }
+    : PAGE_TITLES['/workspace'];
+
+  const meta = onPaperDetail || pathKey === '/workspace'
+    ? workspaceMeta
+    : (PAGE_TITLES[pathKey] || {
+        title: 'PaperMate',
+        sub: '',
+      });
 
   const menuItems = [
     {
       key: '/workspace',
       icon: <HomeOutlined />,
-      label: '工作空间',
+      label: lockedPaperId ? '工作空间（阅读中）' : '工作空间',
     },
     {
       key: '/learning',
@@ -104,6 +116,15 @@ export default function MainLayout({
         ? 'light'
         : 'dark'
     );
+  };
+
+  const handleMenuClick = ({ key }) => {
+    // 工作空间被论文锁定时：点「工作空间」回到该论文详情
+    if (key === '/workspace' && lockedPaperId) {
+      navigate(`/paper/${lockedPaperId}`);
+      return;
+    }
+    navigate(key);
   };
 
   return (
@@ -141,7 +162,7 @@ export default function MainLayout({
           mode="inline"
           selectedKeys={[pathKey]}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={handleMenuClick}
         />
 
         <div className="sider-footer">

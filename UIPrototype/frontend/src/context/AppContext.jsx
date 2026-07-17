@@ -13,6 +13,8 @@ export function AppProvider({ children }) {
   const [topics, setTopics] = useState(['cs.CL']);
   const [workspaceSearched, setWorkspaceSearched] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
+  /** 工作空间锁定的论文：切到学习/设置后再回工作空间仍进此详情；退出论文后清空 */
+  const [lockedPaperId, setLockedPaperId] = useState(null);
   const [paperNotes, setPaperNotes] = useState(() => JSON.parse(JSON.stringify(DEFAULT_PAPER_NOTES)));
   const [comparePaperA, setComparePaperA] = useState('attention');
   const [comparePaperB, setComparePaperB] = useState('bert');
@@ -32,6 +34,7 @@ export function AppProvider({ children }) {
     setIsAdmin(false);
     setWorkspaceSearched(false);
     setLastSearchQuery('');
+    setLockedPaperId(null);
   }, []);
 
   const showAdminNav = WIREFRAME_DEMO || isAdmin;
@@ -65,18 +68,25 @@ export function AppProvider({ children }) {
     setComparePaperB((b) => (b === paperId ? getDefaultCompareTarget(paperId) : b));
   }, []);
 
+  const exitLockedPaper = useCallback(() => {
+    setLockedPaperId(null);
+  }, []);
+
   const value = useMemo(() => ({
     loggedIn, isAdmin, userId, persona, topics, workspaceSearched, lastSearchQuery,
+    lockedPaperId,
     comparePaperA, comparePaperB, compareActiveSlot,
     showAdminNav,
     login, logout, setPersona, setTopics,
     setWorkspaceSearched, setLastSearchQuery,
+    setLockedPaperId, exitLockedPaper,
     setComparePaperA, setComparePaperB, setCompareActiveSlot,
     getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
   }), [
     loggedIn, isAdmin, userId, persona, topics, workspaceSearched, lastSearchQuery,
+    lockedPaperId,
     comparePaperA, comparePaperB, compareActiveSlot, showAdminNav,
-    login, logout, getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
+    login, logout, exitLockedPaper, getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

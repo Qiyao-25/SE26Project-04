@@ -26,7 +26,7 @@ export default function FavoriteButton({ paperId, block = false, size }) {
   const toggle = async (event) => {
     event.stopPropagation();
     if (!persist) {
-      message.info('当前为演示论文，登录后选择数据库论文即可持久化收藏');
+      message.warning('当前论文尚未入库，无法持久化收藏');
       return;
     }
     const next = !favorite;
