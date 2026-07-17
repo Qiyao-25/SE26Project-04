@@ -76,7 +76,8 @@ backend 已从「仅 health」升级为 **双通道 papers API**（DB 数字 ID 
 | 请求体 `{"papers":[...]}` | → **JSON 数组** `list[PaperUpsert]` |
 | 作者 `display_name` | → **`{name}`**（`AuthorInput`） |
 | Wiki 单块 `wiki_triple` | → **`summary` / `concepts` / `methods` / `limitations` 多行**（`wiki_to_backend_structured_rows`） |
-| 分块检索 API 不存在 | → 远程 best-effort + **本地 samples 兜底**；文档标明待 C 补 `POST /api/search/chunks` |
+| 分块检索 | → **`POST /api/search/chunks`**（`ChunksClient`）；失败回退本地 samples |
+| 解析写回 | → **`BackendClient` + `run_backend_worker`**：parse → chunks → finalize |
 
 代码位置：`PaperPipeline/src/pipeline/integration/contracts.py`、`crawler/ingest.py`、`INTEGRATION.md`。
 
@@ -91,60 +92,47 @@ backend 已从「仅 health」升级为 **双通道 papers API**（DB 数字 ID 
                │  VITE_USE_MOCK=false
                ▼
           backend :8000
-               │  POST /api/papers/batch（已通）
-               │  未来：写 StructuredResult / TextChunk
-               │  未来：POST /api/search/chunks · 真 RAG QA
+               │  POST /api/papers/batch
+               │  POST /api/papers/{id}/parse · /chunks · /wiki · /qa
+               │  /api/tasks/* · POST /api/search/chunks
                ▼
-          PaperPipeline Worker（独立进程或定时任务）
-               │  读 arXiv / 解析 PDF
+          PaperPipeline Worker（独立进程）
+               │  读 arXiv / 解析 PDF·HTML → finalize
                ▼
           SQLite/PostgreSQL（同一 PAPERMATE_DATABASE_URL）
 ```
 
-原则：**C 拥有写库权威；D 产出算法结果并通过契约写入（或由 C 提供写入 API 供 D 调用）。**
+原则：**C 拥有写库权威；D 产出算法结果并通过 HTTP 契约写入。**
 
-### 3.2 分阶段落地（建议 4 步）
+### 3.2 分阶段落地（当前进度）
 
-#### 阶段 A — 元数据闭环（可立即做）
+#### 阶段 A — 元数据闭环 ✅
 
 1. 启动 backend：`uvicorn app.main:app --port 8000`
 2. PaperPipeline：
    ```powershell
-   cd SE26Project-04/PaperPipeline
+   cd ppp/PaperPipeline
    $env:PYTHONPATH="src"
    $env:PAPERMATE_API_BASE="http://127.0.0.1:8000"
    python -m pipeline.crawler.run_crawl --target 20
    ```
-3. 验证：`GET /api/papers?keyword=attention` 能看到入库论文  
-4. UI：对 **数字 paper_id** 走 DB 详情（mock 字符串 ID 仍演示固定 6 篇）
+3. 验证：`GET /api/papers?keyword=attention`  
+4. API 宕机时仍有 `seed.json`
 
-**验收：** 抓取成功 → DB 有记录；API 宕机时仍有 `seed.json`。
+#### 阶段 B — Wiki / Chunks 闭环 ✅
 
-#### 阶段 B — Wiki 内容闭环（需 C 小接口）
+已由 `run_backend_worker` 调用：`create_parse` → 解析 → `finalize`（chunks + structured rows）。  
+验收：`GET /api/papers/{id}/wiki` 有 summary；`qa_ready`；`POST /api/search/chunks` 有命中。
 
-成员 C 增加其一即可：
+#### 阶段 C — QA 闭环 ✅（样例 + DB）
 
-- `POST /api/papers/{paper_id}/structured` 接收 `wiki_to_backend_structured_rows()` 的 rows；或  
-- Worker 同进程直接写 ORM（若 D/C 合仓部署）
+- 本地：`python -m pipeline.qa.run_eval`（sample 模式）
+- 联调：`PAPERMATE_QA_MODE=remote` + `PAPERMATE_API_BASE` 走 chunks 检索
+- 一键：`python scripts/run_project_integration.py [--with-backend]`
 
-同时更新 `Paper.ingest_status = "parsed"`，使 `parse_status=completed`。
+#### 阶段 D — E2E 三篇与观测（进行中）
 
-**验收：** `GET /api/papers/{id}/wiki` 返回非空 concepts/methods（不再只有 abstract）。
-
-#### 阶段 C — 出处问答闭环（需 C 分块检索）
-
-1. D 解析后调用写入 `TextChunk`（`paragraphs_to_text_chunks`）
-2. C 提供 `POST /api/search/chunks`（或内部服务）
-3. 将 `POST /api/papers/{id}/qa` 从「摘要 stub」改为：调检索 → 生成/模板回答 → 返回 UI 形 citations
-4. 可选：QA 逻辑直接复用 `pipeline.qa.service.QAService`（作为库被 backend 调用）
-
-**验收：** 问答引用含 `pageNumber`/`quote`；P9/P10 类不可用拒答。
-
-#### 阶段 D — 任务可观测（管理后台）
-
-1. C 暴露 `ParseTask` 创建/查询 API  
-2. D Worker 写 `ParseTask` 状态（queued→running→succeeded/failed）  
-3. UI 管理端「任务队列」读 DB，不再纯 mock
+`run_full_demo` + Worker 常驻 + `GET /api/tasks/stats`；补幂等/重试/耗时数字。
 
 ### 3.3 代码集成两种部署方式
 
@@ -159,8 +147,8 @@ backend 已从「仅 health」升级为 **双通道 papers API**（DB 数字 ID 
 
 | 成员 | 待办 |
 |------|------|
-| **D** | 保持契约与 backend 同步；提供 rows/chunks 载荷；本地评测 20 题 |
-| **C** | batch 已完成；补 structured/chunks 写与搜；QA 换真检索 |
+| **D** | 契约同步；`run_backend_worker` / 联调脚本；本地 20 题 + E2E 三篇数字 |
+| **C** | batch / tasks / chunks / search 已通；继续稳定 QA RAG |
 | **B** | `VITE_USE_MOCK=false` 接数字 ID；引用卡片字段已对齐 mock |
 | **A/E** | ADR 冻结字段；黄金题替换 `data/qa/questions.json` |
 
@@ -175,9 +163,13 @@ $env:PYTHONPATH="src"
 python -m pipeline.worker.run_demo
 python -m pipeline.qa.run_eval
 
-# 联调入库
+# SE26 联调：入库 → 解析任务 → Worker → Wiki/chunks（一键）
 $env:PAPERMATE_API_BASE="http://127.0.0.1:8000"
+python -m pipeline.run_se26_integration --arxiv-id 1706.03762
+
+# 批量入库 + 常驻 Worker
 python -m pipeline.crawler.run_crawl --target 20
+python -m pipeline.worker.run_backend_worker --once
 ```
 
-更细的字段表见：`SE26Project-04/PaperPipeline/INTEGRATION.md`。
+更细的字段表见：`PaperPipeline/INTEGRATION.md`。
