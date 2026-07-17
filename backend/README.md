@@ -45,6 +45,7 @@ python -m harness health
 python -m harness orm
 python -m alembic upgrade head
 python -m alembic current
+python -m alembic upgrade head
 python -m scripts.import_seed --seed ../PaperPipeline/data/seed.json
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -186,5 +187,7 @@ POST /api/search/chunks
 POST /api/learning/actions
 GET  /api/learning/actions?user_id=demo
 ```
+
+解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

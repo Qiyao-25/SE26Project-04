@@ -57,7 +57,7 @@ $env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"
 python -m pipeline.worker.run_backend_worker
 ```
 
-只处理一个任务可使用 `--once`。PDF 默认缓存到 `data/worker_pdfs`，可通过 `--pdf-dir` 修改。Worker 运行环境需要先执行 `pip install -r requirements.txt`。
+只处理一个任务可使用 `--once`。PDF 默认缓存到 `data/worker_pdfs`，HTML 默认缓存到 `data/worker_html`，可分别通过 `--pdf-dir`、`--html-dir` 修改。默认 PDF 优先、解析失败后回退 ar5iv；验证 HTML 路径时可添加 `--prefer-html`。Worker 运行环境需要先执行 `pip install -r requirements.txt`。
 
 ## 交付对应（迭代 2）
 

@@ -83,7 +83,7 @@ async function getMockPaperSummary(paperId) {
   if (paperId === summaryMock.data.paperId) return summaryMock.data;
   const paper = PAPERS[paperId];
   if (!paper) return null;
-  return { paperId, parseStatus: paper.parseStatus || 'completed', summary: paper.summary, concepts: (paper.conceptTags || []).map((name, index) => ({ conceptId: `${paperId}-concept-${index + 1}`, name, description: `${name} 是该论文结构化解析得到的核心概念。` })), methods: [{ order: 1, title: '研究问题定义', description: `围绕“${paper.direction}”方向明确研究问题与任务目标。` }, { order: 2, title: '模型与方法设计', description: '分析论文提出的模型结构、训练方式和关键技术模块。' }, { order: 3, title: '实验验证', description: '使用实验结果和评价指标验证所提方法的有效性。' }], limitations: ['当前为前端 Mock 解析结果，可通过 VITE_USE_MOCK=false 切换到后端接口。'] };
+  return { paperId, parseStatus: paper.parseStatus || 'completed', summary: paper.summary, concepts: (paper.conceptTags || []).map((name, index) => ({ conceptId: `${paperId}-concept-${index + 1}`, name, description: `${name} 是该论文结构化解析得到的核心概念。` })), methods: [{ order: 1, title: '研究问题定义', description: `围绕“${paper.direction}”方向明确研究问题与任务目标。` }, { order: 2, title: '模型与方法设计', description: '分析论文提出的模型结构、训练方式和关键技术模块。' }, { order: 3, title: '实验验证', description: '使用实验结果和评价指标验证所提方法的有效性。' }], experiments: [{ title: '实验与结果', description: '当前 Mock 模式使用论文摘要和预置样例展示实验结果区域。' }], limitations: ['当前为前端 Mock 解析结果，可通过 VITE_USE_MOCK=false 切换到后端接口。'], validationFlags: ['mock_result'] };
 }
 
 export async function searchPapers(params = {}) {

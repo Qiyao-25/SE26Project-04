@@ -31,6 +31,7 @@ def to_task(task: ParseTask) -> TaskResponse:
         started_at=task.started_at,
         finished_at=task.finished_at,
         error_code=task.error_code,
+        stage=task.stage,
     )
 
 
@@ -85,6 +86,8 @@ def update_task(session: Session, task_id: int, payload: TaskUpdate) -> TaskResp
         raise ValueError("TASK_NOT_FOUND")
     if payload.status == "running" and task.status == "queued":
         task.started_at = task.started_at or _now()
+    if payload.stage:
+        task.stage = payload.stage
     if payload.status in {"failed", "timed_out"}:
         task.finished_at = _now()
     task.status = payload.status
@@ -129,6 +132,7 @@ def save_results(session: Session, task_id: int, payload: StructuredResultBatch)
     task.status = "succeeded"
     task.finished_at = _now()
     task.error_code = None
+    task.stage = "completed"
     paper = session.get(Paper, task.paper_id)
     paper.ingest_status = "parsed"
     session.commit()

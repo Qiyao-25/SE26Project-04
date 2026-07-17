@@ -27,9 +27,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="PaperMate database-backed PDF parse worker")
     parser.add_argument("--api-base", default=os.environ.get("PAPERMATE_API_BASE", "http://127.0.0.1:8000"))
     parser.add_argument("--pdf-dir", type=Path, default=Path("data/worker_pdfs"))
+    parser.add_argument("--html-dir", type=Path, default=Path("data/worker_html"))
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--max-pages", type=int, default=0, help="0 means no page limit")
     parser.add_argument("--min-chars", type=int, default=500)
+    parser.add_argument("--prefer-html", action="store_true", help="try ar5iv HTML before PDF")
     parser.add_argument("--once", action="store_true", help="process at most one queued task")
     args = parser.parse_args()
 
@@ -43,6 +45,8 @@ def main() -> int:
         args.pdf_dir,
         max_pages=args.max_pages or None,
         min_chars=args.min_chars,
+        html_dir=args.html_dir,
+        prefer_html=args.prefer_html,
     )
 
     while True:

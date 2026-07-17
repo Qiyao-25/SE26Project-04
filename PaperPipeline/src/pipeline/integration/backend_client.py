@@ -45,10 +45,12 @@ class BackendClient:
     def get_paper(self, paper_id: int) -> dict:
         return self._request(f"/api/papers/{paper_id}", "GET")
 
-    def update_task(self, task_id: int, status: str, error_code: str | None = None) -> dict:
+    def update_task(self, task_id: int, status: str, error_code: str | None = None, stage: str | None = None) -> dict:
         body: dict[str, Any] = {"status": status}
         if error_code:
             body["error_code"] = error_code[:64]
+        if stage:
+            body["stage"] = stage[:32]
         return self._request(f"/api/tasks/{task_id}", "PATCH", body)
 
     def save_structured_results(self, task_id: int, results: list[dict[str, Any]]) -> dict:

@@ -37,6 +37,23 @@ def test_qa_without_chunk_evidence_is_rejected() -> None:
             raise AssertionError("expected NO_EVIDENCE")
 
 
+def test_qa_rejects_structured_result_without_original_chunks() -> None:
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="structured-only", title="Structured Only", abstract="abstract")]).items[0]
+        from app.schema.papers import StructuredResultBatch, StructuredResultInput
+        from app.service.tasks import create_task, save_results
+
+        task, _ = create_task(session, paper.paper_id, "full_parse", "structured-only-task")
+        save_results(session, task.task_id, StructuredResultBatch(results=[StructuredResultInput(result_type="summary", content_json={"summary": "summary"})]))
+        try:
+            answer_question(session, paper.paper_id, "unsupported fact")
+        except PaperServiceError as exc:
+            assert exc.code == "NO_EVIDENCE"
+            assert exc.status_code == 422
+        else:
+            raise AssertionError("expected NO_EVIDENCE")
+
+
 def test_qa_api_payload_normalizes_numeric_citation_paper_id() -> None:
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="qa-contract-paper", title="QA Contract")]).items[0]

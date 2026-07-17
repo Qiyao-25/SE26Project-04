@@ -79,11 +79,13 @@ class TaskResponse(BaseModel):
     started_at: datetime | None
     finished_at: datetime | None
     error_code: str | None
+    stage: str | None = None
 
 
 class TaskUpdate(BaseModel):
     status: Literal["running", "failed", "timed_out"]
     error_code: str | None = Field(default=None, max_length=64)
+    stage: str | None = Field(default=None, max_length=32)
 
 
 class StructuredResultInput(BaseModel):
@@ -159,7 +161,9 @@ class WikiData(BaseModel):
     summary: str | None
     concepts: list[dict]
     methods: list[dict]
+    experiments: list[dict]
     limitations: list[str]
+    validation_flags: list[str]
     source_locator: dict
 
 

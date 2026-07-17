@@ -46,3 +46,12 @@ def test_list_tasks_returns_oldest_queued_tasks_first() -> None:
         assert [task.task_id for task in queued] == [first.task_id]
         update_task(session, first.task_id, TaskUpdate(status="running"))
         assert list_tasks(session, status="queued", limit=10) == []
+
+
+def test_task_stage_is_persisted() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="stage-paper", title="Stage Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "stage-key")
+        updated = update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
+        assert updated.stage == "parse"
+        assert get_task(session, task.task_id).stage == "parse"
