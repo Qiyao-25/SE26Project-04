@@ -1,4 +1,4 @@
-"""Search Agent — natural language query rewrite + search answer generation."""
+"""Search Agent - natural language query rewrite + search answer generation."""
 
 from __future__ import annotations
 
@@ -104,7 +104,6 @@ class SearchAgent:
         rewritten = str(data.get("rewritten_query") or query).strip() or query
         if not keywords:
             keywords = _heuristic_keywords(query)
-        # merge rewritten tokens
         for token in re.findall(r"[A-Za-z][A-Za-z0-9\-]{1,}|[\u4e00-\u9fff]{2,}", rewritten):
             if token not in keywords:
                 keywords.append(token)
@@ -117,23 +116,15 @@ class SearchAgent:
         )
 
     def _plan_heuristic(self, query: str) -> SearchPlan:
-        keywords = _heuristic_keywords(query)
         return SearchPlan(
             rewritten_query=query,
-            keywords=keywords,
+            keywords=_heuristic_keywords(query),
             category_hints=[],
             intent="基于关键词的模糊匹配",
             source="heuristic",
         )
 
-    def _answer_with_llm(
-        self,
-        *,
-        query: str,
-        plan: SearchPlan,
-        papers: list[dict[str, Any]],
-        total: int,
-    ) -> SearchAnswer:
+    def _answer_with_llm(self, *, query: str, plan: SearchPlan, papers: list[dict[str, Any]], total: int) -> SearchAnswer:
         lines = []
         for index, paper in enumerate(papers[:8], start=1):
             lines.append(
@@ -163,29 +154,18 @@ class SearchAgent:
         answer = str(data.get("answer") or "").strip()
         if not answer:
             return self._answer_template(query=query, plan=plan, papers=papers, total=total)
-        return SearchAnswer(
-            answer=answer,
-            highlights=_as_str_list(data.get("highlights"))[:5],
-            source="llm",
-        )
+        return SearchAnswer(answer=answer, highlights=_as_str_list(data.get("highlights"))[:5], source="llm")
 
-    def _answer_template(
-        self,
-        *,
-        query: str,
-        plan: SearchPlan,
-        papers: list[dict[str, Any]],
-        total: int,
-    ) -> SearchAnswer:
+    def _answer_template(self, *, query: str, plan: SearchPlan, papers: list[dict[str, Any]], total: int) -> SearchAnswer:
         if total <= 0:
             return SearchAnswer(
                 answer=f"未找到与“{query}”匹配的论文。可尝试更短的英文关键词（如 attention、transformer），或更换研究方向。",
                 source="template",
             )
         titles = [str(p.get("title") or "") for p in papers[:3] if p.get("title")]
-        named = "、".join(f"《{t}》" for t in titles)
-        kw = "、".join(plan.keywords[:5]) or query
-        answer = f"已根据“{kw}”完成智能匹配，共找到 {total} 篇相关论文。"
+        named = "、".join(f"《{title}》" for title in titles)
+        keywords = "、".join(plan.keywords[:5]) or query
+        answer = f"已根据“{keywords}”完成智能匹配，共找到 {total} 篇相关论文。"
         if named:
             answer += f" 其中较相关的包括：{named}。"
         if plan.intent:
@@ -194,12 +174,9 @@ class SearchAgent:
 
 
 def _heuristic_keywords(query: str) -> list[str]:
-    tokens = []
-    for token in re.findall(r"[A-Za-z][A-Za-z0-9\-]{1,}|[\u4e00-\u9fff]{2,}", query or ""):
-        tokens.append(token)
-    # expand bilingual synonyms from shared helper
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9\-]{1,}|[\u4e00-\u9fff]{2,}", query or "")
     expanded = list(expand_query_tokens(query))
-    merged = _dedupe(tokens + [t for t in expanded if re.search(r"[A-Za-z]", t) or len(t) >= 2])
+    merged = _dedupe(tokens + [token for token in expanded if re.search(r"[A-Za-z]", token) or len(token) >= 2])
     if query.strip() and query.strip() not in merged:
         merged.insert(0, query.strip())
     return merged[:10]
@@ -208,24 +185,19 @@ def _heuristic_keywords(query: str) -> list[str]:
 def _as_str_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    out = []
-    for item in value:
-        text = str(item or "").strip()
-        if text:
-            out.append(text)
-    return out
+    return [text for item in value if (text := str(item or "").strip())]
 
 
 def _dedupe(values: list[str]) -> list[str]:
     seen: set[str] = set()
-    out: list[str] = []
+    output: list[str] = []
     for value in values:
         key = value.casefold()
         if not value or key in seen:
             continue
         seen.add(key)
-        out.append(value)
-    return out
+        output.append(value)
+    return output
 
 
 def _parse_json(raw: str) -> dict[str, Any]:

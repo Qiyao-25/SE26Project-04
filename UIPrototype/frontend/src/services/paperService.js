@@ -3,7 +3,6 @@ import { USE_MOCK } from './runtimeConfig';
 import { PAPERS, PAPER_LIST } from '../data/papers';
 import detailMock from '../mocks/paper-detail.json';
 import contentMock from '../mocks/paper-content.json';
-import summaryMock from '../mocks/paper-summary.json';
 
 const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -24,15 +23,15 @@ function toPaperListItem(paper) {
     keywords: paper.keywords || [],
     researchDirection: paper.researchDirection || paper.direction || '',
     conceptTags: paper.conceptTags || [],
-    parseStatus: paper.parseStatus || paper.parse_status || 'completed',
+    parseStatus: paper.parseStatus || paper.parse_status || 'pending',
     chunkCount: paper.chunkCount ?? paper.chunk_count ?? 0,
     qaReady: Boolean(paper.qaReady ?? paper.qa_ready),
     isFavorite: Boolean(paper.isFavorite)
   };
 }
 
-function createCompatibleDetail(paper) {
-  const normalized = toPaperListItem(paper);
+function createCompatibleDetail(paper, { forcePending = false } = {}) {
+  const normalized = toPaperListItem(forcePending ? { ...paper, parseStatus: 'pending', chunkCount: 0, qaReady: false } : paper);
   return {
     ...paper,
     ...normalized,
@@ -68,9 +67,9 @@ async function searchMockPapers({ query = '', searchType = 'keyword', categories
 
 async function getMockPaperDetail(paperId) {
   await delay(150);
-  if (paperId === detailMock.data.paperId) return createCompatibleDetail(detailMock.data);
+  if (paperId === detailMock.data.paperId) return createCompatibleDetail(detailMock.data, { forcePending: true });
   const paper = PAPERS[paperId];
-  return paper ? createCompatibleDetail(paper) : null;
+  return paper ? createCompatibleDetail(paper, { forcePending: true }) : null;
 }
 
 async function getMockPaperContent(paperId) {
@@ -82,10 +81,19 @@ async function getMockPaperContent(paperId) {
 
 async function getMockPaperSummary(paperId) {
   await delay(150);
-  if (paperId === summaryMock.data.paperId) return summaryMock.data;
-  const paper = PAPERS[paperId];
-  if (!paper) return null;
-  return { paperId, parseStatus: paper.parseStatus || 'completed', summary: paper.summary, concepts: (paper.conceptTags || []).map((name, index) => ({ conceptId: `${paperId}-concept-${index + 1}`, name, description: `${name} 是该论文结构化解析得到的核心概念。` })), methods: [{ order: 1, title: '研究问题定义', description: `围绕“${paper.direction}”方向明确研究问题与任务目标。` }, { order: 2, title: '模型与方法设计', description: '分析论文提出的模型结构、训练方式和关键技术模块。' }, { order: 3, title: '实验验证', description: '使用实验结果和评价指标验证所提方法的有效性。' }], experiments: [{ title: '实验与结果', description: '当前 Mock 模式使用论文摘要和预置样例展示实验结果区域。' }], limitations: ['当前为前端 Mock 解析结果，可通过 VITE_USE_MOCK=false 切换到后端接口。'], validationFlags: ['mock_result'] };
+  if (!PAPERS[paperId] && paperId !== detailMock.data.paperId) return null;
+  return {
+    paperId,
+    parseStatus: 'pending',
+    summary: '',
+    concepts: [],
+    methods: [],
+    experiments: [],
+    limitations: [],
+    validationFlags: [],
+    chunkCount: 0,
+    qaReady: false
+  };
 }
 
 export async function searchPapers(params = {}) {
@@ -95,7 +103,6 @@ export async function searchPapers(params = {}) {
   return { searchId: `search-${Date.now()}`, query, searchType: 'keyword', sortBy: 'relevance', total: data.total, page: data.page, pageSize: data.page_size, searchTimeMs: 0, items: data.items.map(toPaperListItem) };
 }
 
-/** 工作台「智能论文检索」：LLM 查询改写 + 模糊匹配 + 生成回答 */
 export async function smartSearchPapers({ query = '', page = 1, pageSize = 12, category } = {}) {
   if (USE_MOCK) {
     const data = await searchMockPapers({ query, page, pageSize });
@@ -104,10 +111,7 @@ export async function smartSearchPapers({ query = '', page = 1, pageSize = 12, c
       rewrittenQuery: query,
       keywords: query ? [query] : [],
       intent: '',
-      answer:
-        data.total > 0
-          ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。`
-          : `（Mock）未找到与“${query}”匹配的论文。`,
+      answer: data.total > 0 ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。` : `（Mock）未找到与“${query}”匹配的论文。`,
       highlights: [],
       planSource: 'mock',
       answerSource: 'mock'

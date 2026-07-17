@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 import time
+import socket
 from pathlib import Path
 
 _SRC = Path(__file__).resolve().parents[2]
@@ -26,6 +27,7 @@ from pipeline.worker.backend_worker import BackendParseWorker  # noqa: E402
 def main() -> int:
     parser = argparse.ArgumentParser(description="PaperMate database-backed PDF parse worker")
     parser.add_argument("--api-base", default=os.environ.get("PAPERMATE_API_BASE", "http://127.0.0.1:8000"))
+    parser.add_argument("--worker-id", default=os.environ.get("PAPERMATE_WORKER_ID", f"{socket.gethostname()}-{os.getpid()}"))
     parser.add_argument("--pdf-dir", type=Path, default=Path("data/worker_pdfs"))
     parser.add_argument("--html-dir", type=Path, default=Path("data/worker_html"))
     parser.add_argument("--poll-interval", type=float, default=2.0)
@@ -44,8 +46,9 @@ def main() -> int:
         datefmt="%H:%M:%S",
     )
     worker = BackendParseWorker(
-        BackendClient(args.api_base),
+        BackendClient(args.api_base, worker_token=os.environ.get("PAPERMATE_WORKER_TOKEN")),
         args.pdf_dir,
+        worker_id=args.worker_id,
         max_pages=args.max_pages or None,
         min_chars=args.min_chars,
         html_dir=args.html_dir,
@@ -67,7 +70,12 @@ def main() -> int:
             except Exception:  # noqa: BLE001
                 logging.exception("stale_task_recovery_failed")
             last_recovery = time.monotonic()
-        result = worker.run_once()
+        try:
+            result = worker.run_once()
+        except Exception:  # noqa: BLE001
+            logging.exception("worker_poll_failed")
+            time.sleep(max(args.poll_interval, 1.0))
+            continue
         if result is not None:
             processed += 1
             if result["status"] == "failed":

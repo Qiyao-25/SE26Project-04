@@ -6,7 +6,7 @@ from datetime import timedelta
 from app.schema.papers import ParseResultCommit, PaperUpsert, StructuredResultBatch, StructuredResultInput, TaskUpdate, TextChunkBatch, TextChunkInput
 from app.repository.chunks import upsert_chunks
 from app.service.papers import batch_upsert_papers, get_wiki
-from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
+from app.service.tasks import claim_task, create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 from sqlalchemy.orm import Session
 
 
@@ -58,6 +58,37 @@ def test_task_stage_is_persisted() -> None:
         updated = update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
         assert updated.stage == "parse"
         assert get_task(session, task.task_id).stage == "parse"
+
+
+def test_worker_claim_is_atomic_and_starts_task() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="claim-paper", title="Claim Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "claim-key")
+        claimed = claim_task(session, "worker-a")
+        assert claimed is not None
+        assert claimed.task_id == task.task_id
+        assert claimed.status == "running"
+        assert claimed.stage == "fetch"
+        assert claim_task(session, "worker-b") is None
+
+
+def test_completed_task_rejects_late_status_update() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="transition-paper", title="Transition Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "transition-key")
+        claim_task(session, "worker-a")
+        update_task(session, task.task_id, TaskUpdate(status="failed", error_code="PARSE_FAILED"))
+        retry_task(session, task.task_id)
+        update_task(session, task.task_id, TaskUpdate(status="running"))
+        save_results(session, task.task_id, StructuredResultBatch(results=[StructuredResultInput(result_type="summary", content_json={"summary": "done"})]))
+        try:
+            update_task(session, task.task_id, TaskUpdate(status="failed", error_code="LATE_FAILURE"))
+        except ValueError as exc:
+            assert str(exc) == "TASK_STATE_CONFLICT"
+        else:
+            raise AssertionError("expected TASK_STATE_CONFLICT")
+
+
 
 
 def test_paper_becomes_qa_ready_only_after_chunks_are_persisted() -> None:

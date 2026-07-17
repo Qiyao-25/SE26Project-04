@@ -92,6 +92,10 @@ class TaskQueueStats(BaseModel):
     oldest_queued_at: datetime | None = None
 
 
+class TaskClaimRequest(BaseModel):
+    worker_id: str = Field(min_length=1, max_length=128)
+
+
 class TaskUpdate(BaseModel):
     status: Literal["running", "failed", "timed_out"]
     error_code: str | None = Field(default=None, max_length=64)

@@ -30,11 +30,25 @@
 默认使用 data/dev.db。测试使用内存 SQLite，不会污染开发数据库。PostgreSQL 只需替换：
 
     PAPERMATE_ENV=dev
-    PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/papermate
+PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/papermate
 
 并安装 PostgreSQL 驱动：
 
-    python -m pip install -e ".[postgres]"
+python -m pip install -e ".[postgres]"
+
+Agent 默认关闭。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
+
+    PAPERMATE_AGENT_ENABLED=true
+    PAPERMATE_AGENT_API_KEY=本地密钥
+    PAPERMATE_AGENT_MODEL=模型名称
+    PAPERMATE_AGENT_BASE_URL=https://api.openai.com/v1
+    PAPERMATE_AGENT_TIMEOUT_S=30
+
+解析 Worker 的任务领取、状态更新和结果写回使用内部 Token：
+
+    PAPERMATE_WORKER_TOKEN=本地内部令牌
+
+PaperPipeline 启动时也必须使用同一个 `PAPERMATE_WORKER_TOKEN`，并通过 `X-Worker-Token` 调用内部接口。
 
 ## 3. 可重复执行命令
 
@@ -180,13 +194,15 @@ GET  /api/papers/{paper_id}/summary
 GET  /api/papers/{paper_id}/wiki
 POST /api/papers/{paper_id}/qa
 POST /api/papers/{paper_id}/parse
+POST /api/tasks/claim
 GET  /api/tasks/{task_id}
 POST /api/tasks/{task_id}/retry
-POST /api/tasks/recover-stale
+POST /api/tasks/recover-stale（Worker 内部接口）
 POST /api/tasks/enqueue-pending
 GET  /api/tasks/stats
-POST /api/tasks/{task_id}/finalize
-POST /api/tasks/{task_id}/results
+PATCH /api/tasks/{task_id}（Worker 内部接口）
+POST /api/tasks/{task_id}/finalize（Worker 内部接口）
+POST /api/tasks/{task_id}/results（Worker 内部接口）
 POST /api/papers/{paper_id}/chunks
 POST /api/search/chunks
 POST /api/learning/actions
@@ -194,5 +210,7 @@ GET  /api/learning/actions?user_id=demo
 ```
 
 解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。论文状态会区分 `parsed` 与 `qa_ready`，后者要求数据库中存在文本块，响应同时返回 `chunkCount` / `qaReady`。`finalize` 接口一次性提交文本块和结构化结果，`stats` 接口返回队列数量、可重试失败数和 stale running 数量。
+
+启用 Agent 后，论文问答会把检索到的文本块交给模型生成回答。模型必须返回 `answer` 和 `citation_ids`，后端会校验引用只能来自当前检索证据；校验失败或模型不可用时自动回退到抽取式回答。
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

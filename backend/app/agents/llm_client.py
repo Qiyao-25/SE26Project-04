@@ -1,4 +1,4 @@
-"""OpenAI-compatible chat client for PaperMate agents (provider-agnostic)."""
+"""Small provider-agnostic OpenAI-compatible chat client."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 
 class LlmError(RuntimeError):
-    pass
+    """Raised when the configured LLM cannot return a usable response."""
 
 
 def chat_completion(
@@ -23,9 +23,10 @@ def chat_completion(
     json_mode: bool = False,
 ) -> str:
     if not api_key.strip():
-        raise LlmError("LLM API key 未配置（PAPERMATE_LLM_API_KEY）")
+        raise LlmError("LLM API key 未配置")
+    if not model.strip():
+        raise LlmError("LLM model 未配置")
 
-    url = f"{api_base.rstrip('/')}/chat/completions"
     body: dict[str, Any] = {
         "model": model,
         "messages": messages,
@@ -33,14 +34,13 @@ def chat_completion(
     }
     if json_mode:
         body["response_format"] = {"type": "json_object"}
-
     request = urllib.request.Request(
-        url,
+        f"{api_base.rstrip('/')}/chat/completions",
         data=json.dumps(body).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key.strip()}",
-            "User-Agent": "PaperMate-Backend-Agent/0.1",
+            "User-Agent": "PaperMate-Backend-Agent/0.2",
         },
         method="POST",
     )
@@ -56,7 +56,9 @@ def chat_completion(
     try:
         content = payload["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
-        raise LlmError(f"LLM 响应格式异常: {payload!r}") from exc
+        raise LlmError("LLM 响应格式异常") from exc
+    if isinstance(content, list):
+        content = "".join(item.get("text", "") for item in content if isinstance(item, dict))
     if not isinstance(content, str) or not content.strip():
         raise LlmError("LLM 返回空内容")
     return content

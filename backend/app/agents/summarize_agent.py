@@ -1,4 +1,4 @@
-﻿"""Summarize Agent - call LLM to build structured Wiki fields."""
+"""LLM-backed structured summary Agent used by backend parse integrations."""
 
 from __future__ import annotations
 
@@ -11,21 +11,17 @@ from app.agents.llm_client import LlmError, chat_completion
 from app.core.config import Settings
 
 
-SYSTEM_PROMPT = """你是 PaperMate 的论文阅读 Agent（Summarize Agent）。
-根据给定论文标题、摘要与正文片段，生成结构化知识，供前端「智能总结」页展示。
-必须只输出一个 JSON 对象，字段如下：
+SYSTEM_PROMPT = """你是 PaperMate 的论文阅读 Agent。
+根据标题、摘要和正文片段生成结构化论文知识，只输出 JSON：
 {
-  "summary": "中文结构化摘要，200-400字",
-  "concepts": [{"name": "概念名", "description": "解释"}],
-  "methods": [{"title": "步骤标题", "description": "说明"}],
-  "experiments": [{"title": "实验名", "description": "结果与指标"}],
-  "limitations": ["局限1", "局限2"],
-  "validation_flags": ["可选风险标记，如 uncertain_claim"]
+  "summary": "中文结构化摘要",
+  "concepts": [{"name": "概念", "description": "解释"}],
+  "methods": [{"title": "步骤", "description": "说明"}],
+  "experiments": [{"title": "实验", "description": "结果"}],
+  "limitations": ["局限"],
+  "validation_flags": ["风险标记"]
 }
-要求：
-1. 忠实于原文，不要编造未出现的数据；不确定处在 validation_flags 中标记。
-2. concepts 3-6 条；methods 3-5 步；experiments 1-4 条；limitations 1-4 条。
-3. 全部使用简体中文。
+只能依据输入内容，不要编造论文未出现的数字或结论。
 """
 
 
@@ -42,48 +38,12 @@ class AgentWiki:
     def to_structured_rows(self, *, page_count: int = 0) -> list[dict[str, Any]]:
         locator = {"page_count": page_count, "source": self.source}
         return [
-            {
-                "result_type": "summary",
-                "version": 1,
-                "content_json": {"summary": self.summary},
-                "source_locator": locator,
-                "confidence": 0.8,
-            },
-            {
-                "result_type": "concepts",
-                "version": 1,
-                "content_json": {"items": self.concepts},
-                "source_locator": locator,
-                "confidence": 0.75,
-            },
-            {
-                "result_type": "methods",
-                "version": 1,
-                "content_json": {"items": self.methods},
-                "source_locator": locator,
-                "confidence": 0.75,
-            },
-            {
-                "result_type": "experiments",
-                "version": 1,
-                "content_json": {"items": self.experiments},
-                "source_locator": locator,
-                "confidence": 0.7,
-            },
-            {
-                "result_type": "limitations",
-                "version": 1,
-                "content_json": {"items": self.limitations},
-                "source_locator": locator,
-                "confidence": 0.7,
-            },
-            {
-                "result_type": "validation",
-                "version": 1,
-                "content_json": {"flags": self.validation_flags},
-                "source_locator": locator,
-                "confidence": 1.0,
-            },
+            {"result_type": "summary", "version": 1, "content_json": {"summary": self.summary}, "source_locator": locator, "confidence": 0.8},
+            {"result_type": "concepts", "version": 1, "content_json": {"items": self.concepts}, "source_locator": locator, "confidence": 0.75},
+            {"result_type": "methods", "version": 1, "content_json": {"items": self.methods}, "source_locator": locator, "confidence": 0.75},
+            {"result_type": "experiments", "version": 1, "content_json": {"items": self.experiments}, "source_locator": locator, "confidence": 0.7},
+            {"result_type": "limitations", "version": 1, "content_json": {"items": self.limitations}, "source_locator": locator, "confidence": 0.7},
+            {"result_type": "validation", "version": 1, "content_json": {"flags": self.validation_flags}, "source_locator": locator, "confidence": 1.0},
         ]
 
 
@@ -91,117 +51,64 @@ class SummarizeAgent:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    def run(
-        self,
-        *,
-        title: str,
-        abstract: str,
-        body_text: str,
-        arxiv_id: str = "",
-    ) -> AgentWiki:
-        clipped = (body_text or "")[:12000]
-        user_prompt = (
-            f"arxiv_id: {arxiv_id}\n"
-            f"title: {title}\n"
-            f"abstract: {abstract or '(无)'}\n"
-            f"body_excerpt:\n{clipped or '(无正文，请主要依据标题与摘要)'}\n"
-        )
+    def run(self, *, title: str, abstract: str, body_text: str, arxiv_id: str = "") -> AgentWiki:
         raw = chat_completion(
             api_key=self.settings.llm_api_key,
             api_base=self.settings.llm_api_base,
             model=self.settings.llm_model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
+                {"role": "user", "content": f"arxiv_id: {arxiv_id}\ntitle: {title}\nabstract: {abstract or '(无)'}\nbody_excerpt:\n{(body_text or '')[:12000] or '(无正文)'}"},
             ],
             timeout_s=self.settings.parse_agent_timeout_s,
             json_mode=True,
         )
-        data = _parse_json_object(raw)
-        return _normalize_wiki(data, paper_id_hint=arxiv_id or "paper")
+        return _normalize(json.loads(_strip_fence(raw)), arxiv_id or "paper")
 
 
-def _parse_json_object(raw: str) -> dict[str, Any]:
+def _strip_fence(raw: str) -> str:
     text = raw.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise LlmError(f"Agent 输出不是合法 JSON: {exc}") from exc
+    return text
+
+
+def _normalize(data: dict[str, Any], paper_id: str) -> AgentWiki:
     if not isinstance(data, dict):
-        raise LlmError("Agent JSON 根节点必须是对象")
-    return data
-
-
-def _normalize_wiki(data: dict[str, Any], *, paper_id_hint: str) -> AgentWiki:
+        raise LlmError("Summarize Agent JSON 根节点必须是对象")
     summary = str(data.get("summary") or "").strip()
     if not summary:
-        raise LlmError("Agent 未返回 summary")
+        raise LlmError("Summarize Agent 未返回 summary")
 
-    concepts: list[dict[str, Any]] = []
-    for index, item in enumerate(data.get("concepts") or []):
+    concepts = []
+    for index, item in enumerate(data.get("concepts") or [], 1):
         if isinstance(item, str) and item.strip():
-            concepts.append(
-                {
-                    "conceptId": f"{paper_id_hint}-concept-{index + 1}",
-                    "name": item.strip()[:80],
-                    "description": item.strip(),
-                }
-            )
+            concepts.append({"conceptId": f"{paper_id}-concept-{index}", "name": item.strip()[:80], "description": item.strip()})
         elif isinstance(item, dict):
             name = str(item.get("name") or item.get("title") or "").strip()
-            desc = str(item.get("description") or item.get("desc") or name).strip()
             if name:
-                concepts.append(
-                    {
-                        "conceptId": str(item.get("conceptId") or f"{paper_id_hint}-concept-{index + 1}"),
-                        "name": name[:80],
-                        "description": desc,
-                    }
-                )
+                concepts.append({"conceptId": str(item.get("conceptId") or f"{paper_id}-concept-{index}"), "name": name[:80], "description": str(item.get("description") or item.get("desc") or name).strip()})
 
-    methods: list[dict[str, Any]] = []
-    for index, item in enumerate(data.get("methods") or []):
-        if isinstance(item, str) and item.strip():
-            methods.append({"order": index + 1, "title": f"步骤 {index + 1}", "description": item.strip()})
-        elif isinstance(item, dict):
-            title = str(item.get("title") or item.get("name") or f"步骤 {index + 1}").strip()
-            desc = str(item.get("description") or item.get("desc") or "").strip()
-            if title or desc:
-                methods.append({"order": int(item.get("order") or index + 1), "title": title, "description": desc})
+    def normalize_steps(values: Any) -> list[dict[str, Any]]:
+        output = []
+        for index, item in enumerate(values or [], 1):
+            if isinstance(item, str) and item.strip():
+                output.append({"order": index, "title": f"步骤 {index}", "description": item.strip()})
+            elif isinstance(item, dict):
+                title = str(item.get("title") or item.get("name") or f"步骤 {index}").strip()
+                description = str(item.get("description") or item.get("desc") or "").strip()
+                if title or description:
+                    output.append({"order": int(item.get("order") or index), "title": title, "description": description})
+        return output
 
-    experiments: list[dict[str, Any]] = []
-    for item in data.get("experiments") or []:
-        if isinstance(item, str) and item.strip():
-            experiments.append({"title": "实验结果", "description": item.strip()})
-        elif isinstance(item, dict):
-            title = str(item.get("title") or item.get("name") or "实验").strip()
-            desc = str(item.get("description") or item.get("desc") or "").strip()
-            if title or desc:
-                experiments.append({"title": title, "description": desc})
-
-    limitations: list[str] = []
-    for item in data.get("limitations") or []:
-        if isinstance(item, str) and item.strip():
-            limitations.append(item.strip())
-        elif isinstance(item, dict):
-            text = str(item.get("description") or item.get("text") or item.get("name") or "").strip()
-            if text:
-                limitations.append(text)
-
-    flags = [str(f).strip() for f in (data.get("validation_flags") or []) if str(f).strip()]
-    flags.append("generated_by_summarize_agent")
-
+    methods = normalize_steps(data.get("methods"))
+    experiments = [{"title": str(item.get("title") or item.get("name") or "实验"), "description": str(item.get("description") or item.get("desc") or "").strip()} for item in (data.get("experiments") or []) if isinstance(item, dict)]
+    limitations = [str(item.get("description") or item.get("text") or item.get("name") or "").strip() if isinstance(item, dict) else str(item).strip() for item in (data.get("limitations") or [])]
+    limitations = [item for item in limitations if item]
+    flags = [str(item).strip() for item in (data.get("validation_flags") or []) if str(item).strip()]
     if not concepts:
-        concepts = [
-            {
-                "conceptId": f"{paper_id_hint}-concept-1",
-                "name": "核心贡献",
-                "description": summary[:300],
-            }
-        ]
+        concepts = [{"conceptId": f"{paper_id}-concept-1", "name": "核心贡献", "description": summary[:300]}]
     if not methods:
         methods = [{"order": 1, "title": "方法概述", "description": summary[:400]}]
     if not experiments:
@@ -210,15 +117,7 @@ def _normalize_wiki(data: dict[str, Any], *, paper_id_hint: str) -> AgentWiki:
     if not limitations:
         limitations = ["Agent 未能从摘录中明确识别局限性，建议人工复核。"]
         flags.append("limitations_incomplete")
-
-    return AgentWiki(
-        summary=summary,
-        concepts=concepts,
-        methods=methods,
-        experiments=experiments,
-        limitations=limitations,
-        validation_flags=sorted(set(flags)),
-    )
+    return AgentWiki(summary, concepts, methods, experiments, limitations, sorted(set(flags)))
 
 
-__all__ = ["SummarizeAgent", "AgentWiki"]
+__all__ = ["AgentWiki", "SummarizeAgent"]

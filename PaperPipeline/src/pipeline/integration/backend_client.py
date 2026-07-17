@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,66 +13,36 @@ from .contracts import make_idempotency_key, unwrap_api_response
 
 
 class BackendClient:
-    def __init__(self, api_base: str, timeout_s: float = 30.0):
+    def __init__(self, api_base: str, timeout_s: float = 10.0, worker_token: str | None = None):
         self.api_base = api_base.rstrip("/")
         self.timeout_s = timeout_s
+        self.worker_token = worker_token or os.environ.get("PAPERMATE_WORKER_TOKEN", "")
 
-    def _request(
-        self,
-        path: str,
-        method: str,
-        body: Any | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> Any:
-        data = None if body is None else json.dumps(body).encode("utf-8")
+    def _request(self, path: str, method: str, body: dict[str, Any] | None = None, headers: dict[str, str] | None = None) -> Any:
+        request_headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "PaperMate-Pipeline/0.4",
+            **(headers or {}),
+        }
+        if self.worker_token:
+            request_headers["X-Worker-Token"] = self.worker_token
         request = urllib.request.Request(
             f"{self.api_base}{path}",
-            data=data,
-            headers={"Content-Type": "application/json", "User-Agent": "PaperMate-Pipeline/0.3", **(headers or {})},
+            data=json.dumps(body).encode() if body is not None else None,
+            headers=request_headers,
             method=method,
         )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
-                raw = response.read().decode("utf-8")
-                if not raw.strip():
-                    return {}
-                return unwrap_api_response(json.loads(raw))
+                payload = unwrap_api_response(json.loads(response.read().decode()))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:400]
             raise RuntimeError(f"HTTP {exc.code} {path}: {detail}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"HTTP request failed {path}: {exc}") from exc
+        return payload
 
-    def health(self) -> dict:
-        return self._request("/health", "GET")
-
-    def batch_upsert_papers(self, papers: list[dict[str, Any]]) -> dict:
-        """POST /api/papers/batch — JSON array body."""
-        return self._request("/api/papers/batch", "POST", papers)
-
-    def list_papers(self, *, keyword: str = "", page: int = 1, page_size: int = 20) -> dict:
-        query = urllib.parse.urlencode(
-            {"keyword": keyword, "page": page, "page_size": page_size},
-            doseq=True,
-        )
-        return self._request(f"/api/papers?{query}", "GET")
-
-    def find_paper_id_by_arxiv(self, arxiv_id: str) -> int | None:
-        page = self.list_papers(keyword=arxiv_id, page=1, page_size=50)
-        items = page.get("items") if isinstance(page, dict) else None
-        if not items:
-            return None
-        for item in items:
-            if str(item.get("arxiv_id") or "") == arxiv_id:
-                return int(item["paper_id"])
-        return int(items[0]["paper_id"]) if items else None
-
-    def create_parse_task(
-        self,
-        paper_id: int,
-        arxiv_id: str,
-        task_type: str = "full_parse",
-        *,
-        force: bool = False,
-    ) -> dict:
+    def create_parse_task(self, paper_id: int, arxiv_id: str, task_type: str = "full_parse") -> dict:
         return self._request(
             f"/api/papers/{paper_id}/parse",
             "POST",
@@ -83,6 +54,9 @@ class BackendClient:
         query = urllib.parse.urlencode({"status": status, "limit": limit})
         data = self._request(f"/api/tasks?{query}", "GET")
         return data if isinstance(data, list) else []
+
+    def claim_task(self, worker_id: str) -> dict | None:
+        return self._request("/api/tasks/claim", "POST", {"worker_id": worker_id})
 
     def get_task(self, task_id: int) -> dict:
         return self._request(f"/api/tasks/{task_id}", "GET")

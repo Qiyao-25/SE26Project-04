@@ -24,7 +24,7 @@ const RECOMMENDED = ['bert', 'lora', 'rag'];
 const WELCOME_MESSAGE = {
   messageId: 'workspace-welcome',
   role: 'assistant',
-  content: '您好，可输入自然语言检索论文。系统会智能改写关键词、模糊匹配库内论文，并生成检索说明。',
+  content: '您好，可输入自然语言检索论文。系统会智能改写关键词、匹配数据库论文，并生成检索说明。',
   status: 'success',
   citations: []
 };
@@ -106,8 +106,7 @@ export default function WorkspacePage() {
       setResultTotal(data.total);
       setSearchStatus(data.total > 0 ? 'success' : 'empty');
 
-      const keywordHint =
-        data.keywords?.length > 0 ? `（匹配词：${data.keywords.slice(0, 5).join('、')}）` : '';
+      const keywordHint = data.keywords?.length ? `（匹配词：${data.keywords.slice(0, 5).join('、')}）` : '';
       setMessages((current) => [
         ...current,
         {
@@ -167,7 +166,7 @@ export default function WorkspacePage() {
           loading={searchStatus === 'loading'}
         />
         <Text type="secondary" style={{ fontSize: 12 }}>
-          支持自然语言；系统会改写关键词并模糊匹配，再在对话中给出智能检索说明。
+          支持自然语言；系统会改写关键词并匹配数据库论文，再给出检索说明。
         </Text>
       </Card>
 

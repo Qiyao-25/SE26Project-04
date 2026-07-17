@@ -22,19 +22,19 @@
 ## 成员 C（后端）— 联调 API
 
 | API | 状态 | PaperPipeline 用法 |
-|-----|------|--------------------|
-| `GET /health` | ✅ | 联调探测 |
-| `POST /api/papers/batch` | ✅ | `crawler/ingest.py`、联调脚本 |
-| `GET /api/papers` | ✅ | 按 arxiv_id 回查 `paper_id` |
-| `POST /api/papers/{id}/parse` | ✅ | 创建 `queued` 解析任务 |
-| `GET/PATCH /api/tasks...` | ✅ | Worker 拉队列、改阶段 |
-| `POST /api/tasks/{id}/finalize` | ✅ | `backend_worker` 写回结果 |
-| `POST /api/papers/{id}/chunks` | ✅ | 亦可单独写 chunks |
-| `GET /api/papers/{id}/wiki` | ✅ | 读结构化 Wiki |
-| `POST /api/search/chunks` | ✅ | QA / 检索 |
-| `POST /api/papers/{id}/qa` | ✅ | 基于 DB chunks 的问答 |
+|-----|------|------------|
+| `GET /health` | ✅ 已实现 | 联调探测 |
+| `POST /api/papers/batch` | ✅ 已实现 | `crawler/ingest.py`（100 条元数据批量去重入库） |
+| `GET /api/papers` | ✅ 已实现 | 数据库筛选、分页和详情 |
+| `POST /api/search/chunks` | ✅ 已实现 | `integration/chunks_client.py` |
+| `POST /api/papers/{paper_id}/parse` + `/api/tasks/{task_id}` | ✅ 已实现 | 解析任务状态与结构化结果入库 |
+| `POST /api/tasks/{task_id}/retry` / `recover-stale` | ✅ 已实现 | 失败重试与卡住任务恢复 |
+| `POST /api/tasks/enqueue-pending` | ✅ 已实现 | 将 metadata-only 论文批量加入解析队列 |
+| `POST /api/tasks/{task_id}/finalize` / `GET /api/tasks/stats` | ✅ 已实现 | 解析结果原子提交与队列观测 |
+| 可选解析/QA Agent | ✅ 适配层已实现 | OpenAI-compatible；无 Key 自动降级 |
+| `POST /api/papers/{paper_id}/qa` | ✅ 已实现 | 数据库文本块 QA；无证据时拒答 |
 
-### `POST /api/papers/batch` 请求体（PaperPipeline 发送）
+### `POST /api/papers/batch` 请求体（PaperPipeline 已发送）
 
 ```json
 [

@@ -40,7 +40,9 @@ def test_paper_detail_and_wiki_return_contract() -> None:
         detail = get_paper_detail(session, 1)
         assert detail.arxiv_id == "1706.03762"
         wiki = get_wiki(session, 1)
-        assert wiki.summary == "Transformer architecture based on attention."
+        assert wiki.summary == ""
+        assert wiki.concepts == []
+        assert wiki.methods == []
 
 
 def test_openapi_contains_paper_contract() -> None:

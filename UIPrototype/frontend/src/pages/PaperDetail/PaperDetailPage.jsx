@@ -185,6 +185,8 @@ export default function PaperDetailPage() {
     }
   };
 
+  const structuredSummaryReady = ['completed', 'qa_ready'].includes(summaryData?.parseStatus);
+
   if (loading) {
     return (
       <Card className="section-card">
@@ -313,85 +315,80 @@ export default function PaperDetailPage() {
             {parseTask && <Text type="secondary">解析任务：{parseTask.task_id || parseTask.taskId} · {getParseStatusLabel(parseTask.status)}</Text>}
           </Space>
 
-          {parseLoading && (
+          {structuredSummaryReady ? (
+            <>
+              <Title level={5}>结构化摘要</Title>
+              <Paragraph>{summaryData.summary}</Paragraph>
+
+              <Title level={5}>核心概念</Title>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                {(summaryData.concepts || []).map((concept) => (
+                  <Card size="small" key={concept.conceptId}>
+                    <Text strong>{concept.name}</Text>
+                    <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
+                      {concept.description}
+                    </Paragraph>
+                  </Card>
+                ))}
+              </Space>
+
+              <Title level={5} style={{ marginTop: 20 }}>
+                方法步骤
+              </Title>
+              <ol style={{ paddingLeft: 22 }}>
+                {(summaryData.methods || []).map((method) => (
+                  <li key={method.order} style={{ marginBottom: 12 }}>
+                    <Text strong>{method.title}</Text>
+                    <Paragraph style={{ marginBottom: 0 }}>{method.description}</Paragraph>
+                  </li>
+                ))}
+              </ol>
+
+              <Title level={5}>实验与结果</Title>
+              {(summaryData.experiments || []).length > 0 ? (
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {summaryData.experiments.map((experiment, index) => (
+                    <Card size="small" key={`${experiment.title}-${index}`}>
+                      <Text strong>{experiment.title}</Text>
+                      <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
+                        {experiment.description}
+                      </Paragraph>
+                    </Card>
+                  ))}
+                </Space>
+              ) : (
+                <Text type="secondary">暂无实验结果解析。</Text>
+              )}
+
+              <Title level={5}>局限性</Title>
+              {(summaryData.limitations || []).length > 0 ? (
+                <ul style={{ paddingLeft: 22 }}>
+                  {summaryData.limitations.map((limitation) => (
+                    <li key={limitation} style={{ marginBottom: 8 }}>
+                      {limitation}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Text type="secondary">暂无局限性解析结果。</Text>
+              )}
+
+              {(summaryData.validationFlags || []).length > 0 && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="解析校验提示"
+                  description={summaryData.validationFlags.join('；')}
+                  style={{ marginTop: 16 }}
+                />
+              )}
+            </>
+          ) : (
             <Alert
               type="info"
               showIcon
-              message="Summarize Agent 生成中"
-              description="正在调用 Summarize Agent 生成摘要、概念、方法、实验与局限性，完成后会自动刷新本页。"
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          {parseLoading && !summaryData?.summary ? (
-            <div style={{ minHeight: 180, display: 'grid', placeItems: 'center' }}>
-              <Spin tip="Agent 正在阅读论文并生成智能总结..." />
-            </div>
-          ) : null}
-
-          <Title level={5}>结构化摘要</Title>
-          <Paragraph>{summaryData?.summary || paper.summary}</Paragraph>
-
-          <Title level={5}>核心概念</Title>
-          <Space direction="vertical" style={{ width: '100%' }}>
-            {(summaryData?.concepts || []).map((concept) => (
-              <Card size="small" key={concept.conceptId}>
-                <Text strong>{concept.name}</Text>
-                <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
-                  {concept.description}
-                </Paragraph>
-              </Card>
-            ))}
-          </Space>
-
-          <Title level={5} style={{ marginTop: 20 }}>
-            方法步骤
-          </Title>
-          <ol style={{ paddingLeft: 22 }}>
-            {(summaryData?.methods || []).map((method) => (
-              <li key={method.order} style={{ marginBottom: 12 }}>
-                <Text strong>{method.title}</Text>
-                <Paragraph style={{ marginBottom: 0 }}>{method.description}</Paragraph>
-              </li>
-            ))}
-          </ol>
-
-          <Title level={5}>实验与结果</Title>
-          {(summaryData?.experiments || []).length > 0 ? (
-            <Space direction="vertical" style={{ width: '100%' }}>
-              {summaryData.experiments.map((experiment, index) => (
-                <Card size="small" key={`${experiment.title}-${index}`}>
-                  <Text strong>{experiment.title}</Text>
-                  <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
-                    {experiment.description}
-                  </Paragraph>
-                </Card>
-              ))}
-            </Space>
-          ) : (
-            <Text type="secondary">暂无实验结果解析。</Text>
-          )}
-
-          <Title level={5}>局限性</Title>
-          {(summaryData?.limitations || []).length > 0 ? (
-            <ul style={{ paddingLeft: 22 }}>
-              {summaryData.limitations.map((limitation) => (
-                <li key={limitation} style={{ marginBottom: 8 }}>
-                  {limitation}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Text type="secondary">暂无局限性解析结果。</Text>
-          )}
-
-          {(summaryData?.validationFlags || []).length > 0 && (
-            <Alert
-              type="warning"
-              showIcon
-              message="解析校验提示"
-              description={summaryData.validationFlags.join('；')}
-              style={{ marginTop: 16 }}
+              message="智能总结暂不可用"
+              description="完成论文解析后，这里才会显示摘要、核心概念、方法、实验结果和局限性。"
             />
           )}
         </div>
