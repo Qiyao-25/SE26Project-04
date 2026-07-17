@@ -30,11 +30,19 @@
 默认使用 data/dev.db。测试使用内存 SQLite，不会污染开发数据库。PostgreSQL 只需替换：
 
     PAPERMATE_ENV=dev
-    PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/papermate
+PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/papermate
 
 并安装 PostgreSQL 驱动：
 
-    python -m pip install -e ".[postgres]"
+python -m pip install -e ".[postgres]"
+
+Agent 默认关闭。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
+
+    PAPERMATE_AGENT_ENABLED=true
+    PAPERMATE_AGENT_API_KEY=本地密钥
+    PAPERMATE_AGENT_MODEL=模型名称
+    PAPERMATE_AGENT_BASE_URL=https://api.openai.com/v1
+    PAPERMATE_AGENT_TIMEOUT_S=30
 
 ## 3. 可重复执行命令
 
@@ -194,5 +202,7 @@ GET  /api/learning/actions?user_id=demo
 ```
 
 解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。论文状态会区分 `parsed` 与 `qa_ready`，后者要求数据库中存在文本块，响应同时返回 `chunkCount` / `qaReady`。`finalize` 接口一次性提交文本块和结构化结果，`stats` 接口返回队列数量、可重试失败数和 stale running 数量。
+
+启用 Agent 后，论文问答会把检索到的文本块交给模型生成回答，但页码和引用仍由后端检索结果生成；模型不可用时自动回退到抽取式回答。
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/dev.db"
     echo_sql: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    agent_enabled: bool = False
+    agent_api_key: str | None = None
+    agent_model: str = ""
+    agent_base_url: str = "https://api.openai.com/v1"
+    agent_timeout_s: float = 30.0
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -39,4 +44,3 @@ def ensure_sqlite_parent(database_url: str) -> None:
     if database_path in {":memory:", ""}:
         return
     Path(database_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
-

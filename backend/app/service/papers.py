@@ -6,9 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.model import Paper
+from app.core.config import get_settings
 from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
 from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, PaperItem, PaperPage, PaperUpsert, QaResponse, WikiData
+from app.service.agent import AgentCallError, AgentClient
 
 
 class PaperServiceError(Exception):
@@ -122,7 +124,7 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
     )
 
 
-def answer_question(session: Session, paper_id: int, question: str) -> QaResponse:
+def answer_question(session: Session, paper_id: int, question: str, history: list[dict] | None = None) -> QaResponse:
     paper = get_paper(session, paper_id)
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
@@ -142,6 +144,25 @@ def answer_question(session: Session, paper_id: int, question: str) -> QaRespons
             for chunk, _score in matches
         ]
         answer = "\n".join(excerpts)
+        agent = AgentClient(get_settings())
+        if agent.enabled:
+            try:
+                answer = agent.answer(
+                    question=question,
+                    evidence=[
+                        {
+                            "chunk_id": chunk.chunk_id,
+                            "page_no": chunk.page_no,
+                            "section": chunk.section,
+                            "content": chunk.content[:500],
+                        }
+                        for chunk, _score in matches
+                    ],
+                    history=history,
+                )
+            except AgentCallError:
+                # Keep grounded extractive QA available when the provider is unavailable.
+                pass
     else:
         raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
     return QaResponse(

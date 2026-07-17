@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from ..agent import AgentCallError, AgentConfig, ChatAgent, build_structured_with_agent
 from ..integration.backend_client import BackendClient
 from ..integration.contracts import chunk_to_backend, wiki_to_backend_structured_rows
 from ..parser.document import parse_document
@@ -34,6 +35,7 @@ class BackendParseWorker:
         self.min_chars = min_chars
         self.html_dir = html_dir or pdf_dir.parent / "worker_html"
         self.prefer_html = prefer_html
+        self.agent = ChatAgent(AgentConfig.from_env())
 
     def run_once(self) -> dict[str, Any] | None:
         tasks = self.client.list_tasks(status="queued", limit=1)
@@ -66,12 +68,31 @@ class BackendParseWorker:
                 raise WorkerFailure("PARSE_FAILED", parsed.error or "PDF 解析失败")
 
             self.client.update_task(task_id, "running", stage="summarize")
-            wiki = build_structured(
-                arxiv_id,
-                parsed.paragraphs,
-                title=str(paper.get("title") or ""),
-                abstract_hint=str(paper.get("abstract") or ""),
-            )
+            try:
+                wiki = (
+                    build_structured_with_agent(
+                        arxiv_id,
+                        parsed.paragraphs,
+                        title=str(paper.get("title") or ""),
+                        abstract_hint=str(paper.get("abstract") or ""),
+                        agent=self.agent,
+                    )
+                    if self.agent.ready
+                    else build_structured(
+                        arxiv_id,
+                        parsed.paragraphs,
+                        title=str(paper.get("title") or ""),
+                        abstract_hint=str(paper.get("abstract") or ""),
+                    )
+                )
+            except AgentCallError as exc:
+                logger.warning("structured_agent_fallback task_id=%s detail=%s", task_id, exc)
+                wiki = build_structured(
+                    arxiv_id,
+                    parsed.paragraphs,
+                    title=str(paper.get("title") or ""),
+                    abstract_hint=str(paper.get("abstract") or ""),
+                )
             if not wiki.required_ok():
                 raise WorkerFailure("STRUCTURED_RESULT_FAILED", "结构化摘要字段不完整")
 

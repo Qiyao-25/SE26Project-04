@@ -59,6 +59,8 @@ python -m pipeline.worker.run_backend_worker
 
 只处理一个任务可使用 `--once`；限制处理数量可使用 `--max-tasks N`，常驻运行时可用 `--poll-interval`、`--stale-timeout` 和 `--recover-interval` 控制轮询与卡住任务恢复。PDF 默认缓存到 `data/worker_pdfs`，HTML 默认缓存到 `data/worker_html`，可分别通过 `--pdf-dir`、`--html-dir` 修改。默认 PDF 优先、解析失败后回退 ar5iv；验证 HTML 路径时可添加 `--prefer-html`。Worker 运行环境需要先执行 `pip install -r requirements.txt`。
 
+Worker 支持可选的 OpenAI-compatible 解析 Agent。设置 `PAPERMATE_AGENT_ENABLED=true`、`PAPERMATE_AGENT_API_KEY`、`PAPERMATE_AGENT_MODEL` 和 `PAPERMATE_AGENT_BASE_URL` 后，结构化摘要会由 Agent 生成；未配置或调用失败时继续使用规则抽取降级。
+
 ## 交付对应（迭代 2）
 
 | 成果 | 路径 |
