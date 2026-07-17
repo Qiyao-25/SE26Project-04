@@ -10,6 +10,13 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/dev.db"
     echo_sql: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # DeepSeek Summarize Agent（解析任务后台执行）
+    deepseek_api_key: str = ""
+    deepseek_api_base: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-v4-flash"
+    parse_agent_enabled: bool = True
+    parse_agent_max_pages: int = 12
+    parse_agent_timeout_s: float = 90.0
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -17,6 +24,10 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @property
+    def parse_agent_ready(self) -> bool:
+        return bool(self.parse_agent_enabled and self.deepseek_api_key.strip())
 
     @property
     def is_test(self) -> bool:
