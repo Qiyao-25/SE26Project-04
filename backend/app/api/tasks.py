@@ -41,7 +41,11 @@ def require_worker_access(
     request: Request,
     worker_token: str | None = Header(default=None, alias="X-Worker-Token"),
 ) -> None:
-    expected = request.app.state.settings.worker_token
+    settings = request.app.state.settings
+    expected = settings.worker_token.strip()
+    # Local development does not need a second secret. Production must set one.
+    if settings.environment == "dev" and (not expected or expected.startswith("replace-with-")):
+        return
     if not expected or not worker_token or not secrets.compare_digest(worker_token, expected):
         raise HTTPException(status_code=403, detail="Worker 内部接口未授权")
 
