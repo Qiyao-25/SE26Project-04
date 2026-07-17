@@ -1,4 +1,4 @@
-"""Summarize Agent — DeepSeek 生成论文结构化 Wiki（summary/concepts/methods/...）。"""
+﻿"""Summarize Agent - call LLM to build structured Wiki fields."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from app.agents.deepseek_client import DeepSeekError, chat_completion
+from app.agents.llm_client import LlmError, chat_completion
 from app.core.config import Settings
 
 
@@ -37,7 +37,7 @@ class AgentWiki:
     experiments: list[dict[str, Any]]
     limitations: list[str]
     validation_flags: list[str]
-    source: str = "deepseek_summarize_agent"
+    source: str = "llm_summarize_agent"
 
     def to_structured_rows(self, *, page_count: int = 0) -> list[dict[str, Any]]:
         locator = {"page_count": page_count, "source": self.source}
@@ -107,14 +107,15 @@ class SummarizeAgent:
             f"body_excerpt:\n{clipped or '(无正文，请主要依据标题与摘要)'}\n"
         )
         raw = chat_completion(
-            api_key=self.settings.deepseek_api_key,
-            api_base=self.settings.deepseek_api_base,
-            model=self.settings.deepseek_model,
+            api_key=self.settings.llm_api_key,
+            api_base=self.settings.llm_api_base,
+            model=self.settings.llm_model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
             timeout_s=self.settings.parse_agent_timeout_s,
+            json_mode=True,
         )
         data = _parse_json_object(raw)
         return _normalize_wiki(data, paper_id_hint=arxiv_id or "paper")
@@ -128,16 +129,16 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise DeepSeekError(f"Agent 输出不是合法 JSON: {exc}") from exc
+        raise LlmError(f"Agent 输出不是合法 JSON: {exc}") from exc
     if not isinstance(data, dict):
-        raise DeepSeekError("Agent JSON 根节点必须是对象")
+        raise LlmError("Agent JSON 根节点必须是对象")
     return data
 
 
 def _normalize_wiki(data: dict[str, Any], *, paper_id_hint: str) -> AgentWiki:
     summary = str(data.get("summary") or "").strip()
     if not summary:
-        raise DeepSeekError("Agent 未返回 summary")
+        raise LlmError("Agent 未返回 summary")
 
     concepts: list[dict[str, Any]] = []
     for index, item in enumerate(data.get("concepts") or []):

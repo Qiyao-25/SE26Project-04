@@ -170,7 +170,14 @@ def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
 def qa(paper_id: str, payload: AskPaperRequest, request: Request, db: Session = Depends(db_session)):
     if paper_id.isdigit():
         try:
-            result = answer_question(db, int(paper_id), payload.question)
+            result = answer_question(
+                db,
+                int(paper_id),
+                payload.question,
+                history=[item.model_dump() for item in payload.history],
+                conversation_id=payload.conversationId,
+                settings=request.app.state.settings,
+            )
         except PaperServiceError as exc:
             return _db_error(request, exc)
         data = _qa_payload(result, len(payload.history))

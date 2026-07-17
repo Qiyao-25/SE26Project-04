@@ -122,33 +122,116 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
     )
 
 
-def answer_question(session: Session, paper_id: int, question: str) -> QaResponse:
+def answer_question(
+    session: Session,
+    paper_id: int,
+    question: str,
+    *,
+    history: list[dict] | None = None,
+    conversation_id: str | None = None,
+    settings=None,
+) -> QaResponse:
+    from app.agents.llm_client import LlmError
+    from app.agents.qa_agent import QaAgent
+    from app.core.config import get_settings
+    from app.service.qa_citations import polish_quote, section_label, select_relevant_chunk_ids
+
+    settings = settings or get_settings()
     paper = get_paper(session, paper_id)
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
-    matches = search_chunks(session, ChunkSearchRequest(query=question, paper_id=paper_id, top_k=3))
-    if matches:
-        excerpts = [chunk.content[:500] for chunk, _score in matches]
-        citations = [
+
+    top_k = max(3, int(settings.qa_agent_top_k))
+    matches = search_chunks(session, ChunkSearchRequest(query=question, paper_id=paper_id, top_k=top_k))
+    if not matches:
+        raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
+
+    evidence = [
+        {
+            "chunk_id": chunk.chunk_id,
+            "page_no": chunk.page_no,
+            "section": chunk.section,
+            "content": chunk.content,
+        }
+        for chunk, _score in matches
+    ]
+    chunk_by_id = {chunk.chunk_id: chunk for chunk, _score in matches}
+
+    history_payload = []
+    for item in history or []:
+        if isinstance(item, dict):
+            role = str(item.get("role") or "")
+            content = str(item.get("content") or "")
+        else:
+            role = str(getattr(item, "role", "") or "")
+            content = str(getattr(item, "content", "") or "")
+        if role and content:
+            history_payload.append({"role": role, "content": content})
+
+    if settings.qa_agent_ready:
+        try:
+            agent_result = QaAgent(settings).run(
+                title=paper.title or "",
+                question=question,
+                evidence=evidence,
+                history=history_payload,
+            )
+        except LlmError as exc:
+            raise PaperServiceError("QA_AGENT_FAILED", f"问答生成失败：{exc}", 502) from exc
+
+        if agent_result.refuse and not agent_result.citation_ids:
+            raise PaperServiceError("NO_EVIDENCE", agent_result.answer or "依据不足，无法回答该问题", 422)
+
+        answer = agent_result.answer
+        # 只保留与答案真正相关的引文；禁止盲目塞入前几块证据
+        selected_ids = select_relevant_chunk_ids(
+            answer=answer,
+            evidence=evidence,
+            preferred_ids=agent_result.citation_ids,
+            min_overlap=0.06,
+            max_citations=3,
+        )
+    else:
+        answer = "基于当前论文解析结果：\n" + "\n".join(
+            polish_quote(item["content"], answer=question, max_len=220) for item in evidence[:3]
+        )
+        selected_ids = select_relevant_chunk_ids(
+            answer=question,
+            evidence=evidence,
+            preferred_ids=[item["chunk_id"] for item in evidence],
+            min_overlap=0.02,
+            max_citations=3,
+        )
+
+    citations = []
+    for chunk_id in selected_ids:
+        chunk = chunk_by_id.get(chunk_id)
+        if chunk is None:
+            continue
+        quote = polish_quote(chunk.content or "", answer=answer, max_len=280)
+        if not quote:
+            continue
+        citations.append(
             {
                 "citationId": f"citation-{paper.id}-{chunk.chunk_id}",
                 "paperId": paper.id,
                 "paperTitle": paper.title,
                 "sectionId": chunk.chunk_id,
-                "sectionTitle": chunk.section or "原文",
+                "sectionTitle": section_label(chunk.section, chunk.content or ""),
                 "pageNumber": chunk.page_no,
-                "quote": chunk.content[:500],
+                "quote": quote,
             }
-            for chunk, _score in matches
-        ]
-        answer = "\n".join(excerpts)
-    else:
+        )
+
+    if not answer.strip():
         raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
+
     return QaResponse(
-        conversation_id=f"conversation-{paper.id}",
+        conversation_id=conversation_id or f"conversation-{paper.id}",
         message_id=f"assistant-{uuid4()}",
         paper_id=paper.id,
-        answer=f"基于当前论文解析结果，关于“{question}”：{answer}",
+        answer=answer,
         created_at=datetime.now(timezone.utc),
         citations=citations,
     )
+

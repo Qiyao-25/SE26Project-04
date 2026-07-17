@@ -10,7 +10,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.agents.deepseek_client import DeepSeekError
+from app.agents.llm_client import LlmError
 from app.agents.summarize_agent import SummarizeAgent
 from app.core.config import Settings, get_settings
 from app.model import ParseTask, Paper
@@ -66,7 +66,7 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
             body_text=body_text or paper.abstract or "",
             arxiv_id=paper.arxiv_id or str(paper.id),
         )
-    except DeepSeekError as exc:
+    except LlmError as exc:
         logger.error("summarize_agent_failed task_id=%s err=%s", task_id, exc)
         _fail(session, task_id, "STRUCTURED_RESULT_FAILED")
         return
@@ -238,7 +238,31 @@ def _split_pieces(text: str, *, size: int) -> list[str]:
     text = text.strip()
     if not text:
         return []
-    return [text[i : i + size].strip() for i in range(0, len(text), size) if text[i : i + size].strip()]
+    # Prefer sentence boundaries to avoid mid-word quotes like "tworks that..."
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    if not sentences:
+        return [text[i : i + size].strip() for i in range(0, len(text), size) if text[i : i + size].strip()]
+
+    pieces: list[str] = []
+    buf = ""
+    for sentence in sentences:
+        candidate = f"{buf} {sentence}".strip() if buf else sentence
+        if len(candidate) <= size:
+            buf = candidate
+            continue
+        if buf:
+            pieces.append(buf)
+        if len(sentence) <= size:
+            buf = sentence
+        else:
+            for i in range(0, len(sentence), size):
+                part = sentence[i : i + size].strip()
+                if part:
+                    pieces.append(part)
+            buf = ""
+    if buf:
+        pieces.append(buf)
+    return pieces
 
 
 __all__ = ["run_parse_agent_job"]
