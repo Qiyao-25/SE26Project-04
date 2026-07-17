@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from ..parser.pdf_parse import Paragraph
 from ..summarizer.struct_summary import StructuredWiki
 from ..validation import ContentValidationAgent
@@ -16,6 +18,15 @@ def _evidence(paragraphs: list[Paragraph], max_chars: int = 60000) -> str:
         parts.append(item)
         used += len(item) + 2
     return "\n\n".join(parts)
+
+
+def _string_list(value: Any) -> list[str]:
+    """Normalize provider output that may use a string instead of an array."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
 
 
 def build_structured_with_agent(
@@ -43,12 +54,12 @@ def build_structured_with_agent(
         ),
     )
     paragraph_ids = {paragraph.para_id for paragraph in paragraphs}
-    source_ids = [item for item in result.get("source_para_ids", []) if item in paragraph_ids]
+    source_ids = [item for item in _string_list(result.get("source_para_ids")) if item in paragraph_ids]
     summary = str(result.get("summary") or "").strip()
     concept = str(result.get("concept") or "").strip()
     methods = str(result.get("methods") or "").strip()
     experiments = str(result.get("experiments") or "").strip()
-    limitations = [str(item).strip() for item in result.get("limitations", []) if str(item).strip()]
+    limitations = _string_list(result.get("limitations"))
     flags = ContentValidationAgent().validate(
         summary=summary,
         concept=concept,
