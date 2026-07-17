@@ -107,13 +107,37 @@ export async function getPaperContent(paperId) {
 
 export async function getPaperSummary(paperId) {
   if (USE_MOCK) return getMockPaperSummary(paperId);
-  return apiClient.get(`/papers/${paperId}/summary`);
+  const data = await apiClient.get(`/papers/${paperId}/summary`);
+  return {
+    paperId: String(data.paperId || data.paper_id || paperId),
+    parseStatus: data.parseStatus || data.parse_status || 'pending',
+    summary: data.summary || '',
+    concepts: (data.concepts || []).map((concept, index) => ({
+      conceptId: concept.conceptId || concept.concept_id || `${paperId}-concept-${index + 1}`,
+      name: concept.name || concept.title || `概念 ${index + 1}`,
+      description: concept.description || concept.desc || ''
+    })),
+    methods: (data.methods || []).map((method, index) => ({
+      order: method.order || index + 1,
+      title: method.title || method.name || `步骤 ${index + 1}`,
+      description: method.description || method.desc || ''
+    })),
+    experiments: (data.experiments || []).map((experiment) => ({
+      title: experiment.title || experiment.name || '实验',
+      description: experiment.description || experiment.desc || ''
+    })),
+    limitations: data.limitations || [],
+    validationFlags: data.validationFlags || data.validation_flags || [],
+    chunkCount: data.chunkCount ?? data.chunk_count ?? 0,
+    qaReady: Boolean(data.qaReady ?? data.qa_ready)
+  };
 }
 
 export async function createParseTask(paperId, { force = false } = {}) {
   if (USE_MOCK) {
     return {
       taskId: `mock-task-${paperId}`,
+      task_id: `mock-task-${paperId}`,
       paperId,
       taskType: 'full_parse',
       status: 'succeeded',

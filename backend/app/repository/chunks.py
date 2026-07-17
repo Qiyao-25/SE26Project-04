@@ -52,9 +52,10 @@ def _write_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> i
         chunk.page_no = item.page_no
         chunk.section = item.section
         chunk.content = item.content
+    session.flush()
     paper.chunk_count = session.scalar(
         select(func.count(TextChunk.id)).where(TextChunk.paper_id == paper_id)
-    ) or 0
+    ) or len(payload.chunks)
     return len(payload.chunks)
 
 

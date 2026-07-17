@@ -55,7 +55,13 @@ def create_task(session: Session, paper_id: int, task_type: str, idempotency_key
         .order_by(ParseTask.requested_at.desc(), ParseTask.id.desc())
     )
     if active is not None:
-        return to_task(active), False
+        if not force:
+            return to_task(active), False
+        # force 重新解析：将进行中的任务标记失败，允许新建
+        active.status = "failed"
+        active.error_code = "SUPERSEDED"
+        active.finished_at = _now()
+        active.stage = "failed"
 
     task = ParseTask(paper_id=paper_id, task_type=task_type, status="queued", attempt=1, idempotency_key=idempotency_key)
     session.add(task)

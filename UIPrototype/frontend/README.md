@@ -93,4 +93,6 @@ POST /api/papers/{paperId}/qa
 VITE_USE_MOCK=true
 ```
 
-4. 启动顺序：先在 `backend` 启动 Uvicorn，再在 `UIPrototype/frontend` 执行 `npm run dev`。
+4. 启动顺序：先在 `backend` 启动 Uvicorn（并配置 `PAPERMATE_DEEPSEEK_API_KEY`），再在 `UIPrototype/frontend` 执行 `npm run dev`。
+
+论文详情页点击「开始解析 / 重新解析」会创建任务；backend 内嵌 **Summarize Agent（DeepSeek）** 自动下载 PDF、生成智能总结并写回 `/summary`，前端轮询完成后刷新「智能总结」页。
