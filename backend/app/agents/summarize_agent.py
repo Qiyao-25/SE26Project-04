@@ -1,4 +1,4 @@
-﻿"""Summarize Agent — call LLM to build structured Wiki fields."""
+﻿"""Summarize Agent - call LLM to build structured Wiki fields."""
 
 from __future__ import annotations
 
