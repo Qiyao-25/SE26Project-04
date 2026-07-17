@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Tag, Input, Button, Space, Typography, List, Segmented, message } from 'antd';
-import { SearchOutlined, StarOutlined, LinkOutlined } from '@ant-design/icons';
+import { SearchOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { searchPaperWiki } from '../../../../utils/wiki';
+import FavoriteButton from './FavoriteButton';
 
 const { Text, Paragraph, Title } = Typography;
 
@@ -38,7 +39,7 @@ export default function SidebarInfoPanel({ paper, paperId }) {
         <Title level={5} style={{ marginTop: 8 }}>{paper.title}</Title>
         <Text type="secondary" style={{ fontSize: 12 }}>{paper.authors}</Text>
         <Paragraph style={{ fontSize: 13 }}>{paper.summary}</Paragraph>
-        <Button block icon={<StarOutlined />}>收藏</Button>
+        <FavoriteButton paperId={paperId} block />
         <Button block icon={<LinkOutlined />} style={{ marginTop: 8 }}>原文链接</Button>
       </div>
 

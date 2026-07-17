@@ -1,4 +1,4 @@
-"""arXiv Atom API client with timeout, rate limit, exponential backoff (H047)."""
+"""arXiv Atom API client with timeout, rate limit, exponential backoff ()."""
 
 from __future__ import annotations
 

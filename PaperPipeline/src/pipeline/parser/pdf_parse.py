@@ -1,4 +1,4 @@
-"""H057 · PDF download / extract / section heuristics / clean with page anchors."""
+""" · PDF download / extract / section heuristics / clean with page anchors."""
 
 from __future__ import annotations
 
@@ -49,6 +49,7 @@ def ensure_pdf(
     arxiv_id: str,
     pdf_dir: Path,
     *,
+    pdf_url: str | None = None,
     search_dirs: list[Path] | None = None,
     timeout_s: float = 60.0,
 ) -> Path:
@@ -69,7 +70,7 @@ def ensure_pdf(
             dest.write_bytes(src.read_bytes())
         return dest
 
-    url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+    url = pdf_url or f"https://arxiv.org/pdf/{arxiv_id}.pdf"
     dest = pdf_dir / f"{arxiv_id}.pdf"
     logger.info("download_pdf id=%s url=%s", arxiv_id, url)
     req = urllib.request.Request(url, headers={"User-Agent": "PaperMate-Parser/0.1"})

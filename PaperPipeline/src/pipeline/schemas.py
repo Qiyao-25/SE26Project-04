@@ -1,4 +1,4 @@
-"""H037 · Task / status / result schemas (contract V0).
+"""Task, status and result schemas (contract V0).
 
 Aligned with:
 - Spike states in docs/spike/技术Spike清单.md

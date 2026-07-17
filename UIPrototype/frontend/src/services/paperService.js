@@ -107,3 +107,23 @@ export async function getPaperSummary(paperId) {
   if (USE_MOCK) return getMockPaperSummary(paperId);
   return apiClient.get(`/papers/${paperId}/summary`);
 }
+
+export async function createParseTask(paperId, { force = false } = {}) {
+  if (USE_MOCK) {
+    return {
+      taskId: `mock-task-${paperId}`,
+      paperId,
+      taskType: 'full_parse',
+      status: 'succeeded',
+      errorCode: null
+    };
+  }
+  return apiClient.post(`/papers/${paperId}/parse`, { task_type: 'full_parse', force }, {
+    headers: { 'Idempotency-Key': `paper-${paperId}-parse-${Date.now()}` }
+  });
+}
+
+export async function getParseTask(taskId) {
+  if (USE_MOCK) return { taskId, status: 'succeeded' };
+  return apiClient.get(`/tasks/${taskId}`);
+}

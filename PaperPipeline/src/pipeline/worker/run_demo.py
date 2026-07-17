@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H038 demo CLI: create → execute → success/failure with task_id + stage timing logs.
+""" demo CLI: create → execute → success/failure with task_id + stage timing logs.
 
 Run from PaperPipeline/:
   python -m worker.run_demo
@@ -34,7 +34,7 @@ def _setup_logging() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate memory-queue demo (H038)")
+    parser = argparse.ArgumentParser(description="PaperMate memory-queue demo ()")
     parser.add_argument("--arxiv-id", default="1706.03762", help="Paper id (default P1)")
     parser.add_argument("--fail-stage", choices=["fetch", "parse", "summarize"], default=None)
     parser.add_argument("--also-fail-id", default="9999.99999", help="Enqueue a failing sample")

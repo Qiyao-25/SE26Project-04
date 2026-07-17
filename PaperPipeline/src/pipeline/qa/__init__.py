@@ -1,4 +1,4 @@
-"""H067/H068 QA — retrieval + citation validation."""
+""" QA — retrieval + citation validation."""
 
 from .service import Citation, QAResult, QAService
 

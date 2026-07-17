@@ -1,17 +1,18 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
-from app.schema.papers import BatchUpsertResponse, PaperItem, PaperPage, PaperUpsert, QaRequest, WikiData
+from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperItem, PaperPage, PaperUpsert, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_wiki, search_papers
 from app.service.qa import ask_paper
+from app.service.tasks import create_task
 
 router = APIRouter(prefix="/api/papers", tags=["papers"])
 
@@ -27,6 +28,21 @@ def _not_found(request: Request, paper_id: str):
 def _db_error(request: Request, error: PaperServiceError):
     body = ApiResponse[dict](code=error.code, message=error.message, data={}, request_id=request.state.request_id)
     return JSONResponse(status_code=error.status_code, content=body.model_dump())
+
+
+def _qa_payload(result, history_count: int) -> dict:
+    return {
+        "conversationId": result.conversation_id,
+        "messageId": result.message_id,
+        "paperId": str(result.paper_id),
+        "answer": result.answer,
+        "createdAt": result.created_at.isoformat(),
+        "citations": [
+            {**citation, "paperId": str(citation.get("paperId", result.paper_id))}
+            for citation in result.citations
+        ],
+        "historyCount": history_count,
+    }
 
 
 @router.get("", response_model=ApiResponse[PaperPage], summary="检索数据库论文元数据")
@@ -46,12 +62,45 @@ def papers(
 
 
 @router.post("/batch", response_model=ApiResponse[BatchUpsertResponse], summary="批量去重写入论文元数据")
-def batch_papers(request: Request, payload: list[PaperUpsert], db: Session = Depends(db_session)):
+def batch_papers(request: Request, payload: list[PaperUpsert] | BatchPaperRequest, db: Session = Depends(db_session)):
     try:
-        data = batch_upsert_papers(db, payload)
+        items = payload if isinstance(payload, list) else payload.papers
+        data = batch_upsert_papers(db, items)
     except PaperServiceError as exc:
         return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/parse", response_model=ApiResponse[TaskResponse], summary="创建论文解析任务")
+def parse(
+    paper_id: int,
+    payload: ParseRequest,
+    request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(db_session),
+):
+    if not idempotency_key or not idempotency_key.strip():
+        return _db_error(request, PaperServiceError("VALIDATION_ERROR", "必须提供 Idempotency-Key", 400))
+    try:
+        data, _created = create_task(db, paper_id, payload.task_type, idempotency_key.strip(), force=payload.force)
+    except ValueError as exc:
+        if str(exc) == "PAPER_NOT_FOUND":
+            return _db_error(request, PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404))
+        return _db_error(request, PaperServiceError("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409))
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/chunks", response_model=ApiResponse[dict], summary="批量写入论文文本块")
+def chunks(paper_id: int, payload: TextChunkBatch, request: Request, db: Session = Depends(db_session)):
+    from app.repository.chunks import upsert_chunks
+
+    try:
+        count = upsert_chunks(db, paper_id, payload)
+    except ValueError as exc:
+        if str(exc) == "PAPER_NOT_FOUND":
+            return _db_error(request, PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404))
+        raise
+    return ApiResponse(data={"paper_id": paper_id, "upserted": count}, request_id=request.state.request_id)
 
 
 @router.post("/search", response_model=ApiResponse[SearchResult], summary="检索固定样例论文")
@@ -113,15 +162,7 @@ def qa(paper_id: str, payload: AskPaperRequest, request: Request, db: Session = 
             result = answer_question(db, int(paper_id), payload.question)
         except PaperServiceError as exc:
             return _db_error(request, exc)
-        data = {
-            "conversationId": result.conversation_id,
-            "messageId": result.message_id,
-            "paperId": str(result.paper_id),
-            "answer": result.answer,
-            "createdAt": result.created_at.isoformat(),
-            "citations": result.citations,
-            "historyCount": len(payload.history),
-        }
+        data = _qa_payload(result, len(payload.history))
         return ApiResponse(data=data, request_id=request.state.request_id)
     try:
         data = ask_paper(paper_id, payload)

@@ -1,4 +1,4 @@
-"""Parser package: H038 stub + H057 real PDF parse."""
+"""Parser package:  stub +  real PDF parse."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class ParseOutput:
 
 
 def parse_pdf(arxiv_id: str, pdf_path: str, *, fail: bool = False, sleep_s: float = 0.05) -> ParseOutput:
-    """Stub for memory-queue demo (H038)."""
+    """Stub for memory-queue demo ()."""
     time.sleep(sleep_s)
     if fail:
         return ParseOutput(ok=False, error="parse_failed: empty text")

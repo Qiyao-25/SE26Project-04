@@ -1,4 +1,4 @@
-"""H067/H068 QA service — retrieval + citation validation + no-key sample mode."""
+""" QA service — retrieval + citation validation + no-key sample mode."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H067/H068 — run 20 QA questions with citation validation (no-key sample mode)."""
+""" — run 20 QA questions with citation validation (no-key sample mode)."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def _root() -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate QA eval (H067/H068)")
+    parser = argparse.ArgumentParser(description="PaperMate QA eval ()")
     parser.add_argument("--questions", default="data/qa/questions.json")
     parser.add_argument("--out", default="test/pipeline/qa_results.json")
     args = parser.parse_args()
@@ -77,7 +77,7 @@ def main() -> int:
 
     print(f"QA eval: {pass_count}/{len(questions)} passed")
     print(f"wrote {out_path}")
-    # H068: ≥18/20 on answerable; reject cases must refuse
+    # : ≥18/20 on answerable; reject cases must refuse
     return 0 if pass_count >= 18 else 1
 
 

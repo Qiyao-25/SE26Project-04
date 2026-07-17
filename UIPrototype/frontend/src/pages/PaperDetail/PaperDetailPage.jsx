@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -10,7 +10,8 @@ import {
   Spin,
   Tabs,
   Tag,
-  Typography
+  Typography,
+  message
 } from 'antd';
 import { FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
@@ -18,8 +19,11 @@ import { useApp } from '../../context/AppContext';
 import {
   getPaperContent,
   getPaperDetail,
-  getPaperSummary
+  getPaperSummary,
+  createParseTask,
+  getParseTask
 } from '../../services/paperService';
+import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 
 const { Title, Paragraph, Text } = Typography;
@@ -28,6 +32,9 @@ function getParseStatusLabel(status) {
   const labels = {
     pending: '待解析',
     parsing: '解析中',
+    queued: '排队中',
+    running: '解析中',
+    succeeded: '解析完成',
     completed: '已完成',
     failed: '解析失败'
   };
@@ -37,13 +44,17 @@ function getParseStatusLabel(status) {
 
 export default function PaperDetailPage() {
   const { paperId } = useParams();
-  const { setCompareForPaper } = useApp();
+  const { userId, setCompareForPaper } = useApp();
 
   const [paper, setPaper] = useState(null);
   const [content, setContent] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
+  const [parseTask, setParseTask] = useState(null);
+  const [parseLoading, setParseLoading] = useState(false);
+  const historyRecordedFor = useRef(null);
 
   useEffect(() => {
     if (paperId) setCompareForPaper(paperId);
@@ -87,7 +98,88 @@ export default function PaperDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [paperId]);
+  }, [paperId, reloadToken]);
+
+  useEffect(() => {
+    const taskId = parseTask?.task_id || parseTask?.taskId;
+    const status = parseTask?.status;
+    if (!taskId || !['queued', 'running'].includes(status)) return undefined;
+
+    let cancelled = false;
+    let timer;
+    let timeout;
+    const poll = async () => {
+      try {
+        const next = await getParseTask(taskId);
+        if (cancelled) return;
+        setParseTask(next);
+        if (['succeeded', 'failed', 'timed_out'].includes(next.status)) {
+          window.clearTimeout(timeout);
+          window.clearInterval(timer);
+          setParseLoading(false);
+          if (next.status === 'succeeded') {
+            message.success('论文解析完成，正在刷新结构化结果');
+            setReloadToken((value) => value + 1);
+          } else {
+            message.error(next.error_code || '论文解析失败');
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setParseLoading(false);
+          message.error(error.message || '解析任务查询失败');
+        }
+      }
+    };
+    timer = window.setInterval(poll, 1200);
+    timeout = window.setTimeout(() => {
+      window.clearInterval(timer);
+      setParseLoading(false);
+      message.warning('解析任务仍在排队，请确认后台 Worker 已启动');
+    }, 120000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.clearTimeout(timeout);
+    };
+  }, [parseTask]);
+
+  useEffect(() => {
+    if (!paper || !isPersistedPaperId(paperId) || historyRecordedFor.current === paperId) return;
+    historyRecordedFor.current = paperId;
+    createAction({
+      userId,
+      paperId,
+      actionType: 'reading_history',
+      payload: { section: '论文主体', duration: '刚刚' }
+    }).catch(() => {
+      // 阅读历史不应阻塞论文阅读。
+    });
+  }, [paper, paperId, userId]);
+
+  const handleParse = async () => {
+    if (parseLoading) return;
+    if (!isPersistedPaperId(paperId)) {
+      message.info('当前为演示论文，切换到检索结果中的数据库论文后可启动解析');
+      return;
+    }
+    setParseLoading(true);
+    setLoadError('');
+    try {
+      const task = await createParseTask(paperId, { force: paper.parseStatus === 'completed' });
+      setParseTask(task);
+      if (task.status === 'succeeded') {
+        setParseLoading(false);
+        setReloadToken((value) => value + 1);
+        message.success('论文解析已完成');
+      } else {
+        message.info(`解析任务已${task.status === 'running' ? '开始' : '排队'}`);
+      }
+    } catch (error) {
+      setParseLoading(false);
+      message.error(error.message || '解析任务创建失败');
+    }
+  };
 
   if (loading) {
     return (
@@ -135,6 +227,9 @@ export default function PaperDetailPage() {
             <Tag color={paper.parseStatus === 'completed' ? 'success' : 'warning'}>
               解析状态：{getParseStatusLabel(paper.parseStatus)}
             </Tag>
+            <Button size="small" loading={parseLoading} onClick={handleParse}>
+              {paper.parseStatus === 'completed' ? '重新解析' : '开始解析'}
+            </Button>
           </Space>
 
           <Paragraph type="secondary">
@@ -211,6 +306,7 @@ export default function PaperDetailPage() {
             >
               解析状态：{getParseStatusLabel(summaryData?.parseStatus)}
             </Tag>
+            {parseTask && <Text type="secondary">解析任务：{parseTask.task_id || parseTask.taskId} · {getParseStatusLabel(parseTask.status)}</Text>}
           </Space>
 
           <Title level={5}>结构化摘要</Title>

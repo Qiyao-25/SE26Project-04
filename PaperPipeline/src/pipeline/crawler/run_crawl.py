@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H047/H048 crawl CLI: keyword fetch → clean → ≥N seed + optional API ingest.
+""" crawl CLI: keyword fetch → clean → ≥N seed + optional API ingest.
 
 Usage (from PaperPipeline/):
   set PYTHONPATH=src
@@ -90,7 +90,7 @@ def crawl_until(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="PaperMate crawl ≥N papers (H047/H048)")
+    parser = argparse.ArgumentParser(description="PaperMate crawl ≥N papers ()")
     parser.add_argument("--target", type=int, default=100, help="Minimum cleaned papers")
     parser.add_argument("--page-size", type=int, default=50)
     parser.add_argument("--timeout", type=float, default=10.0)

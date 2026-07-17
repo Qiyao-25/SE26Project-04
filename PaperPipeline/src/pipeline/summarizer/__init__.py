@@ -1,4 +1,4 @@
-"""H037 summarizer stub — summary / concept / methods."""
+""" summarizer stub — summary / concept / methods."""
 
 from __future__ import annotations
 

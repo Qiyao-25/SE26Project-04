@@ -1,4 +1,4 @@
-"""H048 ingest: try member-C API (ORM-aligned), else write/merge local seed.json."""
+""" ingest: try member-C API (ORM-aligned), else write/merge local seed.json."""
 
 from __future__ import annotations
 
@@ -96,8 +96,8 @@ def _write_seed(path: Path, papers: list[dict], *, source: str) -> None:
 
 
 def _post_batch(api_base: str, papers: list[dict], *, timeout_s: float) -> tuple[bool, list[dict], str]:
-    """POST /papers/batch — body papers[] aligned with backend Paper ORM."""
-    url = f"{api_base}/papers/batch"
+    """POST /api/papers/batch — body papers[] aligned with backend API."""
+    url = f"{api_base}/api/papers/batch"
     body = json.dumps({"papers": papers}).encode("utf-8")
     req = urllib.request.Request(
         url,

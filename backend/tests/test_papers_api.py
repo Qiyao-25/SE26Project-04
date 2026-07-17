@@ -4,6 +4,23 @@ from app.service.paper import require_content, require_paper, require_summary, s
 from app.service.qa import ask_paper
 
 
+def test_batch_endpoint_accepts_pipeline_wrapper() -> None:
+    from app.core.config import Settings
+    from app.core.database import create_engine_for
+    from app.model import Base
+    from app.schema.papers import AuthorInput, PaperUpsert
+    from app.service.papers import batch_upsert_papers
+    from sqlalchemy.orm import Session
+
+    engine = create_engine_for(Settings(environment="test", database_url="sqlite:///:memory:"))
+    Base.metadata.create_all(engine)
+    payload = PaperUpsert(arxiv_id="1706.03762", title="Attention", authors=[AuthorInput(display_name="Vaswani")])
+    with Session(engine) as session:
+        result = batch_upsert_papers(session, [payload])
+    assert result.created == 1
+    assert result.items[0].authors == ["Vaswani"]
+
+
 def test_search_and_detail_flow() -> None:
     result = search_papers(SearchRequest(query="Transformer", page=1, pageSize=12))
     assert result.total >= 2

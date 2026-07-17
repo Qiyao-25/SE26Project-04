@@ -6,8 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.model import Paper
+from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
-from app.schema.papers import BatchUpsertResponse, PaperItem, PaperPage, PaperUpsert, QaResponse, WikiData
+from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, PaperItem, PaperPage, PaperUpsert, QaResponse, WikiData
 
 
 class PaperServiceError(Exception):
@@ -86,17 +87,30 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
     by_type = {}
     for result in results:
         by_type.setdefault(result.result_type, result)
+    wiki = by_type.get("wiki_triple")
     summary = by_type.get("summary")
     concepts = by_type.get("concepts")
     methods = by_type.get("methods")
+    if wiki:
+        summary_content = wiki.content_json.get("summary")
+        concept_content = wiki.content_json.get("concepts", wiki.content_json.get("concept", ""))
+        method_content = wiki.content_json.get("methods", "")
+    else:
+        summary_content = summary.content_json.get("summary") if summary else None
+        concept_content = concepts.content_json.get("items", []) if concepts else []
+        method_content = methods.content_json.get("items", []) if methods else []
+    if isinstance(concept_content, str):
+        concept_content = [{"conceptId": f"{paper.id}-concept-1", "name": "Core Concept", "description": concept_content}]
+    if isinstance(method_content, str):
+        method_content = [{"order": 1, "title": "Method Overview", "description": method_content}]
     return WikiData(
         paper_id=paper.id,
         parse_status=parse_status(paper),
-        summary=(summary.content_json.get("summary") if summary else paper.abstract),
-        concepts=(concepts.content_json.get("items", []) if concepts else []),
-        methods=(methods.content_json.get("items", []) if methods else []),
+        summary=summary_content or paper.abstract,
+        concepts=concept_content,
+        methods=method_content,
         limitations=(by_type.get("limitations").content_json.get("items", []) if by_type.get("limitations") else []),
-        source_locator=(summary.source_locator if summary else {}),
+        source_locator=(wiki.source_locator if wiki else (summary.source_locator if summary else {})),
     )
 
 
@@ -104,22 +118,45 @@ def answer_question(session: Session, paper_id: int, question: str) -> QaRespons
     paper = get_paper(session, paper_id)
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
-    answer = paper.abstract or "当前论文还没有可用于回答的摘要内容。"
+    matches = search_chunks(session, ChunkSearchRequest(query=question, paper_id=paper_id, top_k=3))
+    if matches:
+        excerpts = [chunk.content[:500] for chunk, _score in matches]
+        citations = [
+            {
+                "citationId": f"citation-{paper.id}-{chunk.chunk_id}",
+                "paperId": paper.id,
+                "paperTitle": paper.title,
+                "sectionId": chunk.chunk_id,
+                "sectionTitle": chunk.section or "原文",
+                "pageNumber": chunk.page_no,
+                "quote": chunk.content[:500],
+            }
+            for chunk, _score in matches
+        ]
+        answer = "\n".join(excerpts)
+    else:
+        if not paper.structured_results:
+            raise PaperServiceError("NO_EVIDENCE", "当前论文尚未完成解析，请先完成解析后再提问", 422)
+        wiki = get_wiki(session, paper_id)
+        if not wiki.summary:
+            raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据", 422)
+        answer = wiki.summary[:1200]
+        citations = [
+            {
+                "citationId": f"citation-{paper.id}-structured-summary",
+                "paperId": paper.id,
+                "paperTitle": paper.title,
+                "sectionId": "structured-summary",
+                "sectionTitle": "结构化摘要",
+                "pageNumber": None,
+                "quote": wiki.summary[:500],
+            }
+        ]
     return QaResponse(
         conversation_id=f"conversation-{paper.id}",
         message_id=f"assistant-{uuid4()}",
         paper_id=paper.id,
-        answer=f"基于当前已入库的论文元数据，关于“{question}”：{answer}",
+        answer=f"基于当前论文解析结果，关于“{question}”：{answer}",
         created_at=datetime.now(timezone.utc),
-        citations=[
-            {
-                "citationId": f"citation-{paper.id}-abstract",
-                "paperId": paper.id,
-                "paperTitle": paper.title,
-                "sectionId": "abstract",
-                "sectionTitle": "摘要",
-                "pageNumber": None,
-                "quote": paper.abstract or "",
-            }
-        ],
+        citations=citations,
     )

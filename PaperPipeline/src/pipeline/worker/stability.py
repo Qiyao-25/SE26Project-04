@@ -1,4 +1,4 @@
-"""H077/H078 — retry, backoff, task log export on memory queue."""
+""" — retry, backoff, task log export on memory queue."""
 
 from __future__ import annotations
 

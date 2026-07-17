@@ -27,6 +27,7 @@ $env:PYTHONPATH = "src"
 $env:PYTHONIOENCODING = "utf-8"
 
 python -m pipeline.worker.run_demo
+python -m pipeline.worker.run_backend_worker --once
 python -m pipeline.qa.run_eval
 python test/pipeline/run_full_demo.py
 ```
@@ -41,6 +42,19 @@ python test/pipeline/run_full_demo.py
 | 性能 / 三篇演示 | `python test/pipeline/run_benchmark.py` |
 
 可选：`$env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"`（失败自动本地回退）。
+
+### 数据库解析 Worker
+
+前端创建解析任务后，需要启动数据库 Worker 消费 `queued` 任务。Worker 会下载 PDF、使用 `pypdf` 提取带页码的段落、生成结构化摘要，并写回 C 后端：
+
+```powershell
+cd SE26Project-04/PaperPipeline
+$env:PYTHONPATH = "src"
+$env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"
+python -m pipeline.worker.run_backend_worker
+```
+
+只处理一个任务可使用 `--once`。PDF 默认缓存到 `data/worker_pdfs`，可通过 `--pdf-dir` 修改。Worker 运行环境需要先执行 `pip install -r requirements.txt`。
 
 ## 交付对应（迭代 2）
 

@@ -1,6 +1,6 @@
-"""PaperMate pipeline package (H037+).
+"""PaperMate pipeline package.
 
-Contract note (V0): Task / StructuredResult fields mirror Spike + H028.
+Contract note (V0): Task / StructuredResult fields mirror the pipeline contract.
 When member A freezes OpenAPI/ADR, rename here only — do not widen silently.
 """
 

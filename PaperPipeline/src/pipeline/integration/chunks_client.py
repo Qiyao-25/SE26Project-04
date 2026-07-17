@@ -36,8 +36,8 @@ class ChunksClient:
         return self._search_local(arxiv_id, query)
 
     def _search_remote(self, arxiv_id: str, query: str, *, timeout_s: float) -> list[TextChunkRef] | None:
-        """Target: POST {api_base}/search/chunks — pending C H065/H066."""
-        url = f"{self.api_base}/search/chunks"
+        """POST {api_base}/api/search/chunks."""
+        url = f"{self.api_base}/api/search/chunks"
         body = json.dumps({"arxiv_id": arxiv_id, "query": query, "top_k": self.top_k}).encode("utf-8")
         req = urllib.request.Request(
             url,

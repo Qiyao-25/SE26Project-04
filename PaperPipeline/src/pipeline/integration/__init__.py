@@ -7,6 +7,7 @@ Env:
 """
 
 from .chunks_client import ChunksClient, TextChunkRef
+from .backend_client import BackendClient
 from .config import IntegrationConfig
 from .contracts import (
     citation_to_ui,
@@ -19,6 +20,7 @@ from .contracts import (
 
 __all__ = [
     "ChunksClient",
+    "BackendClient",
     "TextChunkRef",
     "IntegrationConfig",
     "paper_meta_to_backend",

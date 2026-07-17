@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H057/H058: parse + structure all 10 frozen samples; write scorecard.
+""": parse + structure all 10 frozen samples; write scorecard.
 
 Usage (from PaperPipeline/):
   set PYTHONPATH=src
@@ -49,7 +49,7 @@ def _setup_logging() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Parse+structure 10 samples (H057/H058)")
+    parser = argparse.ArgumentParser(description="Parse+structure 10 samples ()")
     parser.add_argument("--out-dir", type=Path, default=ROOT / "data" / "samples")
     parser.add_argument("--pdf-dir", type=Path, default=ROOT / "data" / "samples" / "pdfs")
     parser.add_argument(

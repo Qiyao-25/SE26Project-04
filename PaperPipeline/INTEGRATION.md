@@ -35,13 +35,13 @@
 | API | 状态 | PaperPipeline 用法 |
 |-----|------|------------|
 | `GET /health` | ✅ 已实现 | 联调探测 |
-| `POST /papers/batch` | ⬜ 待实现 | `crawler/ingest.py`（已按 ORM 映射） |
-| `GET /papers` | ⬜ 待实现 | 去重（本地先用 `dedupe_by_id`） |
-| `POST /search/chunks` | ⬜ 待实现 | `integration/chunks_client.py` |
-| `POST /tasks` / parse worker | ⬜ 待实现 | 替换内存队列 |
+| `POST /api/papers/batch` | ✅ 已实现 | `crawler/ingest.py`（100 条元数据批量去重入库） |
+| `GET /api/papers` | ✅ 已实现 | 数据库筛选、分页和详情 |
+| `POST /api/search/chunks` | ✅ 已实现 | `integration/chunks_client.py` |
+| `POST /api/papers/{paper_id}/parse` + `/api/tasks/{task_id}` | ✅ 已实现 | 解析任务状态与结构化结果入库 |
 | `POST /qa` | ⬜ 待实现 | 可选；本地 QA 已可演示 |
 
-### `POST /papers/batch` 请求体（PaperPipeline 已发送）
+### `POST /api/papers/batch` 请求体（PaperPipeline 已发送）
 
 ```json
 {
@@ -59,13 +59,15 @@
 }
 ```
 
-### `POST /search/chunks` 期望
+### `POST /api/search/chunks` 期望
 
 ```json
 { "arxiv_id": "1706.03762", "query": "...", "top_k": 5 }
 ```
 
 响应接受 `ApiResponse.data.chunks[]`，字段：`chunk_id`, `page_no`, `section`, `content`, `score`。
+
+`src/pipeline/integration/backend_client.py` 提供了解析任务创建、结构化结果和文本块写入客户端；解析器可使用 `wiki_to_backend_structured()` 和 `chunk_to_backend()` 生成请求体。
 
 ## 成员 B（前端）— 消费约定
 
@@ -87,9 +89,9 @@ Wiki 摘要：`wiki_to_ui_summary(...)` → 对齐 `paper-summary.json`。
 
 ## 建议联调顺序
 
-1. `GET /health`（已可用）
-2. `POST /papers/batch` → 切换真实 ingest
-3. 解析写入 `TextChunk` → 关闭仅依赖 `paragraphs_preview`
-4. `POST /search/chunks` → QA 远程检索
+1. `GET /api/health`（已可用）
+2. `POST /api/papers/batch` → 切换真实 ingest
+3. 解析写入 `StructuredResult` 与 `TextChunk` → 关闭仅依赖 `paragraphs_preview`
+4. `POST /api/search/chunks` → QA 远程检索
 5. 前端 `qaService` / `paperService` 接真实 HTTP（字段已对齐 mock）
 6. E 黄金题 + A ADR → contract V1
