@@ -2,31 +2,24 @@
 
 对齐对象（以当前仓库为准）：
 
-- **backend** `POST /api/papers/batch`、`GET /api/papers/{id}/wiki`、`POST /api/papers/{id}/qa`
-- **ORM** `entities.py`（`Paper` / `ParseTask` / `StructuredResult` / `TextChunk`）
+- **backend** `POST /api/papers/batch`、任务队列、`finalize`、Wiki / chunks / QA
+- **ORM** `Paper` / `ParseTask` / `StructuredResult` / `TextChunk`
 - **UIPrototype** mock 字段（camelCase 引用卡片）
 
-管线默认本地自给。设置 `PAPERMATE_API_BASE=http://127.0.0.1:8000` 后尝试真实入库，失败自动回退 `data/seed.json`。
+管线可本地自给（`data/seed.json` / samples）。设置 `PAPERMATE_API_BASE=http://127.0.0.1:8000` 后走真实入库与 Worker。
 
 ## 已对齐（可联调）
 
 | PaperPipeline | backend | 说明 |
 |---------------|---------|------|
-| `ingest.py` | `POST /api/papers/batch` | **请求体 = JSON 数组** `list[PaperUpsert]` |
-| `paper_meta_to_backend` | `AuthorInput` | 作者字段为 `{name}`（非 `display_name`） |
-| `wiki_to_backend_structured_rows` | `get_wiki()` | 写出 `summary` / `concepts` / `methods` / `limitations` 多行 |
+| `ingest.py` / `BackendClient.batch_upsert_papers` | `POST /api/papers/batch` | **请求体 = JSON 数组** `list[PaperUpsert]`（服务端也接受 `{papers:[...]}`） |
+| `paper_meta_to_backend` | `AuthorInput` | 作者字段为 `{name}` |
+| `wiki_to_backend_structured_rows` | `GET .../wiki` | 写出 summary / concepts / methods / experiments / limitations |
+| `chunk_to_backend` + `finalize` | `POST /api/tasks/{id}/finalize` | 原子提交 chunks + 结构化结果 |
 | `QAResult.to_ui()` | `AskPaperResult` / mock | `pageNumber` / `sectionTitle` / `quote` |
 | 信封解析 | `ApiResponse` | `{code, message, data, request_id}` |
 
-### 批量入库示例
-
-| 变量 | 默认 | 说明 |
-|------|------|------|
-| `PAPERMATE_API_BASE` | 空 | C FastAPI 根地址（如 `http://127.0.0.1:8000`） |
-| `PAPERMATE_QA_MODE` | `sample` | `sample` 无 Key；`remote` 待 LLM |
-| `PAPERMATE_SAMPLES_DIR` | `data/samples` | 本地样例 JSON |
-
-## 成员 C（后端）— 当前与规划
+## 成员 C（后端）— 联调 API
 
 | API | 状态 | PaperPipeline 用法 |
 |-----|------|------------|
@@ -44,8 +37,8 @@
 ### `POST /api/papers/batch` 请求体（PaperPipeline 已发送）
 
 ```json
-{
-  "papers": [{
+[
+  {
     "arxiv_id": "1706.03762",
     "title": "Attention Is All You Need",
     "authors": [{"name": "Ashish Vaswani"}],
@@ -53,30 +46,38 @@
     "primary_category": "cs.CL",
     "pdf_url": "https://arxiv.org/pdf/1706.03762.pdf",
     "source_url": "https://arxiv.org/abs/1706.03762",
-    "ingest_status": "metadata_only",
-    "authors": [{"display_name": "...", "author_order": 1}]
-  }]
-}
+    "ingest_status": "metadata_only"
+  }
+]
 ```
 
-### `POST /api/search/chunks` 期望
+成功 `data` 形如：`{items, created, updated}`。
 
-```json
-{ "arxiv_id": "1706.03762", "query": "...", "top_k": 5 }
+### 建议联调顺序
+
+1. 启动 backend：`uvicorn app.main:app --host 127.0.0.1 --port 8000`
+2. 一键联调（入库 → 创建任务 → Worker → Wiki/chunks）：
+
+```powershell
+cd SE26Project-04/PaperPipeline
+$env:PYTHONPATH = "src"
+$env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"
+python -m pipeline.run_se26_integration --arxiv-id 1706.03762
 ```
 
-成功响应 `data`: `{items, created, updated}`。
+3. 批量入库：`python -m pipeline.crawler.run_crawl --target 20`
+4. 常驻 Worker：`python -m pipeline.worker.run_backend_worker`
+5. 前端接真实 HTTP（字段已对齐 mock）
 
-`src/pipeline/integration/backend_client.py` 提供了解析任务创建、阶段状态、结构化结果和文本块写入客户端；解析器可使用 `wiki_to_backend_structured_rows()` 和 `chunk_to_backend()` 生成请求体。结构化结果包含 `summary`、`concepts`、`methods`、`experiments`、`limitations` 和 `validation`。
+产物：`data/integration/se26_last_run.json`
 
 ## 成员 B（前端）— 消费约定
 
-| 能力 | 状态 | 本地行为 |
-|------|------|----------|
-| `POST /api/search/chunks` | ❌ 无路由（表已有） | `ChunksClient` 搜 `data/samples` |
-| `ParseTask` 入队/Worker | ❌ 仅 ORM | `MemoryTaskQueue` |
-| 写入 `StructuredResult` / `TextChunk` | ❌ 无写 API | 产物在 samples / demo JSON；可用 `wiki_to_backend_structured_rows` / `paragraphs_to_text_chunks` 生成载荷 |
-| DB QA 真实 RAG | ⚠️ 现为摘要 stub | PaperPipeline QA 做引用校验演示 |
+| 能力 | PaperPipeline 侧 | 说明 |
+|------|------------------|------|
+| Wiki / 详情 | `GET /api/papers/{id}/wiki` | Worker finalize 后可读 |
+| 引用检索 | `POST /api/search/chunks` | 无 API 时可回退 `data/samples` |
+| QA 卡片 | `QAResult.to_ui()` | camelCase：`pageNumber` / `sectionTitle` / `quote` |
 
 ## 环境变量
 
@@ -84,13 +85,4 @@
 |------|------|------|
 | `PAPERMATE_API_BASE` | 空 | 如 `http://127.0.0.1:8000` |
 | `PAPERMATE_QA_MODE` | `sample` | `remote` 待接 LLM |
-| `PAPERMATE_SAMPLES_DIR` | `data/samples` | 本地分块 |
-
-## 建议联调顺序
-
-1. `GET /api/health`（已可用）
-2. `POST /api/papers/batch` → 切换真实 ingest
-3. 解析写入 `StructuredResult` 与 `TextChunk` → 关闭仅依赖 `paragraphs_preview`
-4. `POST /api/search/chunks` → QA 远程检索
-5. 前端 `qaService` / `paperService` 接真实 HTTP（字段已对齐 mock）
-6. E 黄金题 + A ADR → contract V1
+| `PAPERMATE_SAMPLES_DIR` | `data/samples` | 本地分块回退 |

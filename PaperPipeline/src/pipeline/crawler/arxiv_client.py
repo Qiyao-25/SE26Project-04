@@ -108,6 +108,16 @@ class ArxivClient:
         xml_bytes = self._http_get(url)
         return _parse_feed(xml_bytes)
 
+    def fetch_by_id(self, arxiv_id: str) -> PaperMeta:
+        """Fetch a single paper by arXiv id (version suffix stripped in parser)."""
+        base = re.sub(r"v\d+$", "", arxiv_id.strip())
+        params = urllib.parse.urlencode({"id_list": base, "max_results": 1})
+        url = f"{ARXIV_API}?{params}"
+        papers = _parse_feed(self._http_get(url))
+        if not papers:
+            raise LookupError(f"arXiv paper not found: {base}")
+        return papers[0]
+
 
 def _parse_feed(xml_bytes: bytes) -> list[PaperMeta]:
     root = ET.fromstring(xml_bytes)

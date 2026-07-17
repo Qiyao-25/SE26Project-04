@@ -32,7 +32,11 @@ def upsert_paper(session: Session, payload: PaperUpsert) -> tuple[Paper, bool]:
             normalized_name = normalize_author_name(author_input.name or author_input.display_name or "")
             author = session.scalar(select(Author).where(Author.normalized_name == normalized_name))
             if author is None:
-                author = Author(normalized_name=normalized_name, display_name=author_input.name or author_input.display_name or "", orcid=author_input.orcid)
+                author = Author(
+                    normalized_name=normalized_name,
+                    display_name=author_input.name or author_input.display_name or "",
+                    orcid=author_input.orcid,
+                )
                 session.add(author)
             elif author_input.orcid and not author.orcid:
                 author.orcid = author_input.orcid

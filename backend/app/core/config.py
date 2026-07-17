@@ -33,6 +33,24 @@ class Settings(BaseSettings):
     search_agent_enabled: bool = True
     search_agent_timeout_s: float = 45.0
 
+    # OpenAI-compatible LLM（解析摘要 / 智能问答共用）
+    llm_api_key: str = ""
+    llm_api_base: str = "https://api.deepseek.com"
+    llm_model: str = "deepseek-v4-flash"
+    # 兼容旧环境变量名（将逐步弃用）
+    deepseek_api_key: str = ""
+    deepseek_api_base: str = ""
+    deepseek_model: str = ""
+
+    parse_agent_enabled: bool = True
+    parse_agent_max_pages: int = 12
+    parse_agent_timeout_s: float = 90.0
+    qa_agent_enabled: bool = True
+    qa_agent_timeout_s: float = 90.0
+    qa_agent_top_k: int = 5
+    search_agent_enabled: bool = True
+    search_agent_timeout_s: float = 45.0
+
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
         env_file=".env",

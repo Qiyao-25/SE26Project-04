@@ -31,7 +31,7 @@ python -m pipeline.worker.run_backend_worker --once
 python -m pipeline.qa.run_eval
 ```
 
-联调入库（backend 需已启动）：
+联调（backend 需已启动）：
 
 ```powershell
 $env:PAPERMATE_API_BASE = "http://127.0.0.1:8000"
@@ -41,6 +41,7 @@ python -m pipeline.crawler.run_crawl --target 20
 
 | 目标 | 命令 |
 |------|------|
+| SE26 联调 | `python -m pipeline.run_se26_integration` |
 | Spike | `python scripts/spike_one_paper.py pipeline --arxiv-id 1706.03762` |
 | 抓取 ≥100 | `python -m pipeline.crawler.run_crawl --target 100` |
 | 解析 10 篇 | `python -m pipeline.parser.run_samples` |

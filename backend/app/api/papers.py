@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -89,17 +89,23 @@ def parse(
     paper_id: int,
     payload: ParseRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(db_session),
 ):
     if not idempotency_key or not idempotency_key.strip():
         return _db_error(request, PaperServiceError("VALIDATION_ERROR", "必须提供 Idempotency-Key", 400))
     try:
-        data, _created = create_task(db, paper_id, payload.task_type, idempotency_key.strip(), force=payload.force)
+        data, created = create_task(db, paper_id, payload.task_type, idempotency_key.strip(), force=payload.force)
     except ValueError as exc:
         if str(exc) == "PAPER_NOT_FOUND":
             return _db_error(request, PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404))
         return _db_error(request, PaperServiceError("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409))
+
+    settings = request.app.state.settings
+    # 新排队任务且已配置 Summarize Agent 时，由 backend 后台执行（无需外挂 Worker）
+    if created and data.status == "queued" and settings.parse_agent_ready:
+        background_tasks.add_task(run_parse_agent_job, request.app.state.engine, data.task_id, settings)
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

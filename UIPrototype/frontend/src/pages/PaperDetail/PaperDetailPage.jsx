@@ -55,6 +55,7 @@ export default function PaperDetailPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [parseTask, setParseTask] = useState(null);
   const [parseLoading, setParseLoading] = useState(false);
+  const [mainTab, setMainTab] = useState('content');
   const historyRecordedFor = useRef(null);
 
   useEffect(() => {
@@ -136,8 +137,8 @@ export default function PaperDetailPage() {
     timeout = window.setTimeout(() => {
       window.clearInterval(timer);
       setParseLoading(false);
-      message.warning('解析任务仍在排队，请确认后台 Worker 已启动');
-    }, 120000);
+      message.warning('解析仍在进行中（Agent 生成可能较慢），请稍后刷新页面查看智能总结');
+    }, 180000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -166,15 +167,17 @@ export default function PaperDetailPage() {
     }
     setParseLoading(true);
     setLoadError('');
+    setMainTab('summary');
     try {
-      const task = await createParseTask(paperId, { force: paper.parseStatus === 'completed' });
+      const force = ['completed', 'qa_ready', 'failed'].includes(paper.parseStatus);
+      const task = await createParseTask(paperId, { force });
       setParseTask(task);
       if (task.status === 'succeeded') {
         setParseLoading(false);
         setReloadToken((value) => value + 1);
         message.success('论文解析已完成');
       } else {
-        message.info(`解析任务已${task.status === 'running' ? '开始' : '排队'}`);
+        message.info('已启动 Summarize Agent，正在生成智能总结…');
       }
     } catch (error) {
       setParseLoading(false);
@@ -415,7 +418,7 @@ export default function PaperDetailPage() {
       <Row gutter={16} align="stretch">
         <Col xs={24} lg={15}>
           <Card className="section-card paper-main-card">
-            <Tabs items={mainTabs} />
+            <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
           </Card>
         </Col>
         <Col xs={24} lg={9}>

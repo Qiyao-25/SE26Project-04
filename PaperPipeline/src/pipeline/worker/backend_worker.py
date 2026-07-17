@@ -99,7 +99,15 @@ class BackendParseWorker:
                 raise WorkerFailure("STRUCTURED_RESULT_FAILED", "结构化摘要字段不完整")
 
             self.client.update_task(task_id, "running", stage="validate")
-            chunks = [chunk_to_backend(asdict(paragraph)) for paragraph in parsed.paragraphs]
+            chunks = [
+                chunk_to_backend(asdict(paragraph))
+                for paragraph in parsed.paragraphs
+                if (paragraph.text or "").strip()
+            ]
+            if not chunks:
+                raise WorkerFailure("PARSE_FAILED", "解析结果无有效文本块")
+            # backend TextChunkBatch max_length=5000
+            chunks = chunks[:5000]
             self.client.update_task(task_id, "running", stage="persist")
             self.client.finalize_parse_result(
                 task_id,

@@ -304,3 +304,4 @@ def answer_question(
         created_at=datetime.now(timezone.utc),
         citations=citations,
     )
+

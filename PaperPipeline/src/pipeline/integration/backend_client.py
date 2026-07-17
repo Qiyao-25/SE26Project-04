@@ -1,4 +1,4 @@
-"""Small HTTP adapter for persisting pipeline output in member C backend."""
+"""HTTP adapter for member C backend — papers, tasks, chunks, finalize."""
 
 from __future__ import annotations
 
@@ -46,13 +46,14 @@ class BackendClient:
         return self._request(
             f"/api/papers/{paper_id}/parse",
             "POST",
-            {"task_type": task_type},
-            {"Idempotency-Key": make_idempotency_key(arxiv_id)},
+            {"task_type": task_type, "force": force},
+            {"Idempotency-Key": make_idempotency_key(arxiv_id, task_type)},
         )
 
     def list_tasks(self, status: str = "queued", limit: int = 20) -> list[dict]:
         query = urllib.parse.urlencode({"status": status, "limit": limit})
-        return self._request(f"/api/tasks?{query}", "GET")
+        data = self._request(f"/api/tasks?{query}", "GET")
+        return data if isinstance(data, list) else []
 
     def claim_task(self, worker_id: str) -> dict | None:
         return self._request("/api/tasks/claim", "POST", {"worker_id": worker_id})
@@ -62,6 +63,9 @@ class BackendClient:
 
     def get_paper(self, paper_id: int) -> dict:
         return self._request(f"/api/papers/{paper_id}", "GET")
+
+    def get_wiki(self, paper_id: int) -> dict:
+        return self._request(f"/api/papers/{paper_id}/wiki", "GET")
 
     def update_task(self, task_id: int, status: str, error_code: str | None = None, stage: str | None = None) -> dict:
         body: dict[str, Any] = {"status": status}
@@ -77,6 +81,10 @@ class BackendClient:
     def recover_stale_tasks(self, timeout_seconds: int = 900) -> dict:
         query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
         return self._request(f"/api/tasks/recover-stale?{query}", "POST")
+
+    def enqueue_pending(self, limit: int = 20) -> dict:
+        query = urllib.parse.urlencode({"limit": limit})
+        return self._request(f"/api/tasks/enqueue-pending?{query}", "POST")
 
     def get_queue_stats(self, timeout_seconds: int = 900) -> dict:
         query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
@@ -94,6 +102,14 @@ class BackendClient:
             "POST",
             {"chunks": chunks, "results": results},
         )
+
+    def search_chunks(self, *, query: str, arxiv_id: str | None = None, paper_id: int | None = None, top_k: int = 5) -> dict:
+        body: dict[str, Any] = {"query": query, "top_k": top_k}
+        if arxiv_id:
+            body["arxiv_id"] = arxiv_id
+        if paper_id is not None:
+            body["paper_id"] = paper_id
+        return self._request("/api/search/chunks", "POST", body)
 
 
 __all__ = ["BackendClient"]

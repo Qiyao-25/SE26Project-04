@@ -9,8 +9,8 @@ export default function SidebarQaPanel({ messages, onSend, qaStatus }) {
       <Alert
         type="info"
         showIcon
-        message="当前为单论文问答"
-        description="回答基于当前论文的结构化内容生成，并展示引用章节与页码。"
+        message="当前为单论文智能问答"
+        description="回答由 QA Agent 基于已解析原文块生成，并展示引用章节与页码。请先完成解析（可问答）后再提问。"
         style={{ marginBottom: 12 }}
       />
 
