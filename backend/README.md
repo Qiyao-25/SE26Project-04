@@ -184,6 +184,8 @@ GET  /api/tasks/{task_id}
 POST /api/tasks/{task_id}/retry
 POST /api/tasks/recover-stale
 POST /api/tasks/enqueue-pending
+GET  /api/tasks/stats
+POST /api/tasks/{task_id}/finalize
 POST /api/tasks/{task_id}/results
 POST /api/papers/{paper_id}/chunks
 POST /api/search/chunks
@@ -191,6 +193,6 @@ POST /api/learning/actions
 GET  /api/learning/actions?user_id=demo
 ```
 
-解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。论文状态会区分 `parsed` 与 `qa_ready`，后者要求数据库中存在文本块，响应同时返回 `chunkCount` / `qaReady`。
+解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。论文状态会区分 `parsed` 与 `qa_ready`，后者要求数据库中存在文本块，响应同时返回 `chunkCount` / `qaReady`。`finalize` 接口一次性提交文本块和结构化结果，`stats` 接口返回队列数量、可重试失败数和 stale running 数量。
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

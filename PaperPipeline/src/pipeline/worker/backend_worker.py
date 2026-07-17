@@ -78,9 +78,9 @@ class BackendParseWorker:
             self.client.update_task(task_id, "running", stage="validate")
             chunks = [chunk_to_backend(asdict(paragraph)) for paragraph in parsed.paragraphs]
             self.client.update_task(task_id, "running", stage="persist")
-            self.client.save_chunks(paper_id, chunks)
-            self.client.save_structured_results(
+            self.client.finalize_parse_result(
                 task_id,
+                chunks,
                 wiki_to_backend_structured_rows(
                     summary=wiki.summary,
                     concept=wiki.concept,

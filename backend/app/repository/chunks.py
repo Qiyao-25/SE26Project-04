@@ -27,6 +27,20 @@ def _tokens(value: str) -> set[str]:
 
 
 def upsert_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> int:
+    count = _write_chunks(session, paper_id, payload)
+    session.commit()
+    return count
+
+
+def replace_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> int:
+    if session.get(Paper, paper_id) is None:
+        raise ValueError("PAPER_NOT_FOUND")
+    session.query(TextChunk).where(TextChunk.paper_id == paper_id).delete(synchronize_session=False)
+    count = _write_chunks(session, paper_id, payload)
+    return count
+
+
+def _write_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> int:
     paper = session.get(Paper, paper_id)
     if paper is None:
         raise ValueError("PAPER_NOT_FOUND")
@@ -41,7 +55,6 @@ def upsert_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> i
     paper.chunk_count = session.scalar(
         select(func.count(TextChunk.id)).where(TextChunk.paper_id == paper_id)
     ) or 0
-    session.commit()
     return len(payload.chunks)
 
 

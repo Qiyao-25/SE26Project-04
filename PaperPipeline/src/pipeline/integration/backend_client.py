@@ -60,11 +60,22 @@ class BackendClient:
         query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
         return self._request(f"/api/tasks/recover-stale?{query}", "POST")
 
+    def get_queue_stats(self, timeout_seconds: int = 900) -> dict:
+        query = urllib.parse.urlencode({"timeout_seconds": timeout_seconds})
+        return self._request(f"/api/tasks/stats?{query}", "GET")
+
     def save_structured_results(self, task_id: int, results: list[dict[str, Any]]) -> dict:
         return self._request(f"/api/tasks/{task_id}/results", "POST", {"results": results})
 
     def save_chunks(self, paper_id: int, chunks: list[dict[str, Any]]) -> dict:
         return self._request(f"/api/papers/{paper_id}/chunks", "POST", {"chunks": chunks})
+
+    def finalize_parse_result(self, task_id: int, chunks: list[dict[str, Any]], results: list[dict[str, Any]]) -> dict:
+        return self._request(
+            f"/api/tasks/{task_id}/finalize",
+            "POST",
+            {"chunks": chunks, "results": results},
+        )
 
 
 __all__ = ["BackendClient"]

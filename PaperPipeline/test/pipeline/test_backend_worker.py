@@ -17,11 +17,8 @@ class FakeBackendClient:
     def get_paper(self, paper_id: int):
         return {"paper_id": paper_id, "arxiv_id": "demo-html", "title": "HTML Demo", "abstract": "Attention model evaluation abstract."}
 
-    def save_chunks(self, paper_id: int, chunks):
+    def finalize_parse_result(self, task_id: int, chunks, results):
         self.saved_chunks.extend(chunks)
-        return {"upserted": len(chunks)}
-
-    def save_structured_results(self, task_id: int, results):
         self.saved_results.extend(results)
         return {"task_id": task_id, "status": "succeeded"}
 

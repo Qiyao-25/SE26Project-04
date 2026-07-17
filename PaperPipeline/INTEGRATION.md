@@ -37,6 +37,7 @@
 | `POST /api/papers/{paper_id}/parse` + `/api/tasks/{task_id}` | ✅ 已实现 | 解析任务状态与结构化结果入库 |
 | `POST /api/tasks/{task_id}/retry` / `recover-stale` | ✅ 已实现 | 失败重试与卡住任务恢复 |
 | `POST /api/tasks/enqueue-pending` | ✅ 已实现 | 将 metadata-only 论文批量加入解析队列 |
+| `POST /api/tasks/{task_id}/finalize` / `GET /api/tasks/stats` | ✅ 已实现 | 解析结果原子提交与队列观测 |
 | `POST /api/papers/{paper_id}/qa` | ✅ 已实现 | 数据库文本块 QA；无证据时拒答 |
 
 ### `POST /api/papers/batch` 请求体（PaperPipeline 已发送）

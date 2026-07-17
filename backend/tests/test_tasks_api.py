@@ -3,10 +3,10 @@ from app.core.database import create_engine_for
 from app.model import Base, ParseTask
 from datetime import timedelta
 
-from app.schema.papers import PaperUpsert, StructuredResultBatch, StructuredResultInput, TaskUpdate, TextChunkBatch, TextChunkInput
+from app.schema.papers import ParseResultCommit, PaperUpsert, StructuredResultBatch, StructuredResultInput, TaskUpdate, TextChunkBatch, TextChunkInput
 from app.repository.chunks import upsert_chunks
 from app.service.papers import batch_upsert_papers, get_wiki
-from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, recover_stale_tasks, retry_task, save_results, update_task
+from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 from sqlalchemy.orm import Session
 
 
@@ -109,3 +109,24 @@ def test_metadata_only_papers_can_be_enqueued() -> None:
         queued = enqueue_pending_tasks(session, limit=10)
         assert queued and queued[0].paper_id == paper_id
         assert get_task(session, queued[0].task_id).status == "queued"
+
+
+def test_finalize_replaces_chunks_and_updates_queue_readiness() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="finalize-paper", title="Finalize Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "finalize-task")
+        completed = save_parse_result(
+            session,
+            task.task_id,
+            ParseResultCommit(
+                chunks=[TextChunkInput(chunk_id="fresh", page_no=2, section="results", content="Fresh evidence")],
+                results=[StructuredResultInput(result_type="summary", content_json={"summary": "Fresh summary"})],
+            ),
+        )
+        assert completed.stage == "completed"
+        wiki = get_wiki(session, paper_id)
+        assert wiki.qa_ready is True
+        assert wiki.chunk_count == 1
+        stats = queue_stats(session)
+        assert stats["counts"]["succeeded"] == 1
+        assert stats["counts"]["queued"] == 0

@@ -82,6 +82,14 @@ class TaskResponse(BaseModel):
     finished_at: datetime | None
     error_code: str | None
     stage: str | None = None
+    retryable: bool = False
+
+
+class TaskQueueStats(BaseModel):
+    counts: dict[str, int]
+    retryable_failed: int
+    stale_running: int
+    oldest_queued_at: datetime | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -115,6 +123,11 @@ class TextChunkInput(BaseModel):
 
 class TextChunkBatch(BaseModel):
     chunks: list[TextChunkInput] = Field(min_length=1, max_length=5000)
+
+
+class ParseResultCommit(BaseModel):
+    chunks: list[TextChunkInput] = Field(min_length=1, max_length=5000)
+    results: list[StructuredResultInput] = Field(min_length=1, max_length=20)
 
 
 class ChunkSearchRequest(BaseModel):

@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.model import ParseTask, Paper, StructuredResult, TextChunk
 from app.schema.papers import (
+    ParseResultCommit,
     StructuredResultBatch,
     TaskResponse,
     TaskUpdate,
+    TextChunkBatch,
 )
 
 
@@ -33,6 +35,7 @@ def to_task(task: ParseTask) -> TaskResponse:
         finished_at=task.finished_at,
         error_code=task.error_code,
         stage=task.stage,
+        retryable=task.status in {"failed", "timed_out"} and task.attempt < MAX_ATTEMPTS,
     )
 
 
@@ -82,6 +85,36 @@ def list_tasks(session: Session, status: str | None = None, limit: int = 20) -> 
     return [to_task(task) for task in session.scalars(stmt).all()]
 
 
+def queue_stats(session: Session, stale_after_seconds: int = 900) -> dict:
+    counts = {
+        status: session.scalar(select(func.count(ParseTask.id)).where(ParseTask.status == status)) or 0
+        for status in sorted(TASK_STATUSES)
+    }
+    cutoff = _now() - timedelta(seconds=stale_after_seconds)
+    stale_running = session.scalar(
+        select(func.count(ParseTask.id)).where(
+            ParseTask.status == "running",
+            ParseTask.started_at.is_not(None),
+            ParseTask.started_at < cutoff,
+        )
+    ) or 0
+    retryable_failed = session.scalar(
+        select(func.count(ParseTask.id)).where(
+            ParseTask.status.in_(("failed", "timed_out")),
+            ParseTask.attempt < MAX_ATTEMPTS,
+        )
+    ) or 0
+    oldest_queued_at = session.scalar(
+        select(func.min(ParseTask.requested_at)).where(ParseTask.status == "queued")
+    )
+    return {
+        "counts": counts,
+        "retryable_failed": retryable_failed,
+        "stale_running": stale_running,
+        "oldest_queued_at": oldest_queued_at,
+    }
+
+
 def update_task(session: Session, task_id: int, payload: TaskUpdate) -> TaskResponse:
     task = session.get(ParseTask, task_id)
     if task is None:
@@ -105,14 +138,15 @@ def update_task(session: Session, task_id: int, payload: TaskUpdate) -> TaskResp
     return to_task(task)
 
 
-def save_results(session: Session, task_id: int, payload: StructuredResultBatch) -> TaskResponse:
+def _get_active_task(session: Session, task_id: int) -> ParseTask:
     task = session.get(ParseTask, task_id)
     if task is None:
         raise ValueError("TASK_NOT_FOUND")
-    if task.status in {"failed", "timed_out"}:
+    if task.status not in {"queued", "running"}:
         raise ValueError("TASK_CONFLICT")
+    return task
 
-    task.started_at = task.started_at or _now()
+def _write_structured_results(session: Session, task: ParseTask, payload: StructuredResultBatch) -> None:
     for item in payload.results:
         result = session.scalar(
             select(StructuredResult).where(
@@ -137,6 +171,9 @@ def save_results(session: Session, task_id: int, payload: StructuredResultBatch)
             result.content_json = item.content_json
             result.source_locator = item.source_locator
             result.confidence = item.confidence
+
+def _complete_task(session: Session, task: ParseTask) -> TaskResponse:
+    task.started_at = task.started_at or _now()
     chunk_count = session.scalar(
         select(func.count(TextChunk.id)).where(TextChunk.paper_id == task.paper_id)
     ) or 0
@@ -150,6 +187,26 @@ def save_results(session: Session, task_id: int, payload: StructuredResultBatch)
     session.commit()
     session.refresh(task)
     return to_task(task)
+
+
+def save_results(session: Session, task_id: int, payload: StructuredResultBatch) -> TaskResponse:
+    task = _get_active_task(session, task_id)
+    task.started_at = task.started_at or _now()
+    _write_structured_results(session, task, payload)
+    return _complete_task(session, task)
+
+
+def save_parse_result(session: Session, task_id: int, payload: ParseResultCommit) -> TaskResponse:
+    from app.repository.chunks import replace_chunks
+
+    task = _get_active_task(session, task_id)
+    replace_chunks(session, task.paper_id, TextChunkBatch(chunks=payload.chunks))
+    _write_structured_results(
+        session,
+        task,
+        StructuredResultBatch(results=payload.results),
+    )
+    return _complete_task(session, task)
 
 
 def retry_task(session: Session, task_id: int) -> TaskResponse:

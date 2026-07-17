@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schema.common import ApiResponse
-from app.schema.papers import StructuredResultBatch, TaskResponse, TaskUpdate
-from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, recover_stale_tasks, retry_task, save_results, update_task
+from app.schema.papers import ParseResultCommit, StructuredResultBatch, TaskQueueStats, TaskResponse, TaskUpdate
+from app.service.tasks import create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -31,6 +31,18 @@ def map_error(request: Request, error: ValueError):
     }
     code, message, status_code = mapping.get(str(error), ("INTERNAL_ERROR", "任务处理失败", 500))
     return error_response(request, code, message, status_code)
+
+
+@router.get("/stats", response_model=ApiResponse[TaskQueueStats], summary="查询解析队列统计")
+def task_stats(
+    request: Request,
+    db: Session = Depends(db_session),
+    timeout_seconds: int = Query(default=900, ge=60, le=86400),
+):
+    return ApiResponse(
+        data=queue_stats(db, timeout_seconds),
+        request_id=request.state.request_id,
+    )
 
 
 @router.get("/{task_id}", response_model=ApiResponse[TaskResponse], summary="查询解析任务")
@@ -104,6 +116,15 @@ def task_retry(task_id: int, request: Request, db: Session = Depends(db_session)
 def task_results(task_id: int, payload: StructuredResultBatch, request: Request, db: Session = Depends(db_session)):
     try:
         data = save_results(db, task_id, payload)
+    except ValueError as exc:
+        return map_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{task_id}/finalize", response_model=ApiResponse[TaskResponse], summary="一次性提交论文解析结果")
+def task_finalize(task_id: int, payload: ParseResultCommit, request: Request, db: Session = Depends(db_session)):
+    try:
+        data = save_parse_result(db, task_id, payload)
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
