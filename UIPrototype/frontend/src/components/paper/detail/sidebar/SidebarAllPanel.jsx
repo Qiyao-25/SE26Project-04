@@ -1,8 +1,10 @@
 import { Alert, Card, Tag, Typography, Button, Space } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import { useApp } from '../../../../context/AppContext';
-import { MODE_ASSIST } from '../../../../data/papers';
+import { getReadingAssist } from '../../../../services/paperService';
 import SidebarNotesPreview from './SidebarNotesPreview';
+import ReadingAssistView from '../ReadingAssistView';
 import { ChatBox } from '../../../common/ChatBox';
 import FavoriteButton from './FavoriteButton';
 
@@ -82,6 +84,30 @@ export default function SidebarAllPanel({
 }) {
   const { persona } = useApp();
   const parsed = ['completed', 'qa_ready'].includes(paper.parseStatus);
+  const [assist, setAssist] = useState(null);
+  const [assistLoading, setAssistLoading] = useState(false);
+
+  useEffect(() => {
+    if (!parsed || !paperId) {
+      setAssist(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setAssistLoading(true);
+    getReadingAssist(paperId, { mode: persona, force: false })
+      .then((data) => {
+        if (!cancelled) setAssist(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAssist(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAssistLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paperId, persona, parsed]);
 
   const sections = [
     {
@@ -96,9 +122,7 @@ export default function SidebarAllPanel({
       extra: <Tag>{persona}模式</Tag>,
       content: (
         parsed ? (
-          <Paragraph style={{ fontSize: 12, margin: 0, whiteSpace: 'pre-wrap' }}>
-            {MODE_ASSIST[persona](paper)}
-          </Paragraph>
+          <ReadingAssistView data={assist} loading={assistLoading} compact />
         ) : (
           <Alert
             type="info"

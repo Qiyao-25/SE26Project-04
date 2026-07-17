@@ -201,3 +201,85 @@ export async function getParseTask(taskId) {
   if (USE_MOCK) return { taskId, status: 'succeeded' };
   return apiClient.get(`/tasks/${taskId}`);
 }
+
+export async function getPaperGraph(paperId, { force = false } = {}) {
+  if (USE_MOCK) {
+    return {
+      paperId,
+      paper_id: paperId,
+      nodes: [
+        { id: 'paper-1', type: 'paper', label: 'Demo Paper', role: 'current', paper_id: Number(paperId) || 1 },
+        { id: 'concept-1', type: 'concept', label: 'Attention' },
+        { id: 'method-1', type: 'method', label: 'Transformer' }
+      ],
+      edges: [
+        { id: 'e1', source: 'paper-1', target: 'concept-1', type: 'introduces', label: '提出' },
+        { id: 'e2', source: 'paper-1', target: 'method-1', type: 'uses', label: '方法' }
+      ],
+      lineage: [
+        { paper_id: Number(paperId) || 1, title: 'Demo Paper', role: 'current', note: '当前论文', published_at: '2017-06-12' }
+      ],
+      narrative: '（Mock）围绕注意力机制的轻量研究脉络示意。',
+      source: 'mock',
+      generated: false
+    };
+  }
+  const data = await apiClient.get(`/papers/${paperId}/graph`, { params: force ? { force: true } : undefined });
+  return {
+    paperId: data.paper_id || data.paperId || paperId,
+    nodes: data.nodes || [],
+    edges: data.edges || [],
+    lineage: data.lineage || [],
+    narrative: data.narrative || '',
+    source: data.source || '',
+    generated: Boolean(data.generated)
+  };
+}
+
+export async function rebuildPaperGraph(paperId) {
+  if (USE_MOCK) return getPaperGraph(paperId);
+  const data = await apiClient.post(`/papers/${paperId}/graph`);
+  return {
+    paperId: data.paper_id || data.paperId || paperId,
+    nodes: data.nodes || [],
+    edges: data.edges || [],
+    lineage: data.lineage || [],
+    narrative: data.narrative || '',
+    source: data.source || '',
+    generated: Boolean(data.generated)
+  };
+}
+
+export async function getReadingAssist(paperId, { mode = '研究', force = false } = {}) {
+  if (USE_MOCK) {
+    return {
+      paperId,
+      mode,
+      headline: `（Mock）${mode}模式导读`,
+      sections: [
+        { title: '模式要点', bullets: [`当前为 ${mode} 模式示例内容`, '联调后端后将生成真实导读'] },
+        { title: '建议', bullets: ['先完成解析', '再切换不同模式对比侧重点'] }
+      ],
+      takeaways: ['模式决定侧重点', '内容应易读', '可按模式重生成'],
+      next_steps: ['切换模式查看差异'],
+      source: 'mock',
+      generated: false
+    };
+  }
+  const data = force
+    ? await apiClient.post(`/papers/${paperId}/assist`, { mode, force: true })
+    : await apiClient.get(`/papers/${paperId}/assist`, { params: { mode } });
+  return {
+    paperId: data.paper_id || data.paperId || paperId,
+    mode: data.mode || mode,
+    headline: data.headline || '',
+    sections: (data.sections || []).map((section) => ({
+      title: section.title,
+      bullets: section.bullets || []
+    })),
+    takeaways: data.takeaways || [],
+    next_steps: data.next_steps || [],
+    source: data.source || '',
+    generated: Boolean(data.generated)
+  };
+}

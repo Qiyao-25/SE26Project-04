@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     qa_agent_top_k: int = 5
     search_agent_enabled: bool = True
     search_agent_timeout_s: float = 45.0
+    graph_agent_enabled: bool = True
+    graph_agent_timeout_s: float = 60.0
+    assist_agent_enabled: bool = True
+    assist_agent_timeout_s: float = 60.0
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -88,6 +92,14 @@ class Settings(BaseSettings):
     @property
     def search_agent_ready(self) -> bool:
         return bool(self.search_agent_enabled and self.llm_api_key.strip())
+
+    @property
+    def graph_agent_ready(self) -> bool:
+        return bool(self.graph_agent_enabled and self.llm_api_key.strip() and self.llm_model.strip())
+
+    @property
+    def assist_agent_ready(self) -> bool:
+        return bool(self.assist_agent_enabled and self.llm_api_key.strip() and self.llm_model.strip())
 
     @property
     def is_test(self) -> bool:

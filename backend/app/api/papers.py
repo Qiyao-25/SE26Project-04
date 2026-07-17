@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
-from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperItem, PaperPage, PaperUpsert, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
+from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
-from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_wiki, search_papers, smart_search_papers
+from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
@@ -174,6 +174,59 @@ def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
 def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
         data = get_wiki(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="获取知识图谱与研究脉络")
+def paper_graph(
+    paper_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    force: bool = Query(default=False, description="强制重新生成图谱"),
+):
+    try:
+        data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=force)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="生成/刷新知识图谱与研究脉络")
+def rebuild_paper_graph(paper_id: int, request: Request, db: Session = Depends(db_session)):
+    try:
+        data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=True)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="按阅读模式生成辅助阅读内容")
+def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Request, db: Session = Depends(db_session)):
+    try:
+        data = get_reading_assist(
+            db,
+            paper_id,
+            mode=payload.mode,
+            force=payload.force,
+            settings=request.app.state.settings,
+        )
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="读取某阅读模式的辅助阅读内容")
+def reading_assist_get(
+    paper_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    mode: str = Query(default="研究", max_length=16),
+    force: bool = Query(default=False),
+):
+    try:
+        data = get_reading_assist(db, paper_id, mode=mode, force=force, settings=request.app.state.settings)
     except PaperServiceError as exc:
         return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)

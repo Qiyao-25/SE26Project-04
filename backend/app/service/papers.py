@@ -11,7 +11,22 @@ from app.agents.qa_agent import QaAgent
 from app.model import Paper
 from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
-from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, PaperItem, PaperPage, PaperUpsert, QaResponse, SmartSearchResponse, WikiData
+from app.schema.papers import (
+    BatchUpsertResponse,
+    ChunkSearchRequest,
+    GraphEdge,
+    GraphNode,
+    LineageItem,
+    PaperGraphData,
+    PaperItem,
+    PaperPage,
+    PaperUpsert,
+    QaResponse,
+    ReadingAssistData,
+    ReadingAssistSection,
+    SmartSearchResponse,
+    WikiData,
+)
 
 
 class PaperServiceError(Exception):
@@ -203,6 +218,227 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
         source_locator=(wiki.source_locator if parsed and wiki else (summary.source_locator if parsed and summary else {})),
         chunk_count=paper.chunk_count,
         qa_ready=paper.ingest_status == "qa_ready" and paper.chunk_count > 0,
+    )
+
+
+def _structured_by_type(paper: Paper) -> dict:
+    results = sorted(paper.structured_results, key=lambda result: (result.result_type, -result.version))
+    by_type = {}
+    for result in results:
+        by_type.setdefault(result.result_type, result)
+    return by_type
+
+
+def _graph_from_structured(paper: Paper) -> PaperGraphData | None:
+    by_type = _structured_by_type(paper)
+    kg = by_type.get("kg_graph")
+    lineage_row = by_type.get("topic_lineage")
+    if kg is None and lineage_row is None:
+        return None
+    kg_json = kg.content_json if kg else {}
+    lineage_json = lineage_row.content_json if lineage_row else {}
+    nodes = [GraphNode(**item) if isinstance(item, dict) else item for item in (kg_json.get("nodes") or [])]
+    edges = [GraphEdge(**item) if isinstance(item, dict) else item for item in (kg_json.get("edges") or [])]
+    lineage = [LineageItem(**item) if isinstance(item, dict) else item for item in (lineage_json.get("items") or [])]
+    source = str(kg_json.get("source") or lineage_json.get("source") or "stored")
+    return PaperGraphData(
+        paper_id=paper.id,
+        nodes=nodes,
+        edges=edges,
+        lineage=lineage,
+        narrative=str(lineage_json.get("narrative") or ""),
+        source=source,
+        generated=False,
+    )
+
+
+def _persist_graph_rows(session: Session, paper: Paper, rows: list[dict]) -> None:
+    from app.model import StructuredResult
+    from sqlalchemy import select
+
+    for row in rows:
+        result = session.scalar(
+            select(StructuredResult).where(
+                StructuredResult.paper_id == paper.id,
+                StructuredResult.result_type == row["result_type"],
+                StructuredResult.version == int(row.get("version") or 1),
+            )
+        )
+        if result is None:
+            result = StructuredResult(
+                paper_id=paper.id,
+                parse_task_id=None,
+                result_type=row["result_type"],
+                version=int(row.get("version") or 1),
+                content_json=row["content_json"],
+                source_locator=row.get("source_locator") or {},
+                confidence=row.get("confidence"),
+            )
+            session.add(result)
+        else:
+            result.content_json = row["content_json"]
+            result.source_locator = row.get("source_locator") or {}
+            result.confidence = row.get("confidence")
+    session.commit()
+
+
+def get_paper_graph(session: Session, paper_id: int, *, settings=None, force: bool = False) -> PaperGraphData:
+    """Read stored knowledge graph / lineage, or build on demand via GraphAgent."""
+    from app.agents.graph_agent import GraphAgent
+    from app.service.parse_agent_runner import _related_paper_payloads
+
+    settings = settings or get_settings()
+    paper = get_paper(session, paper_id)
+    if paper is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
+
+    if not force:
+        existing = _graph_from_structured(paper)
+        if existing is not None and existing.nodes:
+            return existing
+
+    wiki = get_wiki(session, paper_id)
+    related = _related_paper_payloads(session, paper)
+    graph = GraphAgent(settings).run(
+        paper_id=paper.id,
+        title=paper.title or "",
+        abstract=paper.abstract or wiki.summary or "",
+        arxiv_id=paper.arxiv_id or str(paper.id),
+        primary_category=paper.primary_category or "",
+        published_at=paper.published_at.isoformat() if paper.published_at else "",
+        concepts=wiki.concepts or [],
+        methods=wiki.methods or [],
+        related_papers=related,
+    )
+    _persist_graph_rows(session, paper, graph.to_structured_rows())
+    session.refresh(paper)
+    return PaperGraphData(
+        paper_id=paper.id,
+        nodes=[GraphNode(**node) for node in graph.nodes],
+        edges=[GraphEdge(**edge) for edge in graph.edges],
+        lineage=[LineageItem(**item) for item in graph.lineage],
+        narrative=graph.narrative,
+        source=graph.source,
+        generated=True,
+    )
+
+
+def get_reading_assist(
+    session: Session,
+    paper_id: int,
+    *,
+    mode: str = "研究",
+    force: bool = False,
+    settings=None,
+) -> ReadingAssistData:
+    from app.agents.reading_mode_agent import (
+        PERSONAS,
+        ReadingModeAgent,
+        build_fallback_assist,
+    )
+    from app.model import StructuredResult
+    from sqlalchemy import select
+
+    settings = settings or get_settings()
+    paper = get_paper(session, paper_id)
+    if paper is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
+
+    persona = mode if mode in PERSONAS else "研究"
+    result_type = f"reading_assist_{persona}"
+
+    if not force:
+        existing = session.scalar(
+            select(StructuredResult).where(
+                StructuredResult.paper_id == paper.id,
+                StructuredResult.result_type == result_type,
+                StructuredResult.version == 1,
+            )
+        )
+        if existing and isinstance(existing.content_json, dict) and existing.content_json.get("sections"):
+            content = existing.content_json
+            return ReadingAssistData(
+                paper_id=paper.id,
+                mode=persona,
+                headline=str(content.get("headline") or ""),
+                sections=[ReadingAssistSection(**item) for item in (content.get("sections") or []) if isinstance(item, dict)],
+                takeaways=[str(x) for x in (content.get("takeaways") or [])],
+                next_steps=[str(x) for x in (content.get("next_steps") or [])],
+                source=str(content.get("source") or "stored"),
+                generated=False,
+            )
+
+    wiki = get_wiki(session, paper_id)
+    try:
+        if settings.assist_agent_ready:
+            result = ReadingModeAgent(settings).run(
+                mode=persona,
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                summary=wiki.summary or "",
+                concepts=wiki.concepts or [],
+                methods=wiki.methods or [],
+                experiments=wiki.experiments or [],
+                limitations=wiki.limitations or [],
+                primary_category=paper.primary_category or "",
+                arxiv_id=paper.arxiv_id or "",
+            )
+        else:
+            result = build_fallback_assist(
+                mode=persona,
+                title=paper.title or "",
+                summary=wiki.summary or "",
+                abstract=paper.abstract or "",
+                concepts=wiki.concepts or [],
+                methods=wiki.methods or [],
+                limitations=wiki.limitations or [],
+            )
+    except LlmError:
+        result = build_fallback_assist(
+            mode=persona,
+            title=paper.title or "",
+            summary=wiki.summary or "",
+            abstract=paper.abstract or "",
+            concepts=wiki.concepts or [],
+            methods=wiki.methods or [],
+            limitations=wiki.limitations or [],
+        )
+
+    content = result.to_content_json()
+    row = session.scalar(
+        select(StructuredResult).where(
+            StructuredResult.paper_id == paper.id,
+            StructuredResult.result_type == result_type,
+            StructuredResult.version == 1,
+        )
+    )
+    if row is None:
+        session.add(
+            StructuredResult(
+                paper_id=paper.id,
+                parse_task_id=None,
+                result_type=result_type,
+                version=1,
+                content_json=content,
+                source_locator={"source": result.source, "mode": persona},
+                confidence=0.8 if result.source.startswith("llm") else 0.5,
+            )
+        )
+    else:
+        row.content_json = content
+        row.source_locator = {"source": result.source, "mode": persona}
+        row.confidence = 0.8 if result.source.startswith("llm") else 0.5
+    session.commit()
+
+    return ReadingAssistData(
+        paper_id=paper.id,
+        mode=persona,
+        headline=result.headline,
+        sections=[ReadingAssistSection(title=s["title"], bullets=s.get("bullets") or []) for s in result.sections],
+        takeaways=result.takeaways,
+        next_steps=result.next_steps,
+        source=result.source,
+        generated=True,
     )
 
 
