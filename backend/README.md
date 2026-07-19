@@ -42,8 +42,8 @@ python -m pip install -e ".[postgres]"
 解析按钮由 FastAPI 当前进程直接执行，不需要额外启动 PaperPipeline Worker。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
 
     PAPERMATE_LLM_API_KEY=本地密钥
-    PAPERMATE_LLM_MODEL=模型名称
-    PAPERMATE_LLM_API_BASE=https://api.openai.com/v1
+    PAPERMATE_LLM_MODEL=deepseek-v4-flash
+    PAPERMATE_LLM_API_BASE=https://api.deepseek.com
 
 问答接口要求配置并启用 QA Agent；未配置时会明确返回 Agent 未配置，模型调用失败时会返回调用失败，不会使用不可靠的本地抽取内容冒充智能问答。论文解析仍可执行 PDF 抽取和本地结果整理。`PAPERMATE_AGENT_*` 旧变量名仍兼容，但新配置建议统一使用 `PAPERMATE_LLM_*` 和 `PAPERMATE_*_AGENT_*`。
 
