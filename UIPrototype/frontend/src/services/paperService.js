@@ -261,6 +261,33 @@ export async function getReadingAssist(paperId, { mode = '研究', force = false
   };
 }
 
+function normalizePaperGraph(data, paperId) {
+  return {
+    paperId: data.paper_id || data.paperId || paperId,
+    nodes: (data.nodes || []).map((node) => ({
+      ...node,
+      paperId: node.paperId ?? node.paper_id,
+      arxivId: node.arxivId || node.arxiv_id || '',
+      publishedAt: node.publishedAt || node.published_at || '',
+      score: node.score ?? null
+    })),
+    edges: (data.edges || []).map((edge) => ({
+      ...edge,
+      weight: edge.weight ?? null,
+      evidence: edge.evidence || []
+    })),
+    lineage: (data.lineage || []).map((item) => ({
+      ...item,
+      paperId: item.paperId ?? item.paper_id,
+      arxivId: item.arxivId || item.arxiv_id || '',
+      publishedAt: item.publishedAt || item.published_at || ''
+    })),
+    narrative: data.narrative || '',
+    source: data.source || 'heuristic',
+    generated: Boolean(data.generated)
+  };
+}
+
 export async function getPaperGraph(paperId, { force = false } = {}) {
   if (USE_MOCK) return {
     paperId,
@@ -272,13 +299,11 @@ export async function getPaperGraph(paperId, { force = false } = {}) {
     generated: false
   };
   const data = await apiClient.get(`/papers/${paperId}/graph`, { params: force ? { force: true } : undefined });
-  return {
-    paperId: data.paper_id || data.paperId || paperId,
-    nodes: data.nodes || [],
-    edges: data.edges || [],
-    lineage: data.lineage || [],
-    narrative: data.narrative || '',
-    source: data.source || '',
-    generated: Boolean(data.generated)
-  };
+  return normalizePaperGraph(data, paperId);
+}
+
+export async function rebuildPaperGraph(paperId) {
+  if (USE_MOCK) return getPaperGraph(paperId);
+  const data = await apiClient.post(`/papers/${paperId}/graph`, {});
+  return normalizePaperGraph(data, paperId);
 }

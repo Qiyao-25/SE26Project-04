@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from math import ceil
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -9,7 +10,7 @@ from app.core.config import get_settings
 from app.agents.llm_client import LlmError
 from app.agents.qa_agent import QaAgent
 from app.agents.graph_agent import GraphAgent
-from app.model import Paper
+from app.model import Paper, StructuredResult
 from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
 from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
@@ -238,10 +239,118 @@ def get_reading_assist(session: Session, paper_id: int, *, mode: str = "研究",
     )
 
 
+def get_related_paper_payloads(session: Session, paper: Paper, *, limit: int = 24) -> list[dict]:
+    """Return candidate papers for explainable graph relation ranking."""
+    candidates, _ = list_papers(
+        session,
+        keyword=None,
+        keywords=None,
+        author=None,
+        category=paper.primary_category,
+        published_from=None,
+        published_to=None,
+        page=1,
+        page_size=min(max(limit * 3, 30), 100),
+    )
+    if len(candidates) < limit * 2:
+        broader, _ = list_papers(
+            session,
+            keyword=None,
+            keywords=None,
+            author=None,
+            category=None,
+            published_from=None,
+            published_to=None,
+            page=1,
+            page_size=min(max(limit * 4, 50), 100),
+        )
+        candidates = list({item.id: item for item in [*candidates, *broader]}.values())
+
+    payloads = []
+    for item in candidates:
+        if item.id == paper.id:
+            continue
+        payloads.append({
+            "paper_id": item.id,
+            "arxiv_id": item.arxiv_id or "",
+            "title": item.title or "",
+            "abstract": item.abstract or "",
+            "primary_category": item.primary_category or "",
+            "published_at": item.published_at.isoformat() if item.published_at else "",
+            "authors": [link.author.display_name for link in sorted(item.authors, key=lambda link: link.author_order)],
+        })
+    return payloads
+
+
+def _stored_paper_graph(paper: Paper) -> PaperGraphData | None:
+    graph_result = max(
+        (item for item in paper.structured_results if item.result_type == "kg_graph"),
+        key=lambda item: item.version,
+        default=None,
+    )
+    lineage_result = max(
+        (item for item in paper.structured_results if item.result_type == "topic_lineage"),
+        key=lambda item: item.version,
+        default=None,
+    )
+    if graph_result is None or not isinstance(graph_result.content_json, dict):
+        return None
+    graph_content = graph_result.content_json
+    lineage_content = lineage_result.content_json if lineage_result and isinstance(lineage_result.content_json, dict) else {}
+    if not isinstance(graph_content.get("nodes"), list) or not isinstance(graph_content.get("edges"), list):
+        return None
+    return PaperGraphData(
+        paper_id=paper.id,
+        nodes=[GraphNode(**node) for node in graph_content["nodes"] if isinstance(node, dict)],
+        edges=[GraphEdge(**edge) for edge in graph_content["edges"] if isinstance(edge, dict)],
+        lineage=[LineageItem(**item) for item in lineage_content.get("items", []) if isinstance(item, dict)],
+        narrative=str(lineage_content.get("narrative") or ""),
+        source=str(graph_content.get("source") or lineage_content.get("source") or "heuristic"),
+        generated=True,
+    )
+
+
+def _persist_paper_graph(session: Session, paper: Paper, graph: PaperGraphData) -> None:
+    task_id = next(
+        (task.id for task in sorted(paper.parse_tasks, key=lambda item: item.id, reverse=True) if task.status == "succeeded"),
+        None,
+    )
+    rows = {
+        "kg_graph": {"nodes": [node.model_dump() for node in graph.nodes], "edges": [edge.model_dump() for edge in graph.edges], "source": graph.source},
+        "topic_lineage": {"items": [item.model_dump() for item in graph.lineage], "narrative": graph.narrative, "source": graph.source},
+    }
+    for result_type, content_json in rows.items():
+        result = session.scalar(
+            select(StructuredResult)
+            .where(StructuredResult.paper_id == paper.id, StructuredResult.result_type == result_type)
+            .order_by(StructuredResult.version.desc())
+        )
+        if result is None:
+            result = StructuredResult(
+                paper_id=paper.id,
+                parse_task_id=task_id,
+                result_type=result_type,
+                version=1,
+                content_json=content_json,
+                source_locator={"source": graph.source},
+                confidence=0.55,
+            )
+            session.add(result)
+        else:
+            result.parse_task_id = task_id
+            result.content_json = content_json
+            result.source_locator = {"source": graph.source}
+    session.commit()
+
+
 def get_paper_graph(session: Session, paper_id: int, *, settings=None, force: bool = False) -> PaperGraphData:
     paper = get_paper(session, paper_id)
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
+    if not force:
+        stored = _stored_paper_graph(paper)
+        if stored is not None:
+            return stored
     wiki = get_wiki(session, paper_id)
     graph = GraphAgent(settings or get_settings()).run(
         paper_id=paper.id,
@@ -252,9 +361,11 @@ def get_paper_graph(session: Session, paper_id: int, *, settings=None, force: bo
         published_at=paper.published_at.isoformat() if paper.published_at else "",
         concepts=wiki.concepts,
         methods=wiki.methods,
-        related_papers=[],
+        experiments=wiki.experiments,
+        limitations=wiki.limitations,
+        related_papers=get_related_paper_payloads(session, paper),
     )
-    return PaperGraphData(
+    data = PaperGraphData(
         paper_id=paper.id,
         nodes=[GraphNode(**node) for node in graph.nodes],
         edges=[GraphEdge(**edge) for edge in graph.edges],
@@ -263,6 +374,9 @@ def get_paper_graph(session: Session, paper_id: int, *, settings=None, force: bo
         source=graph.source,
         generated=True,
     )
+    if force:
+        _persist_paper_graph(session, paper, data)
+    return data
 
 
 def answer_question(

@@ -16,6 +16,7 @@ from app.agents.graph_agent import GraphAgent
 from app.core.config import Settings, get_settings
 from app.model import ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
+from app.service.papers import get_related_paper_payloads
 from app.service.tasks import save_parse_result
 
 logger = logging.getLogger("papermate.parse_agent")
@@ -82,7 +83,7 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         )
 
     _mark_running(session, task, paper, stage="graph")
-    related = _related_paper_payloads(session, paper)
+    related = get_related_paper_payloads(session, paper)
     graph = GraphAgent(settings).run(
         paper_id=paper.id,
         title=paper.title or "",
@@ -92,6 +93,8 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         published_at=paper.published_at.isoformat() if paper.published_at else "",
         concepts=wiki.concepts,
         methods=wiki.methods,
+        experiments=wiki.experiments,
+        limitations=wiki.limitations,
         related_papers=related,
     )
 
@@ -140,47 +143,6 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         source,
         graph.source,
     )
-
-
-def _related_paper_payloads(session: Session, paper: Paper, *, limit: int = 8) -> list[dict]:
-    from app.repository.papers import list_papers
-
-    keywords = []
-    for token in re.split(r"[\s,;:/|\-–—]+", paper.title or ""):
-        token = token.strip()
-        if len(token) >= 4 and token.casefold() not in {"with", "from", "that", "this", "using", "based"}:
-            keywords.append(token)
-    if paper.primary_category:
-        keywords.append(paper.primary_category)
-    if paper.arxiv_id:
-        keywords.append(paper.arxiv_id.split(".")[0])
-
-    papers, _total = list_papers(
-        session, keyword=(paper.title or "")[:80] or None, keywords=keywords[:8] or None,
-        author=None, category=paper.primary_category, published_from=None, published_to=None,
-        page=1, page_size=max(limit + 2, 10),
-    )
-    if not papers and paper.primary_category:
-        papers, _total = list_papers(
-            session, keyword=(paper.title or "")[:80] or None, keywords=keywords[:8] or None,
-            author=None, category=None, published_from=None, published_to=None,
-            page=1, page_size=max(limit + 2, 10),
-        )
-    payloads = []
-    for item in papers:
-        if item.id == paper.id:
-            continue
-        payloads.append({
-            "paper_id": item.id,
-            "arxiv_id": item.arxiv_id or "",
-            "title": item.title or "",
-            "published_at": item.published_at.isoformat() if item.published_at else "",
-            "primary_category": item.primary_category or "",
-            "abstract": (item.abstract or "")[:400],
-        })
-        if len(payloads) >= limit:
-            break
-    return payloads
 
 
 def _mark_running(session: Session, task: ParseTask, paper: Paper, *, stage: str) -> None:

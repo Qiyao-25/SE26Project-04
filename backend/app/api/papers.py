@@ -189,9 +189,9 @@ def reading_assist_get(paper_id: int, request: Request, mode: str = Query(defaul
 
 
 @router.get("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="读取论文知识图谱")
-def paper_graph(paper_id: int, request: Request, db: Session = Depends(db_session)):
+def paper_graph(paper_id: int, request: Request, force: bool = Query(default=False), db: Session = Depends(db_session)):
     try:
-        data = get_paper_graph(db, paper_id, settings=request.app.state.settings)
+        data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=force)
     except PaperServiceError as exc:
         return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)

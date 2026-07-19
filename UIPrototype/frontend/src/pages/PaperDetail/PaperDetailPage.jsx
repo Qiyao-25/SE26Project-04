@@ -14,7 +14,7 @@ import {
   Typography,
   message
 } from 'antd';
-import { FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
+import { FilePdfOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
@@ -22,11 +22,13 @@ import {
   getPaperDetail,
   getPaperSummary,
   getPaperGraph,
+  rebuildPaperGraph,
   createParseTask,
   getParseTask
 } from '../../services/paperService';
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
+import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -58,6 +60,7 @@ export default function PaperDetailPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [parseTask, setParseTask] = useState(null);
   const [parseLoading, setParseLoading] = useState(false);
+  const [graphRefreshing, setGraphRefreshing] = useState(false);
   const [mainTab, setMainTab] = useState('content');
   const historyRecordedFor = useRef(null);
 
@@ -190,6 +193,19 @@ export default function PaperDetailPage() {
     } catch (error) {
       setParseLoading(false);
       message.error(error.message || '解析任务创建失败');
+    }
+  };
+
+  const handleGraphRefresh = async () => {
+    if (graphRefreshing) return;
+    setGraphRefreshing(true);
+    try {
+      setGraphData(await rebuildPaperGraph(paperId));
+      message.success('知识图谱已刷新');
+    } catch (error) {
+      message.error(error.message || '知识图谱刷新失败');
+    } finally {
+      setGraphRefreshing(false);
     }
   };
 
@@ -409,18 +425,29 @@ export default function PaperDetailPage() {
         <div className="graph-placeholder">
           {graphData ? (
             <>
-              <Paragraph>{graphData.narrative || '暂无研究脉络说明。'}</Paragraph>
-              <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
-              <Space wrap style={{ marginTop: 12 }}>
-                {graphData.nodes.map((node) => <Tag key={node.id} color={node.type === 'paper' ? 'blue' : 'processing'}>{node.label}</Tag>)}
+              <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
+                <Button icon={<ReloadOutlined />} loading={graphRefreshing} onClick={handleGraphRefresh}>
+                  刷新图谱
+                </Button>
               </Space>
+              <Paragraph>{graphData.narrative || '暂无研究脉络说明。'}</Paragraph>
+              <PaperGraphCanvas paperId={paperId} nodes={graphData.nodes} edges={graphData.edges} />
               <List
                 size="small"
                 style={{ marginTop: 12 }}
                 header={<Text strong>研究脉络</Text>}
                 dataSource={graphData.lineage}
                 locale={{ emptyText: '暂无相关论文' }}
-                renderItem={(item) => <List.Item><Text>{item.title || item.arxiv_id}</Text><Tag>{item.role}</Tag></List.Item>}
+                renderItem={(item) => (
+                  <List.Item>
+                    <Space direction="vertical" size={0}>
+                      <Text>{item.title || item.arxivId || item.arxiv_id}</Text>
+                      <Text type="secondary">{item.note}</Text>
+                    </Space>
+                    <Tag>{item.role}</Tag>
+                  </List.Item>
+                )}
               />
             </>
           ) : <Spin size="small" tip="正在生成知识图谱..." />}

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from fastapi import BackgroundTasks
@@ -10,7 +11,7 @@ from app.core.config import Settings
 from app.core.database import create_engine_for
 from app.model import Base, Paper
 from app.schema.papers import AuthorInput, PaperUpsert, ParseRequest
-from app.service.papers import batch_upsert_papers, get_paper_detail, get_wiki
+from app.service.papers import batch_upsert_papers, get_paper_detail, get_paper_graph, get_wiki
 
 
 def make_session() -> Session:
@@ -95,3 +96,32 @@ def test_parse_endpoint_schedules_background_job() -> None:
     assert result.data.paper_id == paper_id
     assert result.data.status == "queued"
     assert len(background_tasks.tasks) == 1
+
+
+def test_paper_graph_refresh_persists_and_reuses_related_papers() -> None:
+    settings = Settings(environment="test", database_url="sqlite:///:memory:")
+    engine = create_engine_for(settings)
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        current = PaperUpsert(
+            arxiv_id="graph-current",
+            title="Attention Model",
+            abstract="An attention model evaluated on GLUE benchmark tasks.",
+            primary_category="cs.CL",
+            published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        )
+        related = PaperUpsert(
+            arxiv_id="graph-related",
+            title="Earlier Attention Model",
+            abstract="An earlier attention encoder.",
+            primary_category="cs.CL",
+            published_at=datetime(2019, 1, 1, tzinfo=timezone.utc),
+        )
+        current_id = batch_upsert_papers(session, [current, related]).items[0].paper_id
+
+        refreshed = get_paper_graph(session, current_id, settings=settings, force=True)
+        reused = get_paper_graph(session, current_id, settings=settings, force=False)
+
+    assert any(node.paper_id and node.paper_id != current_id for node in refreshed.nodes)
+    assert any(edge.type == "precedes" for edge in refreshed.edges)
+    assert reused.model_dump() == refreshed.model_dump()
