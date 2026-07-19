@@ -17,16 +17,6 @@ function shuffle(items) {
   return next;
 }
 
-function uniqueByPaperId(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    const id = String(item.paperId);
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-}
-
 function normalizeRecommendedPaper(paper) {
   return {
     paperId: paper.paperId ?? paper.paper_id ?? paper.id,
@@ -49,39 +39,6 @@ function normalizeRecommendedPaper(paper) {
 
 function normalizeRecommendations(items) {
   return (items || []).map(normalizeRecommendedPaper).filter((item) => item.paperId !== undefined && item.paperId !== null);
-}
-
-async function sampleFromDatabase({ limit = 3, category, excludeIds = [] } = {}) {
-  const exclude = new Set(excludeIds.map(String));
-  // 多取一些再随机，避免首页每次同一批
-  const pageSize = Math.min(50, Math.max(limit * 8, 12));
-  const page = 1 + Math.floor(Math.random() * 3);
-
-  const data = await searchPapers({
-    query: '',
-    categories: category ? [category] : [],
-    page,
-    pageSize,
-    sortBy: 'date'
-  });
-
-  let pool = uniqueByPaperId(data.items || []).filter((item) => !exclude.has(String(item.paperId)));
-
-  // 若随机页偏空，回退第一页
-  if (pool.length < limit) {
-    const fallback = await searchPapers({
-      query: '',
-      categories: category ? [category] : [],
-      page: 1,
-      pageSize: 50,
-      sortBy: 'date'
-    });
-    pool = uniqueByPaperId([...(fallback.items || []), ...pool]).filter(
-      (item) => !exclude.has(String(item.paperId))
-    );
-  }
-
-  return shuffle(pool).slice(0, limit);
 }
 
 /** 每日 ArXiv 精选：数据库随机论文 */

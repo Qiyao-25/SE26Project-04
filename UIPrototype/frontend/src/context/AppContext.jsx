@@ -115,8 +115,6 @@ export function AppProvider({ children }) {
     setComparePaperA(paperId);
     setComparePaperB((b) => (b === paperId ? getDefaultCompareTarget(paperId) : b));
   }, []);
-  const exitLockedPaper = useCallback(() => setLockedPaperId(null), []);
-
   const exitLockedPaper = useCallback(() => {
     setLockedPaperId(null);
   }, []);
