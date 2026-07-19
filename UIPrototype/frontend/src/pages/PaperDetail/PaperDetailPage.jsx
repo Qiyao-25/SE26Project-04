@@ -15,7 +15,7 @@ import {
   message
 } from 'antd';
 import { ArrowLeftOutlined, FilePdfOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   getPaperContent,
