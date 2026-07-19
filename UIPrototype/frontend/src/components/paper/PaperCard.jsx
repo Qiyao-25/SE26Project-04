@@ -18,7 +18,8 @@ function getAuthorText(authors) {
 
 export default function PaperCard({ paperId, paper: paperProp, compact = false }) {
   const navigate = useNavigate();
-  const paper = paperProp || PAPERS[paperId];
+  // 优先使用接口传入的论文对象；仅 Mock/旧入口才回退静态数据
+  const paper = paperProp || (paperId ? PAPERS[paperId] : null);
 
   if (!paper) return null;
 

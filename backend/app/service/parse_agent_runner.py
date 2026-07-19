@@ -18,6 +18,7 @@ from app.model import ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
 from app.service.papers import get_related_paper_payloads
 from app.service.tasks import save_parse_result
+from app.repository.papers import list_papers
 
 logger = logging.getLogger("papermate.parse_agent")
 
@@ -98,6 +99,20 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         related_papers=related,
     )
 
+    _mark_running(session, task, paper, stage="graph")
+    related = _related_paper_payloads(session, paper)
+    graph = GraphAgent(settings).run(
+        paper_id=paper.id,
+        title=paper.title or "",
+        abstract=paper.abstract or "",
+        arxiv_id=paper.arxiv_id or str(paper.id),
+        primary_category=paper.primary_category or "",
+        published_at=paper.published_at.isoformat() if paper.published_at else "",
+        concepts=wiki.concepts,
+        methods=wiki.methods,
+        related_papers=related,
+    )
+
     _mark_running(session, task, paper, stage="persist")
     chunks = _text_to_chunks(body_text or paper.abstract or "", max_chunks=80)
     result_rows = [*wiki.to_structured_rows(page_count=page_count), *graph.to_structured_rows()]
@@ -143,6 +158,52 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         source,
         graph.source,
     )
+    payloads = []
+    for item in papers:
+        if item.id == paper.id:
+            continue
+        payloads.append(
+            {
+                "paper_id": item.id,
+                "arxiv_id": item.arxiv_id or "",
+                "title": item.title or "",
+                "published_at": item.published_at.isoformat() if item.published_at else "",
+                "primary_category": item.primary_category or "",
+                "abstract": (item.abstract or "")[:400],
+            }
+        )
+        if len(payloads) >= limit:
+            break
+
+    # If category filter emptied the list, retry without category
+    if not payloads and paper.primary_category:
+        papers, _ = list_papers(
+            session,
+            keyword=title[:80] if title else None,
+            keywords=keywords[:8] or None,
+            author=None,
+            category=None,
+            published_from=None,
+            published_to=None,
+            page=1,
+            page_size=max(limit + 2, 10),
+        )
+        for item in papers:
+            if item.id == paper.id:
+                continue
+            payloads.append(
+                {
+                    "paper_id": item.id,
+                    "arxiv_id": item.arxiv_id or "",
+                    "title": item.title or "",
+                    "published_at": item.published_at.isoformat() if item.published_at else "",
+                    "primary_category": item.primary_category or "",
+                    "abstract": (item.abstract or "")[:400],
+                }
+            )
+            if len(payloads) >= limit:
+                break
+    return payloads
 
 
 def _mark_running(session: Session, task: ParseTask, paper: Paper, *, stage: str) -> None:

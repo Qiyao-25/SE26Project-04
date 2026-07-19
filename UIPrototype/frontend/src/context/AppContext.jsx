@@ -117,6 +117,10 @@ export function AppProvider({ children }) {
   }, []);
   const exitLockedPaper = useCallback(() => setLockedPaperId(null), []);
 
+  const exitLockedPaper = useCallback(() => {
+    setLockedPaperId(null);
+  }, []);
+
   const value = useMemo(() => ({
     loggedIn, authReady, isAdmin, userId, email, persona, topics, workspaceSearched, lastSearchQuery,
     lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, showAdminNav,

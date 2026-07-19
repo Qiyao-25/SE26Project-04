@@ -51,6 +51,11 @@ export default function WorkspacePage() {
   const [recommendStatus, setRecommendStatus] = useState('idle');
   const [recommendError, setRecommendError] = useState('');
 
+  const [dailyPapers, setDailyPapers] = useState([]);
+  const [profilePapers, setProfilePapers] = useState([]);
+  const [recommendStatus, setRecommendStatus] = useState('idle');
+  const [recommendError, setRecommendError] = useState('');
+
   useEffect(() => {
     if (skipRestoreRef.current) {
       skipRestoreRef.current = false;
