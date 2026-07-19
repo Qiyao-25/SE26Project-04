@@ -229,6 +229,6 @@ GET  /api/learning/actions?user_id=demo
 
 解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。论文状态会区分 `parsed` 与 `qa_ready`，后者要求数据库中存在文本块，响应同时返回 `chunkCount` / `qaReady`。`finalize` 接口一次性提交文本块和结构化结果，`stats` 接口返回队列数量、可重试失败数和 stale running 数量。
 
-启用 Agent 后，论文问答会把检索到的文本块交给模型生成回答。模型必须返回 `answer` 和 `citation_ids`，后端会校验引用只能来自当前检索证据；校验失败或模型不可用时自动回退到抽取式回答。
+论文问答必须启用 QA Agent，并把检索到的文本块交给模型生成回答。模型必须返回 `answer` 和 `citation_ids`，后端会校验引用只能来自当前检索证据；证据不足、引用无效、模型未配置或调用失败时返回明确错误，不使用抽取式回答兜底。
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

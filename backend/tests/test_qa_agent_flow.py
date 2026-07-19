@@ -18,14 +18,13 @@ def test_agent_answer_keeps_only_known_citations(monkeypatch) -> None:
     result = answer_with_agent(
         question="What is the method?",
         evidence=[{"chunk_id": "c1", "content": "The method uses attention."}],
-        fallback="fallback",
         settings=type("Settings", (), {"qa_agent_ready": True})(),
     )
     assert result.answer == "The method uses attention."
     assert result.citation_ids == ["c1"]
 
 
-def test_invalid_agent_citation_falls_back_to_evidence(monkeypatch) -> None:
+def test_invalid_agent_citation_is_refused(monkeypatch) -> None:
     from app.agents.qa_agent import QaAgentResult
     import app.service.qa as qa
 
@@ -34,11 +33,11 @@ def test_invalid_agent_citation_falls_back_to_evidence(monkeypatch) -> None:
     result = answer_with_agent(
         question="What is the method?",
         evidence=[{"chunk_id": "c1", "content": "The method uses attention."}],
-        fallback="evidence fallback",
         settings=type("Settings", (), {"qa_agent_ready": True})(),
     )
-    assert result.answer == "evidence fallback"
-    assert result.citation_ids == ["c1"]
+    assert result.answer == "unsupported"
+    assert result.citation_ids == []
+    assert result.refused is True
 
 
 def test_agent_parses_string_false_as_false(monkeypatch) -> None:

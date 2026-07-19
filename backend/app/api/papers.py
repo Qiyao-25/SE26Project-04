@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.agents.llm_client import LlmError
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
 from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
@@ -235,6 +236,14 @@ def qa(paper_id: str, payload: AskPaperRequest, request: Request, db: Session = 
         data = ask_paper(paper_id, payload)
     except KeyError:
         return _not_found(request, paper_id)
+    except LlmError as exc:
+        message = str(exc)
+        code = "QA_AGENT_UNAVAILABLE" if "未配置" in message or "未启用" in message else "QA_AGENT_FAILED"
+        status_code = 503 if code == "QA_AGENT_UNAVAILABLE" else 502
+        return JSONResponse(
+            status_code=status_code,
+            content=ApiResponse[dict](code=code, message=message, data={}, request_id=request.state.request_id).model_dump(),
+        )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

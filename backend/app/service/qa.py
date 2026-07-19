@@ -22,30 +22,25 @@ def answer_with_agent(
     *,
     question: str,
     evidence: list[dict[str, Any]],
-    fallback: str,
     history: list[dict[str, str]] | None = None,
     title: str = "",
     settings=None,
 ) -> GroundedAnswer:
-    """Use one grounded-Agent path for database and sample-paper QA."""
-    fallback_ids = [str(item.get("chunk_id")) for item in evidence if item.get("chunk_id")]
+    """Use the grounded Agent path without an extractive fallback."""
     settings = settings or get_settings()
     if not settings.qa_agent_ready:
-        return GroundedAnswer(answer=fallback, citation_ids=fallback_ids)
-    try:
-        generated = QaAgent(settings).run(title=title, question=question, evidence=evidence, history=history)
-        selected_ids = select_relevant_chunk_ids(
-            answer=generated.answer,
-            evidence=evidence,
-            preferred_ids=generated.citation_ids,
-        )
-        if generated.refuse:
-            return GroundedAnswer(answer=generated.answer, citation_ids=[], refused=True)
-        if not selected_ids:
-            raise LlmError("Agent answer has no supporting evidence")
-        return GroundedAnswer(answer=generated.answer, citation_ids=selected_ids)
-    except LlmError:
-        return GroundedAnswer(answer=fallback, citation_ids=fallback_ids)
+        raise LlmError("问答 Agent 未配置或未启用")
+    generated = QaAgent(settings).run(title=title, question=question, evidence=evidence, history=history)
+    if generated.refuse:
+        return GroundedAnswer(answer=generated.answer, citation_ids=[], refused=True)
+    selected_ids = select_relevant_chunk_ids(
+        answer=generated.answer,
+        evidence=evidence,
+        preferred_ids=generated.citation_ids,
+    )
+    if not selected_ids:
+        return GroundedAnswer(answer=generated.answer, citation_ids=[], refused=True)
+    return GroundedAnswer(answer=generated.answer, citation_ids=selected_ids)
 
 
 def ask_paper(paper_id: str, request: AskPaperRequest) -> AskPaperResult:
@@ -55,23 +50,6 @@ def ask_paper(paper_id: str, request: AskPaperRequest) -> AskPaperResult:
         raise KeyError(paper_id)
 
     question = request.question.strip()
-    question_lower = question.lower()
-
-    if any(keyword in question_lower for keyword in ["局限", "limit"]):
-        answer = "该论文当前样例解析出的局限性包括：" + "；".join(summary["limitations"])
-        section_title = "Limitations"
-        quote = summary["limitations"][0]
-    elif any(keyword in question_lower for keyword in ["方法", "method", "怎么做"]):
-        answer = "论文的方法流程包括：" + "；".join(
-            f"{item['title']}：{item['description']}" for item in summary["methods"]
-        )
-        section_title = "Method"
-        quote = summary["methods"][1]["description"]
-    else:
-        answer = f"《{paper['title']}》的核心内容是：{summary['summary']}"
-        section_title = "Abstract"
-        quote = paper["abstract"]
-
     evidence = [
         {"chunk_id": "mock-summary", "page_no": 1, "section": "Abstract", "content": summary["summary"]},
         *[
@@ -86,14 +64,15 @@ def ask_paper(paper_id: str, request: AskPaperRequest) -> AskPaperResult:
     grounded = answer_with_agent(
         question=question,
         evidence=evidence,
-        fallback=answer,
         history=[item.model_dump() for item in request.history],
         title=paper["title"],
     )
+    if grounded.refused or not grounded.citation_ids:
+        raise LlmError("QA Agent 无法基于证据回答该问题")
     citation_ids = set(grounded.citation_ids)
     selected = [item for item in evidence if item["chunk_id"] in citation_ids]
-    if not selected and not grounded.refused:
-        selected = [evidence[0]]
+    if not selected:
+        raise LlmError("QA Agent 返回的引用无法匹配证据")
 
     now = datetime.now(timezone.utc).isoformat()
     return AskPaperResult(
@@ -108,7 +87,7 @@ def ask_paper(paper_id: str, request: AskPaperRequest) -> AskPaperResult:
                 "paperId": paper_id,
                 "paperTitle": paper["title"],
                 "sectionId": item["chunk_id"],
-                "sectionTitle": item["section"] or section_title,
+                "sectionTitle": item["section"] or "原文",
                 "pageNumber": item["page_no"],
                 "quote": item["content"],
             }

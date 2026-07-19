@@ -20,7 +20,7 @@ def admin_overview(session: Session, settings: Settings) -> dict:
         "task_counts": task_counts,
         "agents": [
             {"id": "parse", "name": "解析 Agent", "ready": settings.parse_agent_ready, "status": "可用" if settings.parse_agent_ready else "降级模式"},
-            {"id": "qa", "name": "问答 Agent", "ready": settings.qa_agent_ready, "status": "可用" if settings.qa_agent_ready else "抽取式回退"},
+            {"id": "qa", "name": "问答 Agent", "ready": settings.qa_agent_ready, "status": "可用" if settings.qa_agent_ready else "未配置"},
             {"id": "search", "name": "检索 Agent", "ready": settings.search_agent_ready, "status": "可用" if settings.search_agent_ready else "规则检索"},
             {"id": "graph", "name": "图谱 Agent", "ready": settings.graph_agent_ready, "status": "可用" if settings.graph_agent_ready else "启发式图谱"},
             {"id": "assist", "name": "阅读辅助 Agent", "ready": settings.assist_agent_ready, "status": "可用" if settings.assist_agent_ready else "模板回退"},

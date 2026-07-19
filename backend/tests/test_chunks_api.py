@@ -15,13 +15,39 @@ def make_session() -> Session:
     return Session(engine)
 
 
-def test_chunk_write_search_and_qa_citations() -> None:
+def agent_settings() -> Settings:
+    return Settings(
+        environment="test",
+        database_url="sqlite:///:memory:",
+        qa_agent_enabled=True,
+        llm_api_key="test-key",
+        llm_model="test-model",
+    )
+
+
+def patch_citation_agent(monkeypatch) -> None:
+    from app.agents.qa_agent import QaAgentResult
+    import app.service.papers as papers_service
+
+    monkeypatch.setattr(
+        papers_service,
+        "QaAgent",
+        lambda _settings: type("FakeQaAgent", (), {
+            "run": lambda self, **_kwargs: QaAgentResult(
+                "The transformer uses multi-head attention.", ["c001"], False,
+            ),
+        })(),
+    )
+
+
+def test_chunk_write_search_and_qa_citations(monkeypatch) -> None:
+    patch_citation_agent(monkeypatch)
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="chunk-paper", title="Chunk Paper", abstract="fallback")]).items[0]
         upsert_chunks(session, paper.paper_id, TextChunkBatch(chunks=[TextChunkInput(chunk_id="c001", page_no=2, section="Method", content="The transformer uses multi-head attention.")]))
         matches = search_chunks(session, ChunkSearchRequest(paper_id=paper.paper_id, query="multi-head attention", top_k=3))
         assert matches[0][0].chunk_id == "c001"
-        answer = answer_question(session, paper.paper_id, "multi-head attention")
+        answer = answer_question(session, paper.paper_id, "multi-head attention", settings=agent_settings())
         assert answer.citations[0]["pageNumber"] == 2
 
 
@@ -135,12 +161,35 @@ def test_qa_rejects_agent_answer_without_valid_citation(monkeypatch) -> None:
             raise AssertionError("expected NO_EVIDENCE")
 
 
-def test_qa_api_payload_normalizes_numeric_citation_paper_id() -> None:
+def test_qa_api_payload_normalizes_numeric_citation_paper_id(monkeypatch) -> None:
+    patch_citation_agent(monkeypatch)
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="qa-contract-paper", title="QA Contract")]).items[0]
         upsert_chunks(session, paper.paper_id, TextChunkBatch(chunks=[TextChunkInput(chunk_id="c001", page_no=1, section="Intro", content="The model uses attention for representation learning.")]))
-        result = answer_question(session, paper.paper_id, "attention")
+        result = answer_question(session, paper.paper_id, "attention", settings=agent_settings())
         payload = _qa_payload(result, history_count=0)
         validated = AskPaperResult.model_validate(payload)
         assert validated.paperId == str(paper.paper_id)
         assert validated.citations[0].paperId == str(paper.paper_id)
+
+
+def test_qa_does_not_use_extractive_fallback_when_agent_unavailable() -> None:
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="agent-required", title="Agent Required", abstract="abstract")]).items[0]
+        upsert_chunks(
+            session,
+            paper.paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(
+                chunk_id="c001",
+                page_no=1,
+                section="Method",
+                content="The model uses attention for representation learning.",
+            )]),
+        )
+        try:
+            answer_question(session, paper.paper_id, "attention")
+        except PaperServiceError as exc:
+            assert exc.code == "QA_AGENT_UNAVAILABLE"
+            assert exc.status_code == 503
+        else:
+            raise AssertionError("expected QA_AGENT_UNAVAILABLE")

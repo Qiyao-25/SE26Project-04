@@ -427,40 +427,29 @@ def answer_question(
         if isinstance(item, dict) and item.get("role") and item.get("content")
     ]
 
-    if settings.qa_agent_ready:
-        try:
-            generated = QaAgent(settings).run(
-                title=paper.title or "",
-                question=question,
-                evidence=evidence,
-                history=history_payload,
-            )
-        except LlmError as exc:
-            raise PaperServiceError("QA_AGENT_FAILED", f"问答生成失败：{exc}", 502) from exc
-        if generated.refuse and not generated.citation_ids:
-            raise PaperServiceError("NO_EVIDENCE", generated.answer or "依据不足，无法回答该问题", 422)
-        if not generated.citation_ids:
-            raise PaperServiceError("NO_EVIDENCE", "问答 Agent 没有返回有效引用，无法核验回答", 422)
-        answer = generated.answer
-        selected_ids = select_relevant_chunk_ids(
-            answer=answer,
+    if not settings.qa_agent_ready:
+        raise PaperServiceError("QA_AGENT_UNAVAILABLE", "问答 Agent 未配置或未启用，请检查模型配置", 503)
+    try:
+        generated = QaAgent(settings).run(
+            title=paper.title or "",
+            question=question,
             evidence=evidence,
-            preferred_ids=generated.citation_ids,
-            min_overlap=0.06,
-            max_citations=3,
+            history=history_payload,
         )
-    else:
-        answer = "基于当前论文解析结果：\n" + "\n".join(
-            polish_quote(item["content"], answer=question, max_len=220)
-            for item in evidence[:3]
-        )
-        selected_ids = select_relevant_chunk_ids(
-            answer=question,
-            evidence=evidence,
-            preferred_ids=[item["chunk_id"] for item in evidence],
-            min_overlap=0.02,
-            max_citations=3,
-        )
+    except LlmError as exc:
+        raise PaperServiceError("QA_AGENT_FAILED", f"问答生成失败：{exc}", 502) from exc
+    if generated.refuse:
+        raise PaperServiceError("NO_EVIDENCE", generated.answer or "依据不足，无法核验该问题", 422)
+    if not generated.citation_ids:
+        raise PaperServiceError("NO_EVIDENCE", "问答 Agent 没有返回有效引用，无法核验回答", 422)
+    answer = generated.answer
+    selected_ids = select_relevant_chunk_ids(
+        answer=answer,
+        evidence=evidence,
+        preferred_ids=generated.citation_ids,
+        min_overlap=0.06,
+        max_citations=3,
+    )
 
     citations = []
     for chunk_id in selected_ids:
