@@ -27,6 +27,30 @@ function uniqueByPaperId(items) {
   });
 }
 
+function normalizeRecommendedPaper(paper) {
+  return {
+    paperId: paper.paperId ?? paper.paper_id ?? paper.id,
+    title: paper.title || '',
+    authors: Array.isArray(paper.authors) ? paper.authors : [],
+    primaryCategory: paper.primaryCategory || paper.primary_category || '未分类',
+    arxivId: paper.arxivId || paper.arxiv_id || '',
+    publishedAt: paper.publishedAt || paper.published_at || '',
+    summary: paper.summary || paper.abstract || '',
+    keywords: paper.keywords || [],
+    researchDirection: paper.researchDirection || paper.research_direction || '',
+    conceptTags: paper.conceptTags || paper.concept_tags || [],
+    parseStatus: paper.parseStatus || paper.parse_status || 'pending',
+    chunkCount: paper.chunkCount ?? paper.chunk_count ?? 0,
+    qaReady: Boolean(paper.qaReady ?? paper.qa_ready),
+    sourceUrl: paper.sourceUrl || paper.source_url || '',
+    pdfUrl: paper.pdfUrl || paper.pdf_url || ''
+  };
+}
+
+function normalizeRecommendations(items) {
+  return (items || []).map(normalizeRecommendedPaper).filter((item) => item.paperId !== undefined && item.paperId !== null);
+}
+
 async function sampleFromDatabase({ limit = 3, category, excludeIds = [] } = {}) {
   const exclude = new Set(excludeIds.map(String));
   // 多取一些再随机，避免首页每次同一批
@@ -66,7 +90,8 @@ export async function fetchDailyArxivPicks({ limit = 3 } = {}) {
     const data = await searchPapers({ page: 1, pageSize: 12, sortBy: 'date' });
     return shuffle(data.items || []).slice(0, limit);
   }
-  return apiClient.get('/recommendations/daily', { params: { limit } });
+  const data = await apiClient.get('/recommendations/daily', { params: { limit } });
+  return normalizeRecommendations(data);
 }
 
 /**
@@ -98,7 +123,7 @@ export async function fetchProfileRecommendations({
     return shuffle(data.items || []).slice(0, limit);
   }
 
-  return apiClient.get('/recommendations/profile', {
+  const data = await apiClient.get('/recommendations/profile', {
     params: {
       user_id: profileContext.userId || 'demo-user',
       persona,
@@ -107,4 +132,5 @@ export async function fetchProfileRecommendations({
       exclude_ids: excludeIds.join(',')
     }
   });
+  return normalizeRecommendations(data);
 }

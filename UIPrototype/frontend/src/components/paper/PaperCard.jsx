@@ -22,7 +22,8 @@ export default function PaperCard({ paperId, paper: paperProp, compact = false }
 
   if (!paper) return null;
 
-  const resolvedPaperId = paper.paperId || paper.id || paperId;
+  const resolvedPaperId = paper.paperId ?? paper.paper_id ?? paper.id ?? paperId;
+  if (resolvedPaperId === undefined || resolvedPaperId === null || resolvedPaperId === '') return null;
   const category = paper.primaryCategory || paper.tag || '未分类';
   const arxivId = paper.arxivId || paper.arxiv || '待补充';
   const publishedAt = paper.publishedAt || paper.date || '待补充';

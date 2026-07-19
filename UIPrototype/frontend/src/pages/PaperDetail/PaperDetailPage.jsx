@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   Empty,
+  List,
   Row,
   Space,
   Spin,
@@ -76,7 +77,7 @@ export default function PaperDetailPage() {
       setGraphData(null);
 
       try {
-        const [detail, paperContent, paperSummary, paperGraph] = await Promise.all([
+        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
           getPaperDetail(paperId),
           getPaperContent(paperId),
           getPaperSummary(paperId),
@@ -85,10 +86,12 @@ export default function PaperDetailPage() {
 
         if (cancelled) return;
 
-        setPaper(detail);
-        setContent(paperContent);
-        setSummaryData(paperSummary);
-        setGraphData(paperGraph);
+        if (detailResult.status === 'rejected') throw detailResult.reason;
+
+        setPaper(detailResult.value);
+        setContent(contentResult.status === 'fulfilled' ? contentResult.value : null);
+        setSummaryData(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
+        setGraphData(graphResult.status === 'fulfilled' ? graphResult.value : null);
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || '论文加载失败');
