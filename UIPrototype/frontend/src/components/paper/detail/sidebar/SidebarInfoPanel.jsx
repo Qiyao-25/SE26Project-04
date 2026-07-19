@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
-import { Tag, Input, Button, Space, Typography, List, Segmented, message } from 'antd';
+import { useState, useMemo, useEffect } from 'react';
+import { Tag, Input, Button, Space, Typography, List, Segmented } from 'antd';
 import { SearchOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { searchPaperWiki } from '../../../../utils/wiki';
+import { searchPaperWiki as searchMockPaperWiki } from '../../../../utils/wiki';
+import { searchPaperWiki as searchRemotePaperWiki } from '../../../../services/paperService';
+import { isPersistedPaperId } from '../../../../services/learningService';
 import FavoriteButton from './FavoriteButton';
 
 const { Text, Paragraph, Title } = Typography;
@@ -20,8 +22,29 @@ export default function SidebarInfoPanel({ paper, paperId }) {
   const navigate = useNavigate();
   const [mode, setMode] = useState('all');
   const [query, setQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [remoteResults, setRemoteResults] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const results = useMemo(() => searchPaperWiki(query, mode, paperId), [query, mode, paperId]);
+  const persisted = isPersistedPaperId(paperId);
+  const localResults = useMemo(() => searchMockPaperWiki(query, mode, paperId), [query, mode, paperId]);
+
+  useEffect(() => {
+    if (!persisted || !submittedQuery) {
+      setRemoteResults([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoading(true);
+    searchRemotePaperWiki(submittedQuery)
+      .then((items) => { if (!cancelled) setRemoteResults(items); })
+      .catch(() => { if (!cancelled) setRemoteResults([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [persisted, submittedQuery]);
+
+  const results = persisted ? remoteResults : localResults;
+  const submitSearch = () => setSubmittedQuery(query.trim());
 
   const quickTags = [
     ...(paper.direction ? [{ text: paper.direction, mode: 'direction' }] : []),
@@ -59,9 +82,9 @@ export default function SidebarInfoPanel({ paper, paperId }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="输入检索词..."
-            onPressEnter={() => message.success('检索完成')}
+            onPressEnter={submitSearch}
           />
-          <Button icon={<SearchOutlined />} type="primary" onClick={() => message.success('检索完成')}>检索</Button>
+          <Button icon={<SearchOutlined />} type="primary" loading={loading} onClick={submitSearch}>检索</Button>
         </Space.Compact>
         <Text className="block-label" style={{ marginTop: 12 }}>本篇 Wiki 标签</Text>
         <Space wrap size={4}>

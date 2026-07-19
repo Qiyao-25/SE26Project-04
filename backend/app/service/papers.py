@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.agents.llm_client import LlmError
 from app.agents.qa_agent import QaAgent
+from app.agents.graph_agent import GraphAgent
 from app.model import Paper
 from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
-from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, PaperItem, PaperPage, PaperUpsert, QaResponse, SmartSearchResponse, WikiData
+from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
 
 
 class PaperServiceError(Exception):
@@ -206,6 +207,64 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
     )
 
 
+def get_reading_assist(session: Session, paper_id: int, *, mode: str = "研究", force: bool = False, settings=None) -> ReadingAssistData:
+    """Return mode-specific reading guidance from the stored structured summary."""
+    paper = get_paper(session, paper_id)
+    if paper is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
+    persona = mode if mode in {"新手", "研究", "工程", "教学", "管理"} else "研究"
+    wiki = get_wiki(session, paper_id)
+    summary = (wiki.summary or paper.abstract or "暂无结构化摘要，请先完成解析。").strip()
+    method_names = [str(item.get("title") or item.get("name")) for item in wiki.methods[:4] if isinstance(item, dict) and (item.get("title") or item.get("name"))]
+    concept_names = [str(item.get("name")) for item in wiki.concepts[:4] if isinstance(item, dict) and item.get("name")]
+    limits = [str(item) for item in wiki.limitations[:3] if str(item).strip()]
+    mode_sections = {
+        "新手": [("这篇论文在讲什么", [summary[:160], "先抓住它要解决的问题，再看它提出的办法。"]), ("关键术语", [f"{name}：先把它当成文中的重要概念记住即可" for name in (concept_names or ["核心概念"])]), ("阅读建议", ["用自己的话复述问题、方法和结果。"])],
+        "研究": [("核心贡献", [summary[:180]]), ("方法要点", method_names or ["结合智能总结中的方法步骤核对原文"]), ("局限与可追问点", limits or ["建议对照实验设置追问可泛化性"])],
+        "工程": [("系统怎么搭", [summary[:140], "定位输入、输出与关键模块边界"]), ("关键模块", method_names or ["从方法章节抽出可实现组件清单"]), ("复现清单", ["确认数据与评测协议", "估算训练和推理资源"])],
+        "教学": [("本节学习目标", ["说明论文问题与贡献", "解释核心概念并提出有依据的追问"]), ("推荐讲解顺序", ["动机与背景", "概念、方法、实验结论与局限"]), ("课堂思考题", ["该方法最依赖什么假设？"])],
+        "管理": [("一句话价值", [summary[:140]]), ("可能的应用场景", ["评估是否匹配当前研究或业务方向", "判断是否值得跟进原型验证"]), ("风险与建议动作", limits or ["技术成熟度与数据门槛需再评估"])],
+    }
+    sections = [ReadingAssistSection(title=title, bullets=bullets[:5]) for title, bullets in mode_sections[persona]]
+    return ReadingAssistData(
+        paper_id=paper.id,
+        mode=persona,
+        headline=f"{persona}视角：{paper.title[:28]}",
+        sections=sections,
+        takeaways=["抓住当前模式关注的重点", "回到原文核对关键结论", "记录下一步可追问的问题"],
+        next_steps=["结合智能总结继续精读", "必要时使用论文问答核对细节"],
+        source="heuristic",
+        generated=False,
+    )
+
+
+def get_paper_graph(session: Session, paper_id: int, *, settings=None, force: bool = False) -> PaperGraphData:
+    paper = get_paper(session, paper_id)
+    if paper is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
+    wiki = get_wiki(session, paper_id)
+    graph = GraphAgent(settings or get_settings()).run(
+        paper_id=paper.id,
+        title=paper.title or "",
+        abstract=paper.abstract or wiki.summary or "",
+        arxiv_id=paper.arxiv_id or str(paper.id),
+        primary_category=paper.primary_category or "",
+        published_at=paper.published_at.isoformat() if paper.published_at else "",
+        concepts=wiki.concepts,
+        methods=wiki.methods,
+        related_papers=[],
+    )
+    return PaperGraphData(
+        paper_id=paper.id,
+        nodes=[GraphNode(**node) for node in graph.nodes],
+        edges=[GraphEdge(**edge) for edge in graph.edges],
+        lineage=[LineageItem(**item) for item in graph.lineage],
+        narrative=graph.narrative,
+        source=graph.source,
+        generated=True,
+    )
+
+
 def answer_question(
     session: Session,
     paper_id: int,
@@ -304,4 +363,3 @@ def answer_question(
         created_at=datetime.now(timezone.utc),
         citations=citations,
     )
-

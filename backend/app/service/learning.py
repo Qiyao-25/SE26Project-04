@@ -60,19 +60,23 @@ def list_actions(session: Session, user_id: str, paper_id: int | None, action_ty
     return [to_action(action) for action in actions]
 
 
-def update_action(session: Session, action_id: int, payload: UserActionUpdate) -> UserActionItem:
+def update_action(session: Session, action_id: int, payload: UserActionUpdate, user_id: str | None = None) -> UserActionItem:
     action = session.get(UserAction, action_id)
     if action is None:
         raise ValueError("ACTION_NOT_FOUND")
+    if user_id is not None and action.user_id != user_id:
+        raise ValueError("ACTION_FORBIDDEN")
     action.payload_json = payload.payload_json
     session.commit()
     session.refresh(action)
     return to_action(action)
 
 
-def delete_action(session: Session, action_id: int) -> None:
+def delete_action(session: Session, action_id: int, user_id: str | None = None) -> None:
     action = session.get(UserAction, action_id)
     if action is None:
         raise ValueError("ACTION_NOT_FOUND")
+    if user_id is not None and action.user_id != user_id:
+        raise ValueError("ACTION_FORBIDDEN")
     session.delete(action)
     session.commit()

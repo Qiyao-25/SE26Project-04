@@ -178,6 +178,26 @@ class UserActionItem(BaseModel):
     occurred_at: datetime
 
 
+PERSONAS = ("新手", "研究", "工程", "教学", "管理")
+
+
+class UserProfileUpdate(BaseModel):
+    persona: str = Field(default="研究", max_length=32)
+    topics: list[str] = Field(default_factory=list, max_length=20)
+    preferences: dict = Field(default_factory=dict)
+
+
+class UserProfileData(UserProfileUpdate):
+    user_id: str
+
+
+class DictionaryEntry(BaseModel):
+    term: str
+    description: str
+    paper_ids: list[int] = Field(default_factory=list)
+    paper_titles: list[str] = Field(default_factory=list)
+
+
 class WikiData(BaseModel):
     paper_id: int
     parse_status: str
@@ -227,3 +247,62 @@ class SmartSearchResponse(BaseModel):
     page: int
     page_size: int
     pages: int
+
+
+class ReadingAssistRequest(BaseModel):
+    mode: str = Field(default="研究", max_length=16)
+    force: bool = False
+
+
+class ReadingAssistSection(BaseModel):
+    title: str
+    bullets: list[str] = Field(default_factory=list)
+
+
+class ReadingAssistData(BaseModel):
+    paper_id: int
+    mode: str
+    headline: str = ""
+    sections: list[ReadingAssistSection] = Field(default_factory=list)
+    takeaways: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)
+    source: str = "heuristic"
+    generated: bool = False
+
+
+class GraphNode(BaseModel):
+    id: str
+    type: str
+    label: str
+    paper_id: int | None = None
+    arxiv_id: str | None = None
+    role: str | None = None
+    published_at: str | None = None
+    description: str | None = None
+
+
+class GraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    type: str
+    label: str = ""
+
+
+class LineageItem(BaseModel):
+    paper_id: int | None = None
+    arxiv_id: str = ""
+    title: str = ""
+    published_at: str = ""
+    role: str = "related"
+    note: str = ""
+
+
+class PaperGraphData(BaseModel):
+    paper_id: int
+    nodes: list[GraphNode] = Field(default_factory=list)
+    edges: list[GraphEdge] = Field(default_factory=list)
+    lineage: list[LineageItem] = Field(default_factory=list)
+    narrative: str = ""
+    source: str = "heuristic"
+    generated: bool = False

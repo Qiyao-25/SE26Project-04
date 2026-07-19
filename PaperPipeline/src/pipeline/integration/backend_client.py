@@ -42,7 +42,7 @@ class BackendClient:
             raise RuntimeError(f"HTTP request failed {path}: {exc}") from exc
         return payload
 
-    def create_parse_task(self, paper_id: int, arxiv_id: str, task_type: str = "full_parse") -> dict:
+    def create_parse_task(self, paper_id: int, arxiv_id: str, task_type: str = "full_parse", force: bool = False) -> dict:
         return self._request(
             f"/api/papers/{paper_id}/parse",
             "POST",

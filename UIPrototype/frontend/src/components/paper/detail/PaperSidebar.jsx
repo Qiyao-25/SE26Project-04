@@ -150,7 +150,7 @@ export default function PaperSidebar({ paperId, paper }) {
     {
       key: 'assist',
       label: '辅助',
-      children: <SidebarAssistPanel paper={paper} />
+      children: <SidebarAssistPanel paper={paper} paperId={paperId} />
     },
     {
       key: 'notes',

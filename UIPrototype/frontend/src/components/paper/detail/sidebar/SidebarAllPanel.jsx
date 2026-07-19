@@ -1,10 +1,10 @@
 import { Alert, Card, Tag, Typography, Button, Space } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import { useApp } from '../../../../context/AppContext';
-import { MODE_ASSIST } from '../../../../data/papers';
 import SidebarNotesPreview from './SidebarNotesPreview';
 import { ChatBox } from '../../../common/ChatBox';
 import FavoriteButton from './FavoriteButton';
+import SidebarAssistPanel from './SidebarAssistPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -95,11 +95,7 @@ export default function SidebarAllPanel({
       title: '辅助阅读',
       extra: <Tag>{persona}模式</Tag>,
       content: (
-        parsed ? (
-          <Paragraph style={{ fontSize: 12, margin: 0, whiteSpace: 'pre-wrap' }}>
-            {MODE_ASSIST[persona](paper)}
-          </Paragraph>
-        ) : (
+        parsed ? <SidebarAssistPanel paper={paper} paperId={paperId} /> : (
           <Alert
             type="info"
             showIcon

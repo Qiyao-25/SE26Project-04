@@ -7,6 +7,7 @@
 - SQLAlchemy 2.x ORM 与 H005 核心实体
 - Alembic 首次迁移、升级和回滚
 - 统一响应模型与请求 ID
+- 用户注册、登录、当前用户和账户修改接口
 - 论文元数据、解析任务、结构化结果、文本块检索和学习行为 API
 - python -m harness 可重复验收入口
 
@@ -36,15 +37,17 @@ PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/paperma
 
 python -m pip install -e ".[postgres]"
 
-Agent 默认关闭。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
+解析按钮由 FastAPI 当前进程直接执行，不需要额外启动 PaperPipeline Worker。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
 
-    PAPERMATE_AGENT_ENABLED=true
-    PAPERMATE_AGENT_API_KEY=本地密钥
-    PAPERMATE_AGENT_MODEL=模型名称
-    PAPERMATE_AGENT_BASE_URL=https://api.openai.com/v1
-    PAPERMATE_AGENT_TIMEOUT_S=30
+    PAPERMATE_LLM_API_KEY=本地密钥
+    PAPERMATE_LLM_MODEL=模型名称
+    PAPERMATE_LLM_API_BASE=https://api.openai.com/v1
 
-解析 Worker 的任务领取、状态更新和结果写回使用内部 Token。开发环境可不配置；生产环境必须配置：
+未配置模型时，解析仍会执行 PDF 抽取和本地降级摘要；模型调用失败时也会自动降级，不会让任务永久停留在 queued。`PAPERMATE_AGENT_*` 旧变量名仍兼容。
+
+认证接口：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/account`。前端登录后通过 Bearer Token 访问后端。
+
+旧版独立 Worker 的任务领取、状态更新和结果写回使用内部 Token。开发环境可不配置；生产环境必须配置：
 
     PAPERMATE_WORKER_TOKEN=生产环境内部令牌
 
@@ -192,7 +195,22 @@ GET  /api/papers/{paper_id}
 GET  /api/papers/{paper_id}/content
 GET  /api/papers/{paper_id}/summary
 GET  /api/papers/{paper_id}/wiki
+GET  /api/papers/{paper_id}/graph
+POST /api/papers/{paper_id}/graph
+GET  /api/papers/{paper_id}/assist
+POST /api/papers/{paper_id}/assist
 POST /api/papers/{paper_id}/qa
+POST /api/papers/smart-search
+GET  /api/recommendations/daily
+GET  /api/recommendations/profile
+GET  /api/learning/profile
+PUT  /api/learning/profile
+GET  /api/learning/dictionary
+GET  /api/admin/overview
+GET  /api/admin/tasks
+GET  /api/admin/users
+GET  /api/admin/quality
+GET  /api/admin/audit
 POST /api/papers/{paper_id}/parse
 POST /api/tasks/claim
 GET  /api/tasks/{task_id}

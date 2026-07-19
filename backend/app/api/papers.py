@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
-from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperItem, PaperPage, PaperUpsert, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
+from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
-from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_wiki, search_papers, smart_search_papers
+from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
 
@@ -103,8 +103,8 @@ def parse(
         return _db_error(request, PaperServiceError("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409))
 
     settings = request.app.state.settings
-    # 新排队任务且已配置 Summarize Agent 时，由 backend 后台执行（无需外挂 Worker）
-    if created and data.status == "queued" and settings.parse_agent_ready:
+    # 解析由当前 FastAPI 进程直接执行；无 LLM 配置时 runner 使用本地降级摘要。
+    if data.status == "queued" and data.started_at is None:
         background_tasks.add_task(run_parse_agent_job, request.app.state.engine, data.task_id, settings)
     return ApiResponse(data=data, request_id=request.state.request_id)
 
@@ -173,6 +173,42 @@ def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
 def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
         data = get_wiki(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="读取个性化辅助阅读")
+def reading_assist_get(paper_id: int, request: Request, mode: str = Query(default="研究", max_length=16), db: Session = Depends(db_session)):
+    try:
+        data = get_reading_assist(db, paper_id, mode=mode, settings=request.app.state.settings)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="读取论文知识图谱")
+def paper_graph(paper_id: int, request: Request, db: Session = Depends(db_session)):
+    try:
+        data = get_paper_graph(db, paper_id, settings=request.app.state.settings)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="刷新论文知识图谱")
+def rebuild_paper_graph(paper_id: int, request: Request, db: Session = Depends(db_session)):
+    try:
+        data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=True)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="生成个性化辅助阅读")
+def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Request, db: Session = Depends(db_session)):
+    try:
+        data = get_reading_assist(db, paper_id, mode=payload.mode, force=payload.force, settings=request.app.state.settings)
     except PaperServiceError as exc:
         return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)

@@ -20,6 +20,7 @@ import {
   getPaperContent,
   getPaperDetail,
   getPaperSummary,
+  getPaperGraph,
   createParseTask,
   getParseTask
 } from '../../services/paperService';
@@ -50,6 +51,7 @@ export default function PaperDetailPage() {
   const [paper, setPaper] = useState(null);
   const [content, setContent] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
+  const [graphData, setGraphData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
@@ -71,12 +73,14 @@ export default function PaperDetailPage() {
       setPaper(null);
       setContent(null);
       setSummaryData(null);
+      setGraphData(null);
 
       try {
-        const [detail, paperContent, paperSummary] = await Promise.all([
+        const [detail, paperContent, paperSummary, paperGraph] = await Promise.all([
           getPaperDetail(paperId),
           getPaperContent(paperId),
-          getPaperSummary(paperId)
+          getPaperSummary(paperId),
+          getPaperGraph(paperId)
         ]);
 
         if (cancelled) return;
@@ -84,6 +88,7 @@ export default function PaperDetailPage() {
         setPaper(detail);
         setContent(paperContent);
         setSummaryData(paperSummary);
+        setGraphData(paperGraph);
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || '论文加载失败');
@@ -138,7 +143,7 @@ export default function PaperDetailPage() {
       window.clearInterval(timer);
       setParseLoading(false);
       message.warning('解析仍在进行中（Agent 生成可能较慢），请稍后刷新页面查看智能总结');
-    }, 180000);
+    }, 300000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -399,15 +404,23 @@ export default function PaperDetailPage() {
       label: 'c · 知识图谱&脉络',
       children: (
         <div className="graph-placeholder">
-          <Tag>{paper.title.split(':')[0]}</Tag>
-          {(paper.conceptTags || []).map((concept) => (
-            <Tag key={concept} color="processing" style={{ margin: 8 }}>
-              {concept}
-            </Tag>
-          ))}
-          <Paragraph type="secondary" style={{ marginTop: 16 }}>
-            知识图谱属于 P1。本轮保留论文节点和核心概念节点，后续接入关系边接口。
-          </Paragraph>
+          {graphData ? (
+            <>
+              <Paragraph>{graphData.narrative || '暂无研究脉络说明。'}</Paragraph>
+              <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
+              <Space wrap style={{ marginTop: 12 }}>
+                {graphData.nodes.map((node) => <Tag key={node.id} color={node.type === 'paper' ? 'blue' : 'processing'}>{node.label}</Tag>)}
+              </Space>
+              <List
+                size="small"
+                style={{ marginTop: 12 }}
+                header={<Text strong>研究脉络</Text>}
+                dataSource={graphData.lineage}
+                locale={{ emptyText: '暂无相关论文' }}
+                renderItem={(item) => <List.Item><Text>{item.title || item.arxiv_id}</Text><Tag>{item.role}</Tag></List.Item>}
+              />
+            </>
+          ) : <Spin size="small" tip="正在生成知识图谱..." />}
         </div>
       )
     }

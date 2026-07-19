@@ -3,7 +3,7 @@ import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, 
 import { READING_HISTORY, PERSONAS, MODE_DESC, PAPERS } from '../../data/papers';
 import { useApp } from '../../context/AppContext';
 import { getPaperDetail } from '../../services/paperService';
-import { listActions } from '../../services/learningService';
+import { getConceptDictionary, getLearningProfile, listActions, updateLearningProfile } from '../../services/learningService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import PaperCard from '../../components/paper/PaperCard';
 
@@ -14,12 +14,40 @@ function emptyLibrary() {
 }
 
 export default function LearningPage() {
-  const { userId, persona, setPersona } = useApp();
+  const { userId, persona, setPersona, topics, setTopics } = useApp();
   const [historyKey, setHistoryKey] = useState('today');
   const [library, setLibrary] = useState(emptyLibrary);
   const [paperMap, setPaperMap] = useState({});
   const [loading, setLoading] = useState(!USE_MOCK);
   const [error, setError] = useState('');
+  const [profile, setProfile] = useState(null);
+  const [dictionary, setDictionary] = useState([]);
+
+  useEffect(() => {
+    if (USE_MOCK) return undefined;
+    let cancelled = false;
+    Promise.all([getLearningProfile(userId), getConceptDictionary(userId)])
+      .then(([nextProfile, nextDictionary]) => {
+        if (cancelled) return;
+        setProfile(nextProfile);
+        setDictionary(nextDictionary || []);
+        if (nextProfile.persona) setPersona(nextProfile.persona);
+        if (Array.isArray(nextProfile.topics)) setTopics(nextProfile.topics);
+      })
+      .catch((requestError) => {
+        if (!cancelled) setError(requestError.message || '画像数据加载失败');
+      });
+    return () => { cancelled = true; };
+  }, [userId, setPersona, setTopics]);
+
+  const handlePersonaChange = (nextPersona) => {
+    setPersona(nextPersona);
+    if (!USE_MOCK) {
+      updateLearningProfile(userId, { persona: nextPersona, topics, preferences: profile?.preferences || {} })
+        .then(setProfile)
+        .catch((requestError) => setError(requestError.message || '画像保存失败'));
+    }
+  };
 
   useEffect(() => {
     if (USE_MOCK) return undefined;
@@ -146,17 +174,21 @@ export default function LearningPage() {
     {
       key: 'wiki',
       label: '概念词典',
-      children: <Row gutter={[16, 16]}>{['Self-Attention', 'Pre-training', 'LoRA'].map((name) => <Col xs={24} sm={8} key={name}><Card hoverable size="small"><Text strong>{name}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>Wiki 词条</Text></Card></Col>)}</Row>
+      children: USE_MOCK
+        ? <Row gutter={[16, 16]}>{['Self-Attention', 'Pre-training', 'LoRA'].map((name) => <Col xs={24} sm={8} key={name}><Card hoverable size="small"><Text strong>{name}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>Wiki 词条</Text></Card></Col>)}</Row>
+        : dictionary.length
+          ? <Row gutter={[16, 16]}>{dictionary.map((item) => <Col xs={24} sm={12} lg={8} key={item.term}><Card hoverable size="small"><Text strong>{item.term}</Text><Paragraph type="secondary" style={{ margin: '6px 0 0' }}>{item.description}</Paragraph><Text type="secondary" style={{ fontSize: 12 }}>来自 {item.paper_titles?.length || 0} 篇论文</Text></Card></Col>)}</Row>
+          : <Empty description="解析论文后会自动生成概念词典" />
     },
     {
       key: 'profile',
       label: '个人画像',
-      children: <Row gutter={16}><Col xs={24} md={12}><Card title="画像标签（系统自动）" size="small"><div><Text type="secondary">常看方向</Text> <Tag>NLP</Tag><Tag>Transformer</Tag></div><div style={{ marginTop: 8 }}><Text type="secondary">偏好难度</Text> <Tag>中等偏高</Tag></div></Card></Col><Col xs={24} md={12}><Card title="手动微调" size="small"><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>偏好有代码</span><Switch defaultChecked /></div><div style={{ marginTop: 8 }}><Text type="secondary">关注作者/机构</Text><Input defaultValue="Google, OpenAI" style={{ marginTop: 4 }} /></div></Card></Col></Row>
+      children: <Row gutter={16}><Col xs={24} md={12}><Card title="画像标签（系统自动）" size="small"><div><Text type="secondary">常看方向</Text> {(profile?.topics?.length ? profile.topics : ['尚未设置']).map((topic) => <Tag key={topic}>{topic}</Tag>)}</div><div style={{ marginTop: 8 }}><Text type="secondary">当前模式</Text> <Tag color="processing">{profile?.persona || persona}</Tag></div></Card></Col><Col xs={24} md={12}><Card title="偏好设置" size="small"><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>偏好有代码</span><Switch checked={profile?.preferences?.code ?? true} onChange={(checked) => { const next = { persona, topics, preferences: { ...(profile?.preferences || {}), code: checked } }; updateLearningProfile(userId, next).then(setProfile); }} /></div><div style={{ marginTop: 8 }}><Text type="secondary">关注作者/机构</Text> <Input defaultValue={profile?.preferences?.authors || ''} onBlur={(event) => updateLearningProfile(userId, { persona, topics, preferences: { ...(profile?.preferences || {}), authors: event.target.value } }).then(setProfile)} style={{ marginTop: 4 }} /></div></Card></Col></Row>
     },
     {
       key: 'mode',
       label: '默认模式',
-      children: <Card><Paragraph type="secondary">设置全局默认阅读模式；论文详情页可快捷切换</Paragraph><Segmented block options={PERSONAS} value={persona} onChange={setPersona} /><Paragraph style={{ marginTop: 16, padding: 12, background: '#fafafa' }}>{MODE_DESC[persona]}</Paragraph></Card>
+      children: <Card><Paragraph type="secondary">设置全局默认阅读模式；论文详情页可快捷切换</Paragraph><Segmented block options={PERSONAS} value={persona} onChange={handlePersonaChange} /><Paragraph style={{ marginTop: 16, padding: 12, background: '#fafafa' }}>{MODE_DESC[persona]}</Paragraph></Card>
     }
   ];
 

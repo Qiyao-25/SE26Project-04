@@ -11,7 +11,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agents.llm_client import LlmError
-from app.agents.summarize_agent import SummarizeAgent
+from app.agents.summarize_agent import SummarizeAgent, build_fallback_summary
+from app.agents.graph_agent import GraphAgent
 from app.core.config import Settings, get_settings
 from app.model import ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
@@ -48,10 +49,6 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         _fail(session, task_id, "PAPER_NOT_FOUND")
         return
 
-    if not settings.parse_agent_ready:
-        _fail(session, task_id, "AGENT_NOT_CONFIGURED")
-        return
-
     _mark_running(session, task, paper, stage="fetch")
     body_text, page_count, source = _extract_paper_text(paper, settings)
     if not body_text.strip() and not (paper.abstract or "").strip():
@@ -59,20 +56,48 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         return
 
     _mark_running(session, task, paper, stage="summarize")
-    try:
-        wiki = SummarizeAgent(settings).run(
+    if settings.parse_agent_ready:
+        try:
+            wiki = SummarizeAgent(settings).run(
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                body_text=body_text or paper.abstract or "",
+                arxiv_id=paper.arxiv_id or str(paper.id),
+            )
+        except LlmError as exc:
+            logger.warning("summarize_agent_fallback task_id=%s err=%s", task_id, exc)
+            wiki = build_fallback_summary(
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                body_text=body_text or paper.abstract or "",
+                arxiv_id=paper.arxiv_id or str(paper.id),
+            )
+    else:
+        logger.info("summarize_agent_disabled task_id=%s using local fallback", task_id)
+        wiki = build_fallback_summary(
             title=paper.title or "",
             abstract=paper.abstract or "",
             body_text=body_text or paper.abstract or "",
             arxiv_id=paper.arxiv_id or str(paper.id),
         )
-    except LlmError as exc:
-        logger.error("summarize_agent_failed task_id=%s err=%s", task_id, exc)
-        _fail(session, task_id, "STRUCTURED_RESULT_FAILED")
-        return
+
+    _mark_running(session, task, paper, stage="graph")
+    related = _related_paper_payloads(session, paper)
+    graph = GraphAgent(settings).run(
+        paper_id=paper.id,
+        title=paper.title or "",
+        abstract=paper.abstract or "",
+        arxiv_id=paper.arxiv_id or str(paper.id),
+        primary_category=paper.primary_category or "",
+        published_at=paper.published_at.isoformat() if paper.published_at else "",
+        concepts=wiki.concepts,
+        methods=wiki.methods,
+        related_papers=related,
+    )
 
     _mark_running(session, task, paper, stage="persist")
     chunks = _text_to_chunks(body_text or paper.abstract or "", max_chunks=80)
+    result_rows = [*wiki.to_structured_rows(page_count=page_count), *graph.to_structured_rows()]
     results = [
         StructuredResultInput(
             result_type=row["result_type"],
@@ -81,7 +106,7 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
             source_locator={**(row.get("source_locator") or {}), "extract_source": source},
             confidence=row.get("confidence"),
         )
-        for row in wiki.to_structured_rows(page_count=page_count)
+        for row in result_rows
     ]
     chunk_inputs = [
         TextChunkInput(
@@ -108,12 +133,54 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         ParseResultCommit(chunks=chunk_inputs, results=results),
     )
     logger.info(
-        "parse_agent_succeeded task_id=%s paper_id=%s chunks=%s source=%s",
+        "parse_agent_succeeded task_id=%s paper_id=%s chunks=%s source=%s graph=%s",
         task_id,
         paper.id,
         len(chunk_inputs),
         source,
+        graph.source,
     )
+
+
+def _related_paper_payloads(session: Session, paper: Paper, *, limit: int = 8) -> list[dict]:
+    from app.repository.papers import list_papers
+
+    keywords = []
+    for token in re.split(r"[\s,;:/|\-–—]+", paper.title or ""):
+        token = token.strip()
+        if len(token) >= 4 and token.casefold() not in {"with", "from", "that", "this", "using", "based"}:
+            keywords.append(token)
+    if paper.primary_category:
+        keywords.append(paper.primary_category)
+    if paper.arxiv_id:
+        keywords.append(paper.arxiv_id.split(".")[0])
+
+    papers, _total = list_papers(
+        session, keyword=(paper.title or "")[:80] or None, keywords=keywords[:8] or None,
+        author=None, category=paper.primary_category, published_from=None, published_to=None,
+        page=1, page_size=max(limit + 2, 10),
+    )
+    if not papers and paper.primary_category:
+        papers, _total = list_papers(
+            session, keyword=(paper.title or "")[:80] or None, keywords=keywords[:8] or None,
+            author=None, category=None, published_from=None, published_to=None,
+            page=1, page_size=max(limit + 2, 10),
+        )
+    payloads = []
+    for item in papers:
+        if item.id == paper.id:
+            continue
+        payloads.append({
+            "paper_id": item.id,
+            "arxiv_id": item.arxiv_id or "",
+            "title": item.title or "",
+            "published_at": item.published_at.isoformat() if item.published_at else "",
+            "primary_category": item.primary_category or "",
+            "abstract": (item.abstract or "")[:400],
+        })
+        if len(payloads) >= limit:
+            break
+    return payloads
 
 
 def _mark_running(session: Session, task: ParseTask, paper: Paper, *, stage: str) -> None:
