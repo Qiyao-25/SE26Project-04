@@ -7,7 +7,7 @@ from app.core.auth import require_admin
 from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
-from app.service.admin import admin_audit, admin_quality, admin_tasks, admin_users, update_user_status
+from app.service.admin import admin_audit, admin_overview, admin_quality, admin_tasks, admin_users, update_user_status
 
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])

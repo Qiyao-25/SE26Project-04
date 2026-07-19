@@ -80,7 +80,7 @@ def update_user_status(session: Session, user_id: int, is_active: bool) -> dict:
 
 def admin_quality(session: Session, limit: int = 50) -> dict:
     failed = session.scalars(
-        select(ParseTask).where(ParseTask.status.in_("failed", "timed_out")).order_by(ParseTask.requested_at.desc()).limit(limit)
+        select(ParseTask).where(ParseTask.status.in_(("failed", "timed_out"))).order_by(ParseTask.requested_at.desc()).limit(limit)
     ).all()
     exceptions = []
     for task in failed:
