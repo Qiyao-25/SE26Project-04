@@ -61,6 +61,23 @@ def admin_users(session: Session, limit: int = 100) -> list[dict]:
     } for user in rows]
 
 
+def update_user_status(session: Session, user_id: int, is_active: bool) -> dict:
+    user = session.get(User, user_id)
+    if user is None:
+        raise ValueError("USER_NOT_FOUND")
+    user.is_active = is_active
+    session.commit()
+    session.refresh(user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "role": user.role,
+        "status": "启用" if user.is_active else "禁用",
+        "created_at": user.created_at,
+        "last_login_at": user.last_login_at,
+    }
+
+
 def admin_quality(session: Session, limit: int = 50) -> dict:
     failed = session.scalars(
         select(ParseTask).where(ParseTask.status.in_("failed", "timed_out")).order_by(ParseTask.requested_at.desc()).limit(limit)

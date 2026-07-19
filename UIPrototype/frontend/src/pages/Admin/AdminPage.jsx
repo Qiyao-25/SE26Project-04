@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Card, Tabs, Row, Col, Statistic, List, Tag, Table, Progress, Select, Button,
-  Input, Typography
+  Input, Typography, message
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { TASK_STATUS_LABELS } from '../../data/admin';
-import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers } from '../../services/adminService';
+import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus } from '../../services/adminService';
 
 const { Text } = Typography;
 
@@ -173,13 +173,14 @@ function QualityTab({ quality }) {
   );
 }
 
-function UsersTab({ users = [] }) {
+function UsersTab({ users = [], onStatusChange }) {
   return (
     <Card title="用户管理" size="small">
       <Table size="small" pagination={false} rowKey="email" dataSource={users} locale={{ emptyText: '暂无注册用户' }} columns={[
         { title: '用户', dataIndex: 'email' },
         { title: '角色', dataIndex: 'role' },
         { title: '状态', dataIndex: 'status' },
+        { title: '操作', render: (_, user) => <Button size="small" onClick={() => onStatusChange(user)}>{user.status === '启用' ? '禁用' : '启用'}</Button> }
       ]} />
     </Card>
   );
@@ -218,6 +219,16 @@ export default function AdminPage() {
   const [audit, setAudit] = useState([]);
   const [error, setError] = useState('');
 
+  const handleUserStatusChange = async (user) => {
+    try {
+      const updated = await updateAdminUserStatus(user.id, user.status !== '启用');
+      setUsers((current) => current.map((item) => item.id === updated.id ? updated : item));
+      message.success(`${updated.email} 已${updated.status}`);
+    } catch (requestError) {
+      message.error(requestError.message || '用户状态更新失败');
+    }
+  };
+
   useEffect(() => {
     Promise.all([getAdminOverview(), getAdminTasks(), getAdminQuality(), getAdminUsers(), getAdminAudit()])
       .then(([nextOverview, nextTasks, nextQuality, nextUsers, nextAudit]) => {
@@ -243,7 +254,7 @@ export default function AdminPage() {
     { key: 'fleet', label: 'Agent舰队', children: <FleetTab agents={(overview?.agents || []).map((agent) => ({ ...agent, health: agent.ready ? 'ok' : 'warn', task: agent.status, latency: '—', cpu: '—' }))} /> },
     { key: 'tasks', label: '任务队列', children: <TasksTab tasks={tasks || []} /> },
     { key: 'quality', label: '质量异常', children: <QualityTab quality={quality} /> },
-    { key: 'users', label: '用户管理', children: <UsersTab users={users} /> },
+    { key: 'users', label: '用户管理', children: <UsersTab users={users} onStatusChange={handleUserStatusChange} /> },
     { key: 'audit', label: '审计日志', children: <AuditTab logs={audit} /> }
   ];
 
