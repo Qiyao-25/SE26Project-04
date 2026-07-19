@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Card, Tabs, Form, Input, Button, Typography, message } from 'antd';
+import { useEffect, useState } from 'react';
+import { Card, Tabs, Form, Input, Button, Typography, message, Spin } from 'antd';
 import {
   BookOutlined,
   ExperimentOutlined,
@@ -14,26 +14,35 @@ const { Text } = Typography;
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, loggedIn } = useApp();
+  const { login, register, loggedIn, authReady } = useApp();
   const [tab, setTab] = useState('login');
   const [showOnboard, setShowOnboard] = useState(false);
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
 
-  if (loggedIn) {
-    navigate('/workspace', { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (authReady && loggedIn) navigate('/workspace', { replace: true });
+  }, [authReady, loggedIn, navigate]);
 
-  const onLogin = (values) => {
-    login(values.email);
-    message.success(values.email?.trim().toLowerCase() === 'admin' ? '管理员登录成功' : '登录成功');
-    navigate('/workspace');
+  if (!authReady || loggedIn) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><Spin tip="正在准备 PaperMate..." /></div>;
+
+  const onLogin = async (values) => {
+    try {
+      await login(values.email, values.password);
+      message.success(values.email?.trim().toLowerCase() === 'admin' ? '管理员登录成功' : '登录成功');
+      navigate('/workspace');
+    } catch (error) {
+      message.error(error.message || '登录失败');
+    }
   };
 
-  const onRegister = (values) => {
-    login(values.email);
-    setShowOnboard(true);
+  const onRegister = async (values) => {
+    try {
+      await register(values.email, values.password);
+      setShowOnboard(true);
+    } catch (error) {
+      message.error(error.message || '注册失败');
+    }
   };
 
   const onOnboardDone = () => {
@@ -65,7 +74,7 @@ export default function LoginPage() {
             <h1>让论文阅读从检索到理解都更轻松</h1>
             <p>
               PaperMate 面向 arXiv 科研阅读场景，整合论文发现、智能总结、知识图谱、
-              对比阅读和学习沉淀。当前版本为静态前端演示，后续可以逐步接入后端接口。
+              对比阅读和学习沉淀。登录、论文数据、解析任务和学习记录均由后端提供服务。
             </p>
           </div>
 
@@ -86,7 +95,7 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-floating-panel">
-          <div className="auth-flow-title">原型演示流程</div>
+          <div className="auth-flow-title">使用流程</div>
           <div className="auth-flow">
             <span>登录/注册</span>
             <span>→</span>
@@ -121,7 +130,7 @@ export default function LoginPage() {
                       label="账号 / 邮箱"
                       rules={[{ required: true, message: '请输入账号或邮箱' }]}
                     >
-                      <Input size="large" placeholder="普通用户任意输入，管理员输入 admin" prefix={<BookOutlined />} />
+                      <Input size="large" placeholder="请输入注册邮箱或账号" prefix={<BookOutlined />} />
                     </Form.Item>
                     <Form.Item
                       name="password"
@@ -139,7 +148,7 @@ export default function LoginPage() {
                     </div>
                     <div className="auth-note">
                       <Text type="secondary">
-                        当前仅为前端演示：普通用户可输入任意账号；管理员演示账号为 <strong>admin</strong>。
+                        普通用户需先注册；管理员演示账号为 <strong>admin / admin123</strong>。
                       </Text>
                     </div>
                   </Form>

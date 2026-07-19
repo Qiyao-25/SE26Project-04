@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   Empty,
+  List,
   Row,
   Space,
   Spin,
@@ -13,19 +14,21 @@ import {
   Typography,
   message
 } from 'antd';
-import { ArrowLeftOutlined, FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { FilePdfOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   getPaperContent,
   getPaperDetail,
   getPaperSummary,
+  getPaperGraph,
+  rebuildPaperGraph,
   createParseTask,
   getParseTask
 } from '../../services/paperService';
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
-import PaperGraphPanel from '../../components/paper/detail/PaperGraphPanel';
+import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -52,11 +55,14 @@ export default function PaperDetailPage() {
   const [paper, setPaper] = useState(null);
   const [content, setContent] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
+  const [graphData, setGraphData] = useState(null);
+  const [graphError, setGraphError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
   const [parseTask, setParseTask] = useState(null);
   const [parseLoading, setParseLoading] = useState(false);
+  const [graphRefreshing, setGraphRefreshing] = useState(false);
   const [mainTab, setMainTab] = useState('content');
   const historyRecordedFor = useRef(null);
 
@@ -78,19 +84,26 @@ export default function PaperDetailPage() {
       setPaper(null);
       setContent(null);
       setSummaryData(null);
+      setGraphData(null);
+      setGraphError('');
 
       try {
-        const [detail, paperContent, paperSummary] = await Promise.all([
+        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
           getPaperDetail(paperId),
           getPaperContent(paperId),
-          getPaperSummary(paperId)
+          getPaperSummary(paperId),
+          getPaperGraph(paperId)
         ]);
 
         if (cancelled) return;
 
-        setPaper(detail);
-        setContent(paperContent);
-        setSummaryData(paperSummary);
+        if (detailResult.status === 'rejected') throw detailResult.reason;
+
+        setPaper(detailResult.value);
+        setContent(contentResult.status === 'fulfilled' ? contentResult.value : null);
+        setSummaryData(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
+        setGraphData(graphResult.status === 'fulfilled' ? graphResult.value : null);
+        setGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || '论文加载失败');
@@ -145,7 +158,7 @@ export default function PaperDetailPage() {
       window.clearInterval(timer);
       setParseLoading(false);
       message.warning('解析仍在进行中（Agent 生成可能较慢），请稍后刷新页面查看智能总结');
-    }, 180000);
+    }, 300000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -195,6 +208,20 @@ export default function PaperDetailPage() {
     } catch (error) {
       setParseLoading(false);
       message.error(error.message || '解析任务创建失败');
+    }
+  };
+
+  const handleGraphRefresh = async () => {
+    if (graphRefreshing) return;
+    setGraphRefreshing(true);
+    try {
+      setGraphData(await rebuildPaperGraph(paperId));
+      setGraphError('');
+      message.success('知识图谱已刷新');
+    } catch (error) {
+      message.error(error.message || '知识图谱刷新失败');
+    } finally {
+      setGraphRefreshing(false);
     }
   };
 
@@ -420,7 +447,60 @@ export default function PaperDetailPage() {
     {
       key: 'graph',
       label: 'c · 知识图谱&脉络',
-      children: <PaperGraphPanel paperId={paperId} paperTitle={paper.title} />
+      children: (
+        <div className="graph-placeholder">
+          {graphData ? (
+            <>
+              <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Space wrap>
+                  <Tag color={graphData.preview ? 'default' : 'success'}>
+                    {graphData.preview ? '解析前主题预览' : '解析后结构化脉络'}
+                  </Tag>
+                  <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
+                </Space>
+                <Button icon={<ReloadOutlined />} loading={graphRefreshing} onClick={handleGraphRefresh}>
+                  刷新图谱
+                </Button>
+              </Space>
+              {graphData.preview && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="当前为解析前主题脉络预览"
+                  description="完成正文解析后，图谱会补充概念、方法、数据集及更完整的关系。"
+                  style={{ marginBottom: 12 }}
+                />
+              )}
+              <Paragraph>{graphData.narrative || '暂无研究脉络说明。'}</Paragraph>
+              <PaperGraphCanvas paperId={paperId} nodes={graphData.nodes} edges={graphData.edges} />
+              <List
+                size="small"
+                style={{ marginTop: 12 }}
+                header={<Text strong>研究脉络</Text>}
+                dataSource={graphData.lineage}
+                locale={{ emptyText: '暂无相关论文' }}
+                renderItem={(item) => (
+                  <List.Item>
+                    <Space direction="vertical" size={0}>
+                      <Text>{item.title || item.arxivId || item.arxiv_id}</Text>
+                      <Text type="secondary">{item.note}</Text>
+                    </Space>
+                    <Tag>{item.role}</Tag>
+                  </List.Item>
+                )}
+              />
+            </>
+          ) : graphError ? (
+            <Alert
+              type="error"
+              showIcon
+              message="知识图谱加载失败"
+              description={graphError}
+              action={<Button size="small" onClick={handleGraphRefresh}>重新加载</Button>}
+            />
+          ) : <Spin size="small" tip="正在生成知识图谱..." />}
+        </div>
+      )
     }
   ];
 

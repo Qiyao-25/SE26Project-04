@@ -84,6 +84,8 @@ GET  /api/papers/{paperId}
 GET  /api/papers/{paperId}/content
 GET  /api/papers/{paperId}/summary
 GET  /api/papers/{paperId}/wiki
+GET  /api/papers/{paperId}/graph
+GET  /api/papers/{paperId}/assist
 POST /api/papers/{paperId}/qa
 ```
 
@@ -93,8 +95,8 @@ POST /api/papers/{paperId}/qa
 VITE_USE_MOCK=true
 ```
 
-4. 启动顺序：先在 `backend` 启动 Uvicorn（并配置 `PAPERMATE_LLM_API_KEY`），再在 `UIPrototype/frontend` 执行 `npm run dev`。
+4. 启动顺序：先在 `backend` 启动 Uvicorn（可配置 `PAPERMATE_LLM_API_KEY`），再在 `UIPrototype/frontend` 执行 `npm run dev`。登录、注册、账户修改和学习数据会通过后端保存；点击论文详情页的解析按钮后，由 FastAPI 当前进程直接执行解析，不需要另开 Worker。
 
-论文详情页点击「开始解析 / 重新解析」会创建任务；backend 内嵌 **Summarize Agent** 自动下载 PDF、生成智能总结并写回 `/summary`，前端轮询完成后刷新「智能总结」页。侧边栏「问答」会调用 **QA Agent**（检索原文块 + LLM 生成，带引用）。
+论文详情页点击「开始解析 / 重新解析」会创建任务；backend 内嵌 **Summarize Agent** 自动下载 PDF、生成智能总结并写回 `/summary`，前端轮询完成后刷新「智能总结」页。知识图谱、辅助阅读、Wiki 小检索、对比阅读、收藏、笔记和阅读历史也会在联调模式下调用真实后端接口。侧边栏「问答」会调用 **QA Agent**（检索原文块 + LLM 生成，带引用）。
 
 工作台「智能论文检索」会调用 `POST /api/papers/smart-search`：**查询改写 → 多关键词模糊匹配 → 生成检索回答**（仅该搜索框接入；详情页 Wiki 小检索等不接 LLM）。

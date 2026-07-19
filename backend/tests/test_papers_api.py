@@ -29,7 +29,22 @@ def test_search_and_detail_flow() -> None:
     assert detail.arxivId == "1706.03762"
 
 
-def test_content_summary_and_qa_flow() -> None:
+def test_content_summary_and_qa_flow(monkeypatch) -> None:
+    from app.agents.qa_agent import QaAgentResult
+    import app.service.qa as qa
+
+    monkeypatch.setattr(qa, "get_settings", lambda: type("Settings", (), {"qa_agent_ready": True})())
+
+    class FakeQaAgent:
+        def __init__(self, _settings):
+            pass
+
+        def run(self, **kwargs):
+            evidence = kwargs["evidence"]
+            method = next(item for item in evidence if item["section"] == "Method")
+            return QaAgentResult(method["content"], [method["chunk_id"]], False)
+
+    monkeypatch.setattr(qa, "QaAgent", FakeQaAgent)
     assert require_content("attention").paperId == "attention"
     assert require_summary("attention").paperId == "attention"
     result = ask_paper("attention", AskPaperRequest(question="这篇论文的方法是什么？"))

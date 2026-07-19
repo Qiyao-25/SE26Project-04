@@ -5,6 +5,18 @@ import detailMock from '../mocks/paper-detail.json';
 import contentMock from '../mocks/paper-content.json';
 
 const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
+const MOCK_PARSED_KEY = 'papermate.mock.parsedPapers';
+
+function isMockParsed(paperId) {
+  try { return JSON.parse(localStorage.getItem(MOCK_PARSED_KEY) || '[]').map(String).includes(String(paperId)); } catch { return false; }
+}
+
+function markMockParsed(paperId) {
+  try {
+    const ids = JSON.parse(localStorage.getItem(MOCK_PARSED_KEY) || '[]').map(String);
+    if (!ids.includes(String(paperId))) localStorage.setItem(MOCK_PARSED_KEY, JSON.stringify([...ids, String(paperId)]));
+  } catch { /* local demo state is optional */ }
+}
 
 function normalizeAuthors(authors) {
   if (Array.isArray(authors)) return authors.map((author) => (typeof author === 'string' ? author : author?.name)).filter(Boolean);
@@ -67,9 +79,9 @@ async function searchMockPapers({ query = '', searchType = 'keyword', categories
 
 async function getMockPaperDetail(paperId) {
   await delay(150);
-  if (paperId === detailMock.data.paperId) return createCompatibleDetail(detailMock.data, { forcePending: true });
+  if (paperId === detailMock.data.paperId) return createCompatibleDetail(detailMock.data, { forcePending: !isMockParsed(paperId) });
   const paper = PAPERS[paperId];
-  return paper ? createCompatibleDetail(paper, { forcePending: true }) : null;
+  return paper ? createCompatibleDetail(paper, { forcePending: !isMockParsed(paperId) }) : null;
 }
 
 async function getMockPaperContent(paperId) {
@@ -82,17 +94,19 @@ async function getMockPaperContent(paperId) {
 async function getMockPaperSummary(paperId) {
   await delay(150);
   if (!PAPERS[paperId] && paperId !== detailMock.data.paperId) return null;
+  const parsed = isMockParsed(paperId);
+  const detail = await getMockPaperDetail(paperId);
   return {
     paperId,
-    parseStatus: 'pending',
-    summary: '',
-    concepts: [],
-    methods: [],
-    experiments: [],
-    limitations: [],
+    parseStatus: parsed ? 'qa_ready' : 'pending',
+    summary: parsed ? (detail?.summary || '演示论文已完成本地解析。') : '',
+    concepts: parsed ? [{ conceptId: `${paperId}-concept-1`, name: '核心概念', description: detail?.summary || '本地演示概念' }] : [],
+    methods: parsed ? [{ order: 1, title: '方法概览', description: '演示模式使用本地结构化摘要展示解析结果。' }] : [],
+    experiments: parsed ? [{ title: '实验与结果', description: '演示模式结果已生成，可继续使用问答功能。' }] : [],
+    limitations: parsed ? ['演示模式数据用于前端联调，不代表真实论文解析结论。'] : [],
     validationFlags: [],
-    chunkCount: 0,
-    qaReady: false
+    chunkCount: parsed ? 1 : 0,
+    qaReady: parsed
   };
 }
 
@@ -101,6 +115,21 @@ export async function searchPapers(params = {}) {
   const { query = '', categories = [], page = 1, pageSize = 12 } = params;
   const data = await apiClient.get('/papers', { params: { keyword: query || undefined, category: categories[0] || undefined, page, page_size: pageSize } });
   return { searchId: `search-${Date.now()}`, query, searchType: 'keyword', sortBy: 'relevance', total: data.total, page: data.page, pageSize: data.page_size, searchTimeMs: 0, items: data.items.map(toPaperListItem) };
+}
+
+export async function searchPaperWiki(query, { pageSize = 20 } = {}) {
+  if (USE_MOCK) return [];
+  const data = await apiClient.get('/papers', {
+    params: { keyword: query?.trim() || undefined, page: 1, page_size: pageSize }
+  });
+  return (data.items || []).map((paper) => ({
+    id: String(paper.paper_id),
+    paper: {
+      title: paper.title,
+      authors: normalizeAuthors(paper.authors).join(', '),
+      tag: paper.primary_category || '未分类'
+    }
+  }));
 }
 
 export async function smartSearchPapers({ query = '', page = 1, pageSize = 12, category } = {}) {
@@ -183,6 +212,7 @@ export async function getPaperSummary(paperId) {
 
 export async function createParseTask(paperId, { force = false } = {}) {
   if (USE_MOCK) {
+    markMockParsed(paperId);
     return {
       taskId: `mock-task-${paperId}`,
       task_id: `mock-task-${paperId}`,
@@ -202,66 +232,16 @@ export async function getParseTask(taskId) {
   return apiClient.get(`/tasks/${taskId}`);
 }
 
-export async function getPaperGraph(paperId, { force = false } = {}) {
-  if (USE_MOCK) {
-    return {
-      paperId,
-      paper_id: paperId,
-      nodes: [
-        { id: 'paper-1', type: 'paper', label: 'Demo Paper', role: 'current', paper_id: Number(paperId) || 1 },
-        { id: 'concept-1', type: 'concept', label: 'Attention' },
-        { id: 'method-1', type: 'method', label: 'Transformer' }
-      ],
-      edges: [
-        { id: 'e1', source: 'paper-1', target: 'concept-1', type: 'introduces', label: '提出' },
-        { id: 'e2', source: 'paper-1', target: 'method-1', type: 'uses', label: '方法' }
-      ],
-      lineage: [
-        { paper_id: Number(paperId) || 1, title: 'Demo Paper', role: 'current', note: '当前论文', published_at: '2017-06-12' }
-      ],
-      narrative: '（Mock）围绕注意力机制的轻量研究脉络示意。',
-      source: 'mock',
-      generated: false
-    };
-  }
-  const data = await apiClient.get(`/papers/${paperId}/graph`, { params: force ? { force: true } : undefined });
-  return {
-    paperId: data.paper_id || data.paperId || paperId,
-    nodes: data.nodes || [],
-    edges: data.edges || [],
-    lineage: data.lineage || [],
-    narrative: data.narrative || '',
-    source: data.source || '',
-    generated: Boolean(data.generated)
-  };
-}
-
-export async function rebuildPaperGraph(paperId) {
-  if (USE_MOCK) return getPaperGraph(paperId);
-  const data = await apiClient.post(`/papers/${paperId}/graph`);
-  return {
-    paperId: data.paper_id || data.paperId || paperId,
-    nodes: data.nodes || [],
-    edges: data.edges || [],
-    lineage: data.lineage || [],
-    narrative: data.narrative || '',
-    source: data.source || '',
-    generated: Boolean(data.generated)
-  };
-}
-
 export async function getReadingAssist(paperId, { mode = '研究', force = false } = {}) {
   if (USE_MOCK) {
+    const paper = await getMockPaperDetail(paperId);
     return {
       paperId,
       mode,
-      headline: `（Mock）${mode}模式导读`,
-      sections: [
-        { title: '模式要点', bullets: [`当前为 ${mode} 模式示例内容`, '联调后端后将生成真实导读'] },
-        { title: '建议', bullets: ['先完成解析', '再切换不同模式对比侧重点'] }
-      ],
-      takeaways: ['模式决定侧重点', '内容应易读', '可按模式重生成'],
-      next_steps: ['切换模式查看差异'],
+      headline: `${mode}模式导读`,
+      sections: [{ title: '模式要点', bullets: [paper?.summary || '暂无摘要'] }],
+      takeaways: ['结合智能总结继续阅读'],
+      next_steps: ['围绕方法和实验继续提问'],
       source: 'mock',
       generated: false
     };
@@ -273,13 +253,61 @@ export async function getReadingAssist(paperId, { mode = '研究', force = false
     paperId: data.paper_id || data.paperId || paperId,
     mode: data.mode || mode,
     headline: data.headline || '',
-    sections: (data.sections || []).map((section) => ({
-      title: section.title,
-      bullets: section.bullets || []
-    })),
+    sections: data.sections || [],
     takeaways: data.takeaways || [],
     next_steps: data.next_steps || [],
     source: data.source || '',
     generated: Boolean(data.generated)
   };
+}
+
+function normalizePaperGraph(data, paperId) {
+  return {
+    paperId: data.paper_id || data.paperId || paperId,
+    nodes: (data.nodes || []).map((node) => ({
+      ...node,
+      paperId: node.paperId ?? node.paper_id,
+      arxivId: node.arxivId || node.arxiv_id || '',
+      publishedAt: node.publishedAt || node.published_at || '',
+      score: node.score ?? null
+    })),
+    edges: (data.edges || []).map((edge) => ({
+      ...edge,
+      weight: edge.weight ?? null,
+      evidence: edge.evidence || []
+    })),
+    lineage: (data.lineage || []).map((item) => ({
+      ...item,
+      paperId: item.paperId ?? item.paper_id,
+      arxivId: item.arxivId || item.arxiv_id || '',
+      publishedAt: item.publishedAt || item.published_at || ''
+    })),
+    narrative: data.narrative || '',
+    source: data.source || 'heuristic',
+    generated: Boolean(data.generated),
+    parseStatus: data.parseStatus || data.parse_status || 'pending',
+    preview: Boolean(data.preview ?? data.is_preview)
+  };
+}
+
+export async function getPaperGraph(paperId, { force = false } = {}) {
+  if (USE_MOCK) return {
+    paperId,
+    nodes: [{ id: 'paper-1', type: 'paper', label: '当前论文', role: 'current' }, { id: 'concept-1', type: 'concept', label: '核心概念' }],
+    edges: [{ id: 'edge-1', source: 'paper-1', target: 'concept-1', type: 'introduces', label: '涉及' }],
+    lineage: [{ paper_id: paperId, title: '当前论文', role: 'current', note: '当前阅读论文' }],
+    narrative: '演示图谱数据',
+    source: 'mock',
+    generated: false,
+    parseStatus: 'pending',
+    preview: true
+  };
+  const data = await apiClient.get(`/papers/${paperId}/graph`, { params: force ? { force: true } : undefined });
+  return normalizePaperGraph(data, paperId);
+}
+
+export async function rebuildPaperGraph(paperId) {
+  if (USE_MOCK) return getPaperGraph(paperId);
+  const data = await apiClient.post(`/papers/${paperId}/graph`, {});
+  return normalizePaperGraph(data, paperId);
 }

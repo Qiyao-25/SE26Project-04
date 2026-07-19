@@ -66,6 +66,35 @@ class SummarizeAgent:
         return _normalize(json.loads(_strip_fence(raw)), arxiv_id or "paper")
 
 
+def build_fallback_summary(*, title: str, abstract: str, body_text: str, arxiv_id: str = "") -> AgentWiki:
+    """Build a usable deterministic result when the remote model is unavailable."""
+    text = re.sub(r"\s+", " ", (body_text or abstract or "")).strip()
+    abstract_text = re.sub(r"\s+", " ", (abstract or "")).strip()
+    sentences = [item.strip() for item in re.split(r"(?<=[.!?。！？])\s+", text) if item.strip()]
+    summary = (abstract_text or " ".join(sentences[:3]) or title or "论文正文已解析").strip()[:1600]
+
+    method_sentences = [
+        item for item in sentences
+        if any(keyword in item.casefold() for keyword in ("method", "approach", "model", "architecture", "attention", "方法", "模型"))
+    ][:3]
+    experiment_sentences = [
+        item for item in sentences
+        if any(keyword in item.casefold() for keyword in ("experiment", "result", "evaluation", "benchmark", "bleu", "accuracy", "实验", "结果"))
+    ][:3]
+    method_text = " ".join(method_sentences)[:1200] or summary[:600]
+    experiment_text = " ".join(experiment_sentences)[:1200] or "已完成正文解析；实验细节需要结合原文核对。"
+    concept_name = title[:80] if title else "论文核心方法"
+    return AgentWiki(
+        summary=summary,
+        concepts=[{"conceptId": f"{arxiv_id or 'paper'}-concept-1", "name": concept_name, "description": summary[:500]}],
+        methods=[{"order": 1, "title": "方法概览", "description": method_text}],
+        experiments=[{"title": "实验与结果", "description": experiment_text}],
+        limitations=["未调用远程总结 Agent，局限性需要人工复核。"],
+        validation_flags=["agent_unavailable"],
+        source="heuristic_fallback",
+    )
+
+
 def _strip_fence(raw: str) -> str:
     text = raw.strip()
     if text.startswith("```"):
@@ -120,4 +149,4 @@ def _normalize(data: dict[str, Any], paper_id: str) -> AgentWiki:
     return AgentWiki(summary, concepts, methods, experiments, limitations, sorted(set(flags)))
 
 
-__all__ = ["AgentWiki", "SummarizeAgent"]
+__all__ = ["AgentWiki", "SummarizeAgent", "build_fallback_summary"]

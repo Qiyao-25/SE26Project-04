@@ -7,6 +7,7 @@
 - SQLAlchemy 2.x ORM 与 H005 核心实体
 - Alembic 首次迁移、升级和回滚
 - 统一响应模型与请求 ID
+- 用户注册、登录、当前用户和账户修改接口
 - 论文元数据、解析任务、结构化结果、文本块检索和学习行为 API
 - python -m harness 可重复验收入口
 
@@ -27,6 +28,8 @@
 
     cp .env.example .env
 
+`.env.example` 只是可提交的配置模板，真正运行时读取的是 `backend/.env`；该文件已被 Git 忽略，不应提交。后端会按固定路径读取它，因此从项目根目录或 `backend` 目录启动，使用的都是同一份配置。若同名变量同时存在于终端环境和 `.env`，终端环境变量优先。
+
 默认使用 data/dev.db。测试使用内存 SQLite，不会污染开发数据库。PostgreSQL 只需替换：
 
     PAPERMATE_ENV=dev
@@ -36,15 +39,23 @@ PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/paperma
 
 python -m pip install -e ".[postgres]"
 
-Agent 默认关闭。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
+解析按钮由 FastAPI 当前进程直接执行，不需要额外启动 PaperPipeline Worker。启用 OpenAI-compatible Chat Completions 服务时，通过环境变量配置，不要把 Key 写入 Git：
 
-    PAPERMATE_AGENT_ENABLED=true
-    PAPERMATE_AGENT_API_KEY=本地密钥
-    PAPERMATE_AGENT_MODEL=模型名称
-    PAPERMATE_AGENT_BASE_URL=https://api.openai.com/v1
-    PAPERMATE_AGENT_TIMEOUT_S=30
+    PAPERMATE_LLM_API_KEY=本地密钥
+    PAPERMATE_LLM_MODEL=deepseek-v4-flash
+    PAPERMATE_LLM_API_BASE=https://api.deepseek.com
 
-解析 Worker 的任务领取、状态更新和结果写回使用内部 Token。开发环境可不配置；生产环境必须配置：
+问答接口要求配置并启用 QA Agent；未配置时会明确返回 Agent 未配置，模型调用失败时会返回调用失败，不会使用不可靠的本地抽取内容冒充智能问答。论文解析仍可执行 PDF 抽取和本地结果整理。`PAPERMATE_AGENT_*` 旧变量名仍兼容，但新配置建议统一使用 `PAPERMATE_LLM_*` 和 `PAPERMATE_*_AGENT_*`。
+
+可用下面的命令检查当前生效配置（只输出是否配置，不输出密钥）：
+
+```bash
+python -c "from app.core.config import get_settings; s=get_settings(); print({'env_file':'backend/.env','environment':s.environment,'llm_model':s.llm_model,'llm_api_base':s.llm_api_base,'qa_agent_enabled':s.qa_agent_enabled,'qa_agent_ready':s.qa_agent_ready,'api_key_configured':bool(s.llm_api_key.strip())})"
+```
+
+认证接口：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/account`。前端登录后通过 Bearer Token 访问后端。
+
+旧版独立 Worker 的任务领取、状态更新和结果写回使用内部 Token。开发环境可不配置；生产环境必须配置：
 
     PAPERMATE_WORKER_TOKEN=生产环境内部令牌
 
@@ -192,7 +203,22 @@ GET  /api/papers/{paper_id}
 GET  /api/papers/{paper_id}/content
 GET  /api/papers/{paper_id}/summary
 GET  /api/papers/{paper_id}/wiki
+GET  /api/papers/{paper_id}/graph
+POST /api/papers/{paper_id}/graph
+GET  /api/papers/{paper_id}/assist
+POST /api/papers/{paper_id}/assist
 POST /api/papers/{paper_id}/qa
+POST /api/papers/smart-search
+GET  /api/recommendations/daily
+GET  /api/recommendations/profile
+GET  /api/learning/profile
+PUT  /api/learning/profile
+GET  /api/learning/dictionary
+GET  /api/admin/overview
+GET  /api/admin/tasks
+GET  /api/admin/users
+GET  /api/admin/quality
+GET  /api/admin/audit
 POST /api/papers/{paper_id}/parse
 POST /api/tasks/claim
 GET  /api/tasks/{task_id}
@@ -211,6 +237,6 @@ GET  /api/learning/actions?user_id=demo
 
 解析任务响应中的 `stage` 会依次反映 `fetch`、`parse`、`summarize`、`validate`、`persist` 和 `completed`；结构化摘要响应额外包含实验结果和校验提示。论文状态会区分 `parsed` 与 `qa_ready`，后者要求数据库中存在文本块，响应同时返回 `chunkCount` / `qaReady`。`finalize` 接口一次性提交文本块和结构化结果，`stats` 接口返回队列数量、可重试失败数和 stale running 数量。
 
-启用 Agent 后，论文问答会把检索到的文本块交给模型生成回答。模型必须返回 `answer` 和 `citation_ids`，后端会校验引用只能来自当前检索证据；校验失败或模型不可用时自动回退到抽取式回答。
+论文问答必须启用 QA Agent，并把检索到的文本块交给模型生成回答。模型必须返回 `answer` 和 `citation_ids`，后端会校验引用只能来自当前检索证据；证据不足、引用无效、模型未配置或调用失败时返回明确错误，不使用抽取式回答兜底。
 
 数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

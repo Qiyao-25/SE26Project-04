@@ -2,11 +2,11 @@ import { Alert, Card, Tag, Typography, Button, Space } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useApp } from '../../../../context/AppContext';
-import { getReadingAssist } from '../../../../services/paperService';
 import SidebarNotesPreview from './SidebarNotesPreview';
 import ReadingAssistView from '../ReadingAssistView';
 import { ChatBox } from '../../../common/ChatBox';
 import FavoriteButton from './FavoriteButton';
+import SidebarAssistPanel from './SidebarAssistPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -121,9 +121,7 @@ export default function SidebarAllPanel({
       title: '辅助阅读',
       extra: <Tag>{persona}模式</Tag>,
       content: (
-        parsed ? (
-          <ReadingAssistView data={assist} loading={assistLoading} compact />
-        ) : (
+        parsed ? <SidebarAssistPanel paper={paper} paperId={paperId} /> : (
           <Alert
             type="info"
             showIcon

@@ -91,7 +91,7 @@ export default function SidebarNotesPanel({ paperId }) {
     <div className="sidebar-scroll">
       <Text className="block-label">添加笔记</Text>
       <Paragraph type="secondary" style={{ fontSize: 11, padding: 8, background: '#fafafa', borderLeft: '3px solid #d9d9d9' }}>
-        [ 选中文本高亮占位：Multi-Head Attention... ]
+        笔记和评论会保存到当前账户，可在学习空间查看。
       </Paragraph>
       <TextArea rows={3} value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="记录阅读笔记..." />
       <Button type="primary" block loading={loading} style={{ marginTop: 8 }} onClick={handleSaveNote}>保存笔记</Button>

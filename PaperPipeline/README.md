@@ -50,7 +50,7 @@ python -m pipeline.crawler.run_crawl --target 20
 
 ### 数据库解析 Worker
 
-前端创建解析任务后，需要启动数据库 Worker 消费 `queued` 任务。Worker 会下载 PDF、使用 `pypdf` 提取带页码的段落、生成结构化摘要，并写回 C 后端：
+当前默认由 FastAPI 在点击解析后直接执行任务，不需要单独启动 Worker。`run_backend_worker` 仍保留为兼容旧部署和批量补偿的可选工具；它会下载 PDF、使用 `pypdf` 提取带页码的段落、生成结构化摘要，并写回后端：
 
 ```powershell
 cd SE26Project-04/PaperPipeline

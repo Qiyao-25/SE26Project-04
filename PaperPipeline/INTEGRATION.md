@@ -1,5 +1,7 @@
 # 对接说明 — PaperPipeline ↔ backend / UIPrototype
 
+当前主线默认由 backend 的 FastAPI 进程在点击解析后直接执行解析任务；PaperPipeline 的独立 Worker 仍保留用于兼容旧部署和批量补偿，不再是页面解析的前置条件。
+
 对齐对象（以当前仓库为准）：
 
 - **backend** `POST /api/papers/batch`、任务队列、`finalize`、Wiki / chunks / QA

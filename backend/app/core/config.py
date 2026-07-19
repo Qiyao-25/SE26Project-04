@@ -5,49 +5,38 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+
 class Settings(BaseSettings):
     environment: str = "dev"
     version: str = "0.1.0"
     database_url: str = "sqlite:///./data/dev.db"
     echo_sql: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    agent_enabled: bool = False
+    agent_enabled: bool | None = None
     agent_api_key: str | None = None
     agent_model: str = ""
     agent_base_url: str = "https://api.openai.com/v1"
     agent_timeout_s: float = 30.0
     worker_token: str = ""
+    auth_secret: str = "papermate-dev-secret"
 
-    # Unified LLM configuration used by the parsing and QA agents.
+    # Unified OpenAI-compatible LLM configuration.
     llm_api_key: str = ""
     llm_api_base: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-v4-flash"
+    # Compatibility names accepted during the migration from AGENT_* settings.
     deepseek_api_key: str = ""
     deepseek_api_base: str = ""
     deepseek_model: str = ""
-    parse_agent_enabled: bool = True
-    parse_agent_timeout_s: float = 90.0
-    qa_agent_enabled: bool = True
-    qa_agent_timeout_s: float = 90.0
-    qa_agent_top_k: int = 5
-    search_agent_enabled: bool = True
-    search_agent_timeout_s: float = 45.0
-
-    # OpenAI-compatible LLM（解析摘要 / 智能问答共用）
-    llm_api_key: str = ""
-    llm_api_base: str = "https://api.deepseek.com"
-    llm_model: str = "deepseek-v4-flash"
-    # 兼容旧环境变量名（将逐步弃用）
-    deepseek_api_key: str = ""
-    deepseek_api_base: str = ""
-    deepseek_model: str = ""
-
     parse_agent_enabled: bool = True
     parse_agent_max_pages: int = 12
     parse_agent_timeout_s: float = 90.0
     qa_agent_enabled: bool = True
     qa_agent_timeout_s: float = 90.0
-    qa_agent_top_k: int = 5
+    qa_agent_top_k: int = 8
+    qa_agent_evidence_chars: int = 1400
     search_agent_enabled: bool = True
     search_agent_timeout_s: float = 45.0
     graph_agent_enabled: bool = True
@@ -57,7 +46,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -65,6 +54,13 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def merge_agent_settings(self):
         """Accept both current PAPERMATE_AGENT_* and remote LLM names."""
+        if self.agent_enabled is not None:
+            # The legacy switch controls every Agent when explicitly provided.
+            self.parse_agent_enabled = self.agent_enabled
+            self.qa_agent_enabled = self.agent_enabled
+            self.search_agent_enabled = self.agent_enabled
+            self.graph_agent_enabled = self.agent_enabled
+            self.assist_agent_enabled = self.agent_enabled
         if not self.llm_api_key.strip() and self.agent_api_key:
             self.llm_api_key = self.agent_api_key.strip()
         if not self.llm_api_key.strip() and self.deepseek_api_key.strip():

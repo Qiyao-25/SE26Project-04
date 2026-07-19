@@ -11,11 +11,12 @@ from pathlib import Path
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agents.llm_client import LlmError
-from app.agents.summarize_agent import SummarizeAgent
+from app.agents.summarize_agent import SummarizeAgent, build_fallback_summary
 from app.agents.graph_agent import GraphAgent
 from app.core.config import Settings, get_settings
 from app.model import ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
+from app.service.papers import get_related_paper_payloads
 from app.service.tasks import save_parse_result
 from app.repository.papers import list_papers
 
@@ -50,10 +51,6 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         _fail(session, task_id, "PAPER_NOT_FOUND")
         return
 
-    if not settings.parse_agent_ready:
-        _fail(session, task_id, "AGENT_NOT_CONFIGURED")
-        return
-
     _mark_running(session, task, paper, stage="fetch")
     body_text, page_count, source = _extract_paper_text(paper, settings)
     if not body_text.strip() and not (paper.abstract or "").strip():
@@ -61,17 +58,46 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         return
 
     _mark_running(session, task, paper, stage="summarize")
-    try:
-        wiki = SummarizeAgent(settings).run(
+    if settings.parse_agent_ready:
+        try:
+            wiki = SummarizeAgent(settings).run(
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                body_text=body_text or paper.abstract or "",
+                arxiv_id=paper.arxiv_id or str(paper.id),
+            )
+        except LlmError as exc:
+            logger.warning("summarize_agent_fallback task_id=%s err=%s", task_id, exc)
+            wiki = build_fallback_summary(
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                body_text=body_text or paper.abstract or "",
+                arxiv_id=paper.arxiv_id or str(paper.id),
+            )
+    else:
+        logger.info("summarize_agent_disabled task_id=%s using local fallback", task_id)
+        wiki = build_fallback_summary(
             title=paper.title or "",
             abstract=paper.abstract or "",
             body_text=body_text or paper.abstract or "",
             arxiv_id=paper.arxiv_id or str(paper.id),
         )
-    except LlmError as exc:
-        logger.error("summarize_agent_failed task_id=%s err=%s", task_id, exc)
-        _fail(session, task_id, "STRUCTURED_RESULT_FAILED")
-        return
+
+    _mark_running(session, task, paper, stage="graph")
+    related = get_related_paper_payloads(session, paper)
+    graph = GraphAgent(settings).run(
+        paper_id=paper.id,
+        title=paper.title or "",
+        abstract=paper.abstract or "",
+        arxiv_id=paper.arxiv_id or str(paper.id),
+        primary_category=paper.primary_category or "",
+        published_at=paper.published_at.isoformat() if paper.published_at else "",
+        concepts=wiki.concepts,
+        methods=wiki.methods,
+        experiments=wiki.experiments,
+        limitations=wiki.limitations,
+        related_papers=related,
+    )
 
     _mark_running(session, task, paper, stage="graph")
     related = _related_paper_payloads(session, paper)
@@ -131,31 +157,6 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         len(chunk_inputs),
         source,
         graph.source,
-    )
-
-
-def _related_paper_payloads(session, paper: Paper, *, limit: int = 8) -> list[dict]:
-    keywords = []
-    title = paper.title or ""
-    for token in re.split(r"[\s,;:/|\-–—]+", title):
-        token = token.strip()
-        if len(token) >= 4 and token.casefold() not in {"with", "from", "that", "this", "using", "based"}:
-            keywords.append(token)
-    if paper.primary_category:
-        keywords.append(paper.primary_category)
-    if paper.arxiv_id:
-        keywords.append(paper.arxiv_id.split(".")[0])
-
-    papers, _total = list_papers(
-        session,
-        keyword=title[:80] if title else None,
-        keywords=keywords[:8] or None,
-        author=None,
-        category=paper.primary_category,
-        published_from=None,
-        published_to=None,
-        page=1,
-        page_size=max(limit + 2, 10),
     )
     payloads = []
     for item in papers:

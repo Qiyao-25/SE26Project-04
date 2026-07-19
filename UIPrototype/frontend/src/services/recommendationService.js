@@ -6,6 +6,7 @@
  */
 import { searchPapers } from './paperService';
 import { USE_MOCK } from './runtimeConfig';
+import apiClient from './apiClient';
 
 function shuffle(items) {
   const next = [...items];
@@ -24,6 +25,30 @@ function uniqueByPaperId(items) {
     seen.add(id);
     return true;
   });
+}
+
+function normalizeRecommendedPaper(paper) {
+  return {
+    paperId: paper.paperId ?? paper.paper_id ?? paper.id,
+    title: paper.title || '',
+    authors: Array.isArray(paper.authors) ? paper.authors : [],
+    primaryCategory: paper.primaryCategory || paper.primary_category || '未分类',
+    arxivId: paper.arxivId || paper.arxiv_id || '',
+    publishedAt: paper.publishedAt || paper.published_at || '',
+    summary: paper.summary || paper.abstract || '',
+    keywords: paper.keywords || [],
+    researchDirection: paper.researchDirection || paper.research_direction || '',
+    conceptTags: paper.conceptTags || paper.concept_tags || [],
+    parseStatus: paper.parseStatus || paper.parse_status || 'pending',
+    chunkCount: paper.chunkCount ?? paper.chunk_count ?? 0,
+    qaReady: Boolean(paper.qaReady ?? paper.qa_ready),
+    sourceUrl: paper.sourceUrl || paper.source_url || '',
+    pdfUrl: paper.pdfUrl || paper.pdf_url || ''
+  };
+}
+
+function normalizeRecommendations(items) {
+  return (items || []).map(normalizeRecommendedPaper).filter((item) => item.paperId !== undefined && item.paperId !== null);
 }
 
 async function sampleFromDatabase({ limit = 3, category, excludeIds = [] } = {}) {
@@ -65,7 +90,8 @@ export async function fetchDailyArxivPicks({ limit = 3 } = {}) {
     const data = await searchPapers({ page: 1, pageSize: 12, sortBy: 'date' });
     return shuffle(data.items || []).slice(0, limit);
   }
-  return sampleFromDatabase({ limit });
+  const data = await apiClient.get('/recommendations/daily', { params: { limit } });
+  return normalizeRecommendations(data);
 }
 
 /**
@@ -74,10 +100,10 @@ export async function fetchDailyArxivPicks({ limit = 3 } = {}) {
  * @param {{ persona?: string, topics?: string[], limit?: number, excludeIds?: Array<string|number> }} options
  * @returns {Promise<Array>} 论文列表（与 searchPapers items 同结构）
  *
- * 后续接入 AI 用户画像总结时：保持本函数签名，替换内部实现即可
- * （例如 POST /api/recommendations/profile { persona, topics }）。
+ * 当前通过后端画像推荐接口读取数据库结果；后续可在后端替换为更复杂的画像模型。
  */
 export async function fetchProfileRecommendations({
+  userId = 'demo-user',
   persona = '',
   topics = [],
   limit = 3,
@@ -85,6 +111,7 @@ export async function fetchProfileRecommendations({
 } = {}) {
   // 预留：画像上下文写入，便于后续 AI 管线消费
   const profileContext = {
+    userId,
     persona,
     topics: Array.isArray(topics) ? topics : [],
     source: 'heuristic-random', // 将来改为 'ai-profile'
@@ -96,23 +123,14 @@ export async function fetchProfileRecommendations({
     return shuffle(data.items || []).slice(0, limit);
   }
 
-  // 若有研究方向标签，优先用第一个 category 粗过滤；不足再全库随机
-  const preferredCategory = profileContext.topics.find((t) => typeof t === 'string' && t.includes('.')) || undefined;
-  let items = await sampleFromDatabase({
-    limit,
-    category: preferredCategory,
-    excludeIds
+  const data = await apiClient.get('/recommendations/profile', {
+    params: {
+      user_id: profileContext.userId || 'demo-user',
+      persona,
+      topics: profileContext.topics.join(','),
+      limit,
+      exclude_ids: excludeIds.join(',')
+    }
   });
-
-  if (items.length < limit) {
-    const more = await sampleFromDatabase({
-      limit: limit - items.length,
-      excludeIds: [...excludeIds, ...items.map((p) => p.paperId)]
-    });
-    items = [...items, ...more];
-  }
-
-  // 不把 profileContext 挂在数组上污染渲染；调用方可忽略
-  void profileContext;
-  return items.slice(0, limit);
+  return normalizeRecommendations(data);
 }

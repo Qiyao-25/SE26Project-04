@@ -178,6 +178,26 @@ class UserActionItem(BaseModel):
     occurred_at: datetime
 
 
+PERSONAS = ("新手", "研究", "工程", "教学", "管理")
+
+
+class UserProfileUpdate(BaseModel):
+    persona: str = Field(default="研究", max_length=32)
+    topics: list[str] = Field(default_factory=list, max_length=20)
+    preferences: dict = Field(default_factory=dict)
+
+
+class UserProfileData(UserProfileUpdate):
+    user_id: str
+
+
+class DictionaryEntry(BaseModel):
+    term: str
+    description: str
+    paper_ids: list[int] = Field(default_factory=list)
+    paper_titles: list[str] = Field(default_factory=list)
+
+
 class WikiData(BaseModel):
     paper_id: int
     parse_status: str
@@ -229,9 +249,28 @@ class SmartSearchResponse(BaseModel):
     pages: int
 
 
-class GraphNode(BaseModel):
-    model_config = {"extra": "ignore"}
+class ReadingAssistRequest(BaseModel):
+    mode: str = Field(default="研究", max_length=16)
+    force: bool = False
 
+
+class ReadingAssistSection(BaseModel):
+    title: str
+    bullets: list[str] = Field(default_factory=list)
+
+
+class ReadingAssistData(BaseModel):
+    paper_id: int
+    mode: str
+    headline: str = ""
+    sections: list[ReadingAssistSection] = Field(default_factory=list)
+    takeaways: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)
+    source: str = "heuristic"
+    generated: bool = False
+
+
+class GraphNode(BaseModel):
     id: str
     type: str
     label: str
@@ -240,21 +279,20 @@ class GraphNode(BaseModel):
     role: str | None = None
     published_at: str | None = None
     description: str | None = None
+    score: float | None = Field(default=None, ge=0, le=1)
 
 
 class GraphEdge(BaseModel):
-    model_config = {"extra": "ignore"}
-
     id: str
     source: str
     target: str
     type: str
     label: str = ""
+    weight: float | None = Field(default=None, ge=0, le=1)
+    evidence: list[str] = Field(default_factory=list)
 
 
 class LineageItem(BaseModel):
-    model_config = {"extra": "ignore"}
-
     paper_id: int | None = None
     arxiv_id: str = ""
     title: str = ""
@@ -271,26 +309,5 @@ class PaperGraphData(BaseModel):
     narrative: str = ""
     source: str = "heuristic"
     generated: bool = False
-
-
-class ReadingAssistRequest(BaseModel):
-    mode: str = Field(default="研究", max_length=16)
-    force: bool = False
-
-
-class ReadingAssistSection(BaseModel):
-    model_config = {"extra": "ignore"}
-
-    title: str
-    bullets: list[str] = Field(default_factory=list)
-
-
-class ReadingAssistData(BaseModel):
-    paper_id: int
-    mode: str
-    headline: str = ""
-    sections: list[ReadingAssistSection] = Field(default_factory=list)
-    takeaways: list[str] = Field(default_factory=list)
-    next_steps: list[str] = Field(default_factory=list)
-    source: str = "heuristic"
-    generated: bool = False
+    parse_status: str = "pending"
+    preview: bool = True

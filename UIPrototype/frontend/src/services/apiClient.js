@@ -7,9 +7,19 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('papermate.accessToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response.data?.data ?? response.data,
   (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('papermate.accessToken');
+      window.dispatchEvent(new Event('papermate:auth-expired'));
+    }
     if (error.code === 'ECONNABORTED') {
       return Promise.reject(new Error('请求超时，请确认后端服务已启动后重试'));
     }

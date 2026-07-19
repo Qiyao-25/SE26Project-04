@@ -51,3 +51,18 @@ export async function setFavorite({ userId, paperId, favorite }) {
 export async function listPaperNotes(userId, paperId) {
   return listActions({ userId, paperId, actionType: 'note' });
 }
+
+export async function getLearningProfile(userId) {
+  if (USE_MOCK) return { user_id: userId, persona: '研究', topics: ['cs.CL'], preferences: {} };
+  return apiClient.get('/learning/profile', { params: { user_id: userId } });
+}
+
+export async function updateLearningProfile(userId, payload) {
+  if (USE_MOCK) return { user_id: userId, ...payload };
+  return apiClient.put('/learning/profile', payload, { params: { user_id: userId } });
+}
+
+export async function getConceptDictionary(userId) {
+  if (USE_MOCK) return [];
+  return apiClient.get('/learning/dictionary', { params: { user_id: userId } });
+}

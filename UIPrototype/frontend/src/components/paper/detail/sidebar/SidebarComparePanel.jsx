@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../../context/AppContext';
 import { PAPER_LIST, PAPERS, shortPaperTitle } from '../../../../data/papers';
 import { getPaperDetail } from '../../../../services/paperService';
+import { searchPapers } from '../../../../services/paperService';
+import { USE_MOCK } from '../../../../services/runtimeConfig';
 
 const { Text } = Typography;
 
@@ -27,6 +29,25 @@ export default function SidebarComparePanel({ paperId, paper }) {
     setComparePaperA, setComparePaperB
   } = useApp();
   const [remotePapers, setRemotePapers] = useState({});
+  const [availablePapers, setAvailablePapers] = useState([]);
+
+  useEffect(() => {
+    if (USE_MOCK) return undefined;
+    let cancelled = false;
+    searchPapers({ query: '', page: 1, pageSize: 50 })
+      .then((data) => { if (!cancelled) setAvailablePapers(data.items || []); })
+      .catch(() => { if (!cancelled) setAvailablePapers([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (USE_MOCK || !availablePapers.length) return;
+    const currentId = String(paperId);
+    const other = availablePapers.find((item) => String(item.paperId) !== currentId);
+    if (other && (!availablePapers.some((item) => String(item.paperId) === String(comparePaperB)) || String(comparePaperB) === currentId)) {
+      setComparePaperB(String(other.paperId));
+    }
+  }, [availablePapers, comparePaperB, paperId, setComparePaperB]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,11 +63,20 @@ export default function SidebarComparePanel({ paperId, paper }) {
 
   const resolvePaper = (id) => {
     if (String(id) === String(paperId)) return paper || EMPTY_PAPER;
-    return PAPERS[id] || remotePapers[String(id)] || EMPTY_PAPER;
+    const remote = PAPERS[id] || remotePapers[String(id)] || availablePapers.find((item) => String(item.paperId) === String(id));
+    if (!remote) return EMPTY_PAPER;
+    return {
+      ...remote,
+      tag: remote.tag || remote.primaryCategory,
+      direction: remote.direction || remote.researchDirection,
+      authorsText: Array.isArray(remote.authors) ? remote.authors.join(', ') : remote.authors
+    };
   };
   const paperA = resolvePaper(comparePaperA);
   const paperB = resolvePaper(comparePaperB);
-  const options = PAPER_LIST.map((p) => ({ value: p.id, label: shortPaperTitle(p.id) }));
+  const options = USE_MOCK
+    ? PAPER_LIST.map((p) => ({ value: p.id, label: shortPaperTitle(p.id) }))
+    : availablePapers.map((item) => ({ value: String(item.paperId), label: item.title }));
   if (/^\d+$/.test(String(paperId)) && !options.some((option) => String(option.value) === String(paperId))) {
     options.unshift({ value: paperId, label: paper?.title || `论文 ${paperId}` });
   }
@@ -93,16 +123,20 @@ export default function SidebarComparePanel({ paperId, paper }) {
       </Row>
 
       <div style={{ marginTop: 12 }}>
-        {PAPER_LIST.map((p) => (
+        {(USE_MOCK ? PAPER_LIST : availablePapers).map((p) => {
+          const id = USE_MOCK ? p.id : String(p.paperId);
+          const label = USE_MOCK ? shortPaperTitle(p.id) : p.title;
+          return (
           <Tag
-            key={p.id}
+            key={id}
             style={{ marginBottom: 4, cursor: 'pointer' }}
-            color={p.id === comparePaperA ? 'blue' : p.id === comparePaperB ? 'default' : undefined}
-            onClick={() => setSlotPaper(compareActiveSlot, p.id)}
+            color={id === comparePaperA ? 'blue' : id === comparePaperB ? 'default' : undefined}
+            onClick={() => setSlotPaper(compareActiveSlot, id)}
           >
-            {shortPaperTitle(p.id)}
+            {label}
           </Tag>
-        ))}
+          );
+        })}
       </div>
 
       <div className="compare-body" style={{ marginTop: 12 }}>

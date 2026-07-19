@@ -23,6 +23,10 @@ import {
   PlusOutlined,
   TagsOutlined,
 } from '@ant-design/icons';
+import { useApp } from '../../context/AppContext';
+import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
+import { updateAccount } from '../../services/authService';
+import { USE_MOCK } from '../../services/runtimeConfig';
 
 const ARXIV_CATEGORIES = [
   {
@@ -108,6 +112,10 @@ const CATEGORY_LABEL_MAP = Object.fromEntries(
 );
 
 export default function SettingsPage() {
+  const { userId, email, applyAuthResponse } = useApp();
+  const [accountForm] = Form.useForm();
+  const [crawlForm] = Form.useForm();
+  const [webForm] = Form.useForm();
   const [subscriptions, setSubscriptions] = useState(
     loadSessionSubscriptions
   );
@@ -115,6 +123,8 @@ export default function SettingsPage() {
   const [subscriptionType, setSubscriptionType] = useState('keyword');
   const [keywordInput, setKeywordInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(undefined);
+  const [profileReady, setProfileReady] = useState(USE_MOCK);
+  const [savedPreferences, setSavedPreferences] = useState({});
 
   useEffect(() => {
     try {
@@ -126,6 +136,44 @@ export default function SettingsPage() {
       console.error('保存订阅设置失败：', error);
     }
   }, [subscriptions]);
+
+  useEffect(() => {
+    if (USE_MOCK) return undefined;
+    getLearningProfile(userId)
+      .then((profile) => {
+        const preferences = profile.preferences || {};
+        setSavedPreferences(preferences);
+        if (Array.isArray(preferences.subscriptions)) setSubscriptions(preferences.subscriptions);
+        if (preferences.crawl) crawlForm.setFieldsValue(preferences.crawl);
+        if (preferences.web) webForm.setFieldsValue(preferences.web);
+        setProfileReady(true);
+      })
+      .catch(() => setProfileReady(true));
+    return undefined;
+  }, [crawlForm, userId, webForm]);
+
+  useEffect(() => {
+    if (!profileReady || USE_MOCK) return;
+    const preferences = { ...savedPreferences, subscriptions };
+    if (JSON.stringify(preferences) === JSON.stringify(savedPreferences)) return;
+    setSavedPreferences(preferences);
+    updateLearningProfile(userId, {
+      persona: '研究',
+      topics: [],
+      preferences
+    }).catch(() => {});
+  }, [profileReady, savedPreferences, subscriptions, userId]);
+
+  const savePreferences = async (patch, successMessage) => {
+    const preferences = { ...savedPreferences, ...patch, subscriptions };
+    try {
+      const profile = await updateLearningProfile(userId, { persona: '研究', topics: [], preferences });
+      setSavedPreferences(profile.preferences || preferences);
+      message.success(successMessage);
+    } catch (error) {
+      message.error(error.message || '设置保存失败');
+    }
+  };
 
   const addSubscription = () => {
     if (subscriptionType === 'keyword') {
@@ -333,15 +381,14 @@ export default function SettingsPage() {
           <Col xs={24} md={10}>
             <Card title="抓取资源配置" size="small">
               <Form
+                form={crawlForm}
                 layout="vertical"
                 initialValues={{
                   frequency: '每日',
                   codeOnly: false,
                   engineeringOnly: false,
                 }}
-                onFinish={() =>
-                  message.success('抓取资源配置已保存')
-                }
+                onFinish={(values) => USE_MOCK ? message.success('抓取资源配置已保存') : savePreferences({ crawl: values }, '抓取资源配置已保存')}
               >
                 <Form.Item
                   name="frequency"
@@ -395,14 +442,22 @@ export default function SettingsPage() {
       children: (
         <Card style={{ maxWidth: 480 }}>
           <Form
+            form={accountForm}
             layout="vertical"
-            initialValues={{
-              email: 'user@example.com',
-              password: '******',
+            initialValues={{ email }}
+            onFinish={async (values) => {
+              if (USE_MOCK) return message.success('账户设置已保存');
+              try {
+                const nextEmail = values.email.trim();
+                const data = await updateAccount({ email: nextEmail === email ? undefined : nextEmail, current_password: values.current_password || undefined, password: values.password || undefined });
+                applyAuthResponse(data);
+                accountForm.resetFields(['password', 'current_password']);
+                accountForm.setFieldsValue({ email: data.user.email });
+                message.success('账户设置已保存');
+              } catch (error) {
+                message.error(error.message || '账户设置保存失败');
+              }
             }}
-            onFinish={() =>
-              message.success('账户设置已保存')
-            }
           >
             <Form.Item
               name="email"
@@ -412,10 +467,10 @@ export default function SettingsPage() {
                   required: true,
                   message: '请输入邮箱',
                 },
-                {
-                  type: 'email',
-                  message: '请输入正确的邮箱格式',
-                },
+                () => ({ validator(_, value) {
+                  if (value === 'admin' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value || '')) return Promise.resolve();
+                  return Promise.reject(new Error('请输入正确的邮箱格式'));
+                }}),
               ]}
             >
               <Input />
@@ -423,9 +478,13 @@ export default function SettingsPage() {
 
             <Form.Item
               name="password"
-              label="密码"
+              label="新密码"
             >
               <Input.Password />
+            </Form.Item>
+
+            <Form.Item name="current_password" label="当前密码">
+              <Input.Password placeholder="修改密码时填写" />
             </Form.Item>
 
             <Button
@@ -444,14 +503,13 @@ export default function SettingsPage() {
       children: (
         <Card style={{ maxWidth: 480 }}>
           <Form
+            form={webForm}
             layout="vertical"
             initialValues={{
               language: 'zh',
               pageSize: '10',
             }}
-            onFinish={() =>
-              message.success('网页设置已保存')
-            }
+            onFinish={(values) => USE_MOCK ? message.success('网页设置已保存') : savePreferences({ web: values }, '网页设置已保存')}
           >
             <Form.Item
               name="language"

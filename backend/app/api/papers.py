@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.agents.llm_client import LlmError
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
 from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
@@ -104,8 +105,8 @@ def parse(
         return _db_error(request, PaperServiceError("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409))
 
     settings = request.app.state.settings
-    # 排队且尚未开始的任务：调度 Summarize Agent（含服务重启后重新点「解析」的僵死 queued）
-    if settings.parse_agent_ready and data.status == "queued" and data.started_at is None:
+    # 解析由当前 FastAPI 进程直接执行；无 LLM 配置时 runner 使用本地降级摘要。
+    if data.status == "queued" and data.started_at is None:
         background_tasks.add_task(run_parse_agent_job, request.app.state.engine, data.task_id, settings)
     return ApiResponse(data=data, request_id=request.state.request_id)
 
@@ -179,13 +180,17 @@ def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
-@router.get("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="获取知识图谱与研究脉络")
-def paper_graph(
-    paper_id: int,
-    request: Request,
-    db: Session = Depends(db_session),
-    force: bool = Query(default=False, description="强制重新生成图谱"),
-):
+@router.get("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="读取个性化辅助阅读")
+def reading_assist_get(paper_id: int, request: Request, mode: str = Query(default="研究", max_length=16), db: Session = Depends(db_session)):
+    try:
+        data = get_reading_assist(db, paper_id, mode=mode, settings=request.app.state.settings)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="读取论文知识图谱")
+def paper_graph(paper_id: int, request: Request, force: bool = Query(default=False), db: Session = Depends(db_session)):
     try:
         data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=force)
     except PaperServiceError as exc:
@@ -193,7 +198,7 @@ def paper_graph(
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
-@router.post("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="生成/刷新知识图谱与研究脉络")
+@router.post("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="刷新论文知识图谱")
 def rebuild_paper_graph(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
         data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=True)
@@ -202,31 +207,10 @@ def rebuild_paper_graph(paper_id: int, request: Request, db: Session = Depends(d
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
-@router.post("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="按阅读模式生成辅助阅读内容")
+@router.post("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="生成个性化辅助阅读")
 def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Request, db: Session = Depends(db_session)):
     try:
-        data = get_reading_assist(
-            db,
-            paper_id,
-            mode=payload.mode,
-            force=payload.force,
-            settings=request.app.state.settings,
-        )
-    except PaperServiceError as exc:
-        return _db_error(request, exc)
-    return ApiResponse(data=data, request_id=request.state.request_id)
-
-
-@router.get("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="读取某阅读模式的辅助阅读内容")
-def reading_assist_get(
-    paper_id: int,
-    request: Request,
-    db: Session = Depends(db_session),
-    mode: str = Query(default="研究", max_length=16),
-    force: bool = Query(default=False),
-):
-    try:
-        data = get_reading_assist(db, paper_id, mode=mode, force=force, settings=request.app.state.settings)
+        data = get_reading_assist(db, paper_id, mode=payload.mode, force=payload.force, settings=request.app.state.settings)
     except PaperServiceError as exc:
         return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
@@ -252,6 +236,14 @@ def qa(paper_id: str, payload: AskPaperRequest, request: Request, db: Session = 
         data = ask_paper(paper_id, payload)
     except KeyError:
         return _not_found(request, paper_id)
+    except LlmError as exc:
+        message = str(exc)
+        code = "QA_AGENT_UNAVAILABLE" if "未配置" in message or "未启用" in message else "QA_AGENT_FAILED"
+        status_code = 503 if code == "QA_AGENT_UNAVAILABLE" else 502
+        return JSONResponse(
+            status_code=status_code,
+            content=ApiResponse[dict](code=code, message=message, data={}, request_id=request.state.request_id).model_dump(),
+        )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

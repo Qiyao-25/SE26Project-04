@@ -114,3 +114,25 @@ class UserAction(Base):
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     paper: Mapped[Paper] = relationship(back_populates="user_actions")
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    persona: Mapped[str] = mapped_column(String(32), nullable=False, default="研究", server_default="研究")
+    topics: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    preferences: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default="user", server_default="user")
+    is_active: Mapped[bool] = mapped_column(default=True, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
