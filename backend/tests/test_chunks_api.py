@@ -51,6 +51,56 @@ def test_chunk_write_search_and_qa_citations(monkeypatch) -> None:
         assert answer.citations[0]["pageNumber"] == 2
 
 
+def test_retrieval_handles_inflected_contribution_question() -> None:
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="contribution-search", title="Contribution Search", abstract="abstract")]).items[0]
+        upsert_chunks(
+            session,
+            paper.paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(
+                chunk_id="c001",
+                page_no=1,
+                section="Introduction",
+                content="Our contributions introduce a lightweight architecture and improve the model performance.",
+            )]),
+        )
+        matches = search_chunks(
+            session,
+            ChunkSearchRequest(paper_id=paper.paper_id, query="What is the main contribution?", top_k=3),
+        )
+        assert matches
+        assert matches[0][1] >= 0.08
+
+
+def test_chinese_agent_summary_can_cite_english_evidence(monkeypatch) -> None:
+    from app.agents.qa_agent import QaAgentResult
+    import app.service.papers as papers_service
+
+    monkeypatch.setattr(
+        papers_service,
+        "QaAgent",
+        lambda _settings: type("FakeQaAgent", (), {
+            "run": lambda self, **_kwargs: QaAgentResult(
+                "根据原文，该方法使用多头注意力来进行表示学习。", ["c001"], False,
+            ),
+        })(),
+    )
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="cross-language-citation", title="Cross Language Citation", abstract="abstract")]).items[0]
+        upsert_chunks(
+            session,
+            paper.paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(
+                chunk_id="c001",
+                page_no=1,
+                section="Method",
+                content="The model uses multi-head attention for representation learning.",
+            )]),
+        )
+        result = answer_question(session, paper.paper_id, "multi-head attention", settings=agent_settings())
+        assert result.citations[0]["sectionId"] == "c001"
+
+
 def test_qa_without_chunk_evidence_is_rejected() -> None:
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="no-chunk-paper", title="No Chunk", abstract="abstract")]).items[0]

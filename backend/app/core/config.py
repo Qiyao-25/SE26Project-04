@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     parse_agent_timeout_s: float = 90.0
     qa_agent_enabled: bool = True
     qa_agent_timeout_s: float = 90.0
-    qa_agent_top_k: int = 5
+    qa_agent_top_k: int = 8
+    qa_agent_evidence_chars: int = 1400
     search_agent_enabled: bool = True
     search_agent_timeout_s: float = 45.0
     graph_agent_enabled: bool = True

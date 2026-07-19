@@ -395,18 +395,45 @@ def answer_question(
     conversation_id: str | None = None,
     settings=None,
 ) -> QaResponse:
-    from app.service.qa_citations import polish_quote, section_label, select_relevant_chunk_ids
+    from app.service.qa_citations import build_retrieval_query, polish_quote, section_label, select_relevant_chunk_ids
 
     settings = settings or get_settings()
     paper = get_paper(session, paper_id)
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
-    top_k = max(3, int(getattr(settings, "qa_agent_top_k", 3)))
-    matches = [
-        (chunk, score)
-        for chunk, score in search_chunks(session, ChunkSearchRequest(query=question, paper_id=paper_id, top_k=top_k))
-        if score >= MIN_QA_RETRIEVAL_SCORE
-    ]
+    top_k = min(12, max(5, int(getattr(settings, "qa_agent_top_k", 8))))
+    retrieval_query = build_retrieval_query(question, history)
+    agent = QaAgent(settings) if settings.qa_agent_ready else None
+    search_queries = [retrieval_query]
+    rewrite_query = getattr(agent, "rewrite_query", None) if agent is not None else None
+    if callable(rewrite_query):
+        try:
+            plan = rewrite_query(
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                question=question,
+                history=history,
+            )
+        except LlmError:
+            plan = None
+        if plan is not None:
+            if not plan.paper_related:
+                raise PaperServiceError("NO_EVIDENCE", "这个问题与当前论文无关，无法基于论文内容回答", 422)
+            search_queries.extend(plan.search_queries)
+
+    matched_by_id = {}
+    for query in dict.fromkeys(item.strip() for item in search_queries if item and item.strip()):
+        for chunk, score in search_chunks(session, ChunkSearchRequest(query=query, paper_id=paper_id, top_k=top_k)):
+            if score < MIN_QA_RETRIEVAL_SCORE:
+                continue
+            existing = matched_by_id.get(chunk.chunk_id)
+            if existing is None or score > existing[1]:
+                matched_by_id[chunk.chunk_id] = (chunk, score)
+    matches = sorted(
+        matched_by_id.values(),
+        key=lambda item: (item[1], len(item[0].content or ""), item[0].id),
+        reverse=True,
+    )[:top_k]
     if not matches:
         raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
 
@@ -427,10 +454,10 @@ def answer_question(
         if isinstance(item, dict) and item.get("role") and item.get("content")
     ]
 
-    if not settings.qa_agent_ready:
+    if agent is None:
         raise PaperServiceError("QA_AGENT_UNAVAILABLE", "问答 Agent 未配置或未启用，请检查模型配置", 503)
     try:
-        generated = QaAgent(settings).run(
+        generated = agent.run(
             title=paper.title or "",
             question=question,
             evidence=evidence,

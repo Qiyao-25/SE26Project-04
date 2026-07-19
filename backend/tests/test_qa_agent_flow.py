@@ -59,3 +59,25 @@ def test_agent_parses_string_false_as_false(monkeypatch) -> None:
         evidence=[{"chunk_id": "c1", "content": "The method uses attention."}],
     )
     assert result.refuse is False
+
+
+def test_agent_parses_query_plan(monkeypatch) -> None:
+    import app.agents.qa_agent as qa_agent
+
+    monkeypatch.setattr(
+        qa_agent,
+        "chat_completion",
+        lambda **_kwargs: '{"paper_related":true,"search_queries":["lightweight transformer survey","edge deployment findings"]}',
+    )
+    result = qa_agent.QaAgent(type("Settings", (), {
+        "llm_api_key": "test-key",
+        "llm_api_base": "https://example.com/v1",
+        "llm_model": "test-model",
+        "qa_agent_timeout_s": 1,
+    })()).rewrite_query(
+        title="Lightweight Transformers",
+        abstract="A survey of efficient models.",
+        question="What is the main contribution?",
+    )
+    assert result.paper_related is True
+    assert result.search_queries == ["lightweight transformer survey", "edge deployment findings"]
