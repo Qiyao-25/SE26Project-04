@@ -55,6 +55,7 @@ export default function PaperDetailPage() {
   const [content, setContent] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [graphData, setGraphData] = useState(null);
+  const [graphError, setGraphError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
@@ -78,6 +79,7 @@ export default function PaperDetailPage() {
       setContent(null);
       setSummaryData(null);
       setGraphData(null);
+      setGraphError('');
 
       try {
         const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
@@ -95,6 +97,7 @@ export default function PaperDetailPage() {
         setContent(contentResult.status === 'fulfilled' ? contentResult.value : null);
         setSummaryData(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
         setGraphData(graphResult.status === 'fulfilled' ? graphResult.value : null);
+        setGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || '论文加载失败');
@@ -201,6 +204,7 @@ export default function PaperDetailPage() {
     setGraphRefreshing(true);
     try {
       setGraphData(await rebuildPaperGraph(paperId));
+      setGraphError('');
       message.success('知识图谱已刷新');
     } catch (error) {
       message.error(error.message || '知识图谱刷新失败');
@@ -426,11 +430,25 @@ export default function PaperDetailPage() {
           {graphData ? (
             <>
               <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
+                <Space wrap>
+                  <Tag color={graphData.preview ? 'default' : 'success'}>
+                    {graphData.preview ? '解析前主题预览' : '解析后结构化脉络'}
+                  </Tag>
+                  <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
+                </Space>
                 <Button icon={<ReloadOutlined />} loading={graphRefreshing} onClick={handleGraphRefresh}>
                   刷新图谱
                 </Button>
               </Space>
+              {graphData.preview && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="当前为解析前主题脉络预览"
+                  description="完成正文解析后，图谱会补充概念、方法、数据集及更完整的关系。"
+                  style={{ marginBottom: 12 }}
+                />
+              )}
               <Paragraph>{graphData.narrative || '暂无研究脉络说明。'}</Paragraph>
               <PaperGraphCanvas paperId={paperId} nodes={graphData.nodes} edges={graphData.edges} />
               <List
@@ -450,6 +468,14 @@ export default function PaperDetailPage() {
                 )}
               />
             </>
+          ) : graphError ? (
+            <Alert
+              type="error"
+              showIcon
+              message="知识图谱加载失败"
+              description={graphError}
+              action={<Button size="small" onClick={handleGraphRefresh}>重新加载</Button>}
+            />
           ) : <Spin size="small" tip="正在生成知识图谱..." />}
         </div>
       )

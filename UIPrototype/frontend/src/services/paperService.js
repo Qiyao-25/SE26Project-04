@@ -284,7 +284,9 @@ function normalizePaperGraph(data, paperId) {
     })),
     narrative: data.narrative || '',
     source: data.source || 'heuristic',
-    generated: Boolean(data.generated)
+    generated: Boolean(data.generated),
+    parseStatus: data.parseStatus || data.parse_status || 'pending',
+    preview: Boolean(data.preview ?? data.is_preview)
   };
 }
 
@@ -296,7 +298,9 @@ export async function getPaperGraph(paperId, { force = false } = {}) {
     lineage: [{ paper_id: paperId, title: '当前论文', role: 'current', note: '当前阅读论文' }],
     narrative: '演示图谱数据',
     source: 'mock',
-    generated: false
+    generated: false,
+    parseStatus: 'pending',
+    preview: true
   };
   const data = await apiClient.get(`/papers/${paperId}/graph`, { params: force ? { force: true } : undefined });
   return normalizePaperGraph(data, paperId);

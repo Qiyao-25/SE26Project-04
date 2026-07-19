@@ -307,6 +307,8 @@ def _stored_paper_graph(paper: Paper) -> PaperGraphData | None:
         narrative=str(lineage_content.get("narrative") or ""),
         source=str(graph_content.get("source") or lineage_content.get("source") or "heuristic"),
         generated=True,
+        parse_status=parse_status(paper),
+        preview=parse_status(paper) not in {"completed", "qa_ready"},
     )
 
 
@@ -373,6 +375,8 @@ def get_paper_graph(session: Session, paper_id: int, *, settings=None, force: bo
         narrative=graph.narrative,
         source=graph.source,
         generated=True,
+        parse_status=parse_status(paper),
+        preview=parse_status(paper) not in {"completed", "qa_ready"},
     )
     if force:
         _persist_paper_graph(session, paper, data)

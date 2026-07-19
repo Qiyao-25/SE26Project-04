@@ -309,3 +309,5 @@ class PaperGraphData(BaseModel):
     narrative: str = ""
     source: str = "heuristic"
     generated: bool = False
+    parse_status: str = "pending"
+    preview: bool = True
