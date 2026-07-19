@@ -100,7 +100,7 @@ def select_relevant_chunk_ids(
         item = by_id.get(str(chunk_id))
         if item is None or is_noisy_chunk(item.get("content") or ""):
             continue
-        if support_score(answer, item.get("content") or "") >= max(0.03, min_overlap * 0.4) or len(item.get("content") or "") >= 100:
+        if support_score(answer, item.get("content") or "") >= max(0.03, min_overlap * 0.4):
             selected.append(str(chunk_id))
         if len(selected) >= max_citations:
             return selected

@@ -25,6 +25,8 @@ SYSTEM_PROMPT = """你是 PaperMate 的论文问答 Agent。
 3. 证据不足时 refuse=true，evidence_ids 返回空数组，并说明无法核验。
 4. 不要编造页码、实验数字或论文未出现的结论。
 5. 通常引用 1-3 条最相关证据。
+6. 对话历史只用于理解追问上下文，不能作为新的事实来源。
+7. 如果只能做出推断，必须明确标注“根据证据推测”，不能把推测写成论文结论。
 """
 
 
@@ -52,8 +54,10 @@ class QaAgent:
         for index, item in enumerate(evidence, start=1):
             evidence_id = f"E{index}"
             id_map[evidence_id] = str(item["chunk_id"])
+            score = item.get("score")
+            score_text = f" retrieval_score={float(score):.3f}" if score is not None else ""
             evidence_lines.append(
-                f"[{evidence_id}] page={item.get('page_no')} section={item.get('section') or 'body'}\n"
+                f"[{evidence_id}] page={item.get('page_no')} section={item.get('section') or 'body'}{score_text}\n"
                 f"{(item.get('content') or '')[:900]}"
             )
 
@@ -96,7 +100,15 @@ class QaAgent:
             chunk_id = id_map.get(evidence_id)
             if chunk_id and chunk_id not in citation_ids:
                 citation_ids.append(chunk_id)
-        return QaAgentResult(answer=answer, citation_ids=citation_ids, refuse=bool(data.get("refuse")))
+        return QaAgentResult(answer=answer, citation_ids=citation_ids, refuse=_as_bool(data.get("refuse")))
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().casefold() in {"true", "1", "yes", "是"}
+    return bool(value)
 
 
 def _parse_json_object(raw: str) -> dict[str, Any]:

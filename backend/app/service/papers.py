@@ -24,6 +24,9 @@ class PaperServiceError(Exception):
         self.message = message
 
 
+MIN_QA_RETRIEVAL_SCORE = 0.08
+
+
 def parse_status(paper: Paper) -> str:
     return {
         "metadata_only": "pending",
@@ -399,7 +402,11 @@ def answer_question(
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
     top_k = max(3, int(getattr(settings, "qa_agent_top_k", 3)))
-    matches = search_chunks(session, ChunkSearchRequest(query=question, paper_id=paper_id, top_k=top_k))
+    matches = [
+        (chunk, score)
+        for chunk, score in search_chunks(session, ChunkSearchRequest(query=question, paper_id=paper_id, top_k=top_k))
+        if score >= MIN_QA_RETRIEVAL_SCORE
+    ]
     if not matches:
         raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
 
@@ -409,8 +416,9 @@ def answer_question(
             "page_no": chunk.page_no,
             "section": chunk.section,
             "content": chunk.content,
+            "score": score,
         }
-        for chunk, _score in matches
+        for chunk, score in matches
     ]
     chunk_by_id = {chunk.chunk_id: chunk for chunk, _score in matches}
     history_payload = [
@@ -431,6 +439,8 @@ def answer_question(
             raise PaperServiceError("QA_AGENT_FAILED", f"问答生成失败：{exc}", 502) from exc
         if generated.refuse and not generated.citation_ids:
             raise PaperServiceError("NO_EVIDENCE", generated.answer or "依据不足，无法回答该问题", 422)
+        if not generated.citation_ids:
+            raise PaperServiceError("NO_EVIDENCE", "问答 Agent 没有返回有效引用，无法核验回答", 422)
         answer = generated.answer
         selected_ids = select_relevant_chunk_ids(
             answer=answer,
@@ -472,6 +482,8 @@ def answer_question(
             )
     if not answer.strip():
         raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
+    if not citations:
+        raise PaperServiceError("NO_EVIDENCE", "回答没有找到足够的原文依据，请换个问题或先补充解析内容", 422)
 
     return QaResponse(
         conversation_id=conversation_id or f"conversation-{paper.id}",

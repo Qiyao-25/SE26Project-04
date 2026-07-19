@@ -54,6 +54,65 @@ def test_qa_rejects_structured_result_without_original_chunks() -> None:
             raise AssertionError("expected NO_EVIDENCE")
 
 
+def test_qa_rejects_weak_long_chunk_without_query_match() -> None:
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="weak-evidence", title="Weak Evidence", abstract="abstract")]).items[0]
+        upsert_chunks(
+            session,
+            paper.paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(
+                chunk_id="c001",
+                page_no=1,
+                section="Introduction",
+                content="This is a long paragraph about an unrelated optimization benchmark and its training setup. " * 8,
+            )]),
+        )
+        try:
+            answer_question(session, paper.paper_id, "quantum entanglement theorem")
+        except PaperServiceError as exc:
+            assert exc.code == "NO_EVIDENCE"
+            assert exc.status_code == 422
+        else:
+            raise AssertionError("expected NO_EVIDENCE")
+
+
+def test_qa_rejects_agent_answer_without_valid_citation(monkeypatch) -> None:
+    from app.agents.qa_agent import QaAgentResult
+    import app.service.papers as papers_service
+
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="agent-no-citation", title="Agent No Citation", abstract="abstract")]).items[0]
+        upsert_chunks(
+            session,
+            paper.paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(
+                chunk_id="c001",
+                page_no=1,
+                section="Method",
+                content="The model uses multi-head attention for representation learning.",
+            )]),
+        )
+        monkeypatch.setattr(
+            papers_service,
+            "QaAgent",
+            lambda _settings: type("FakeQaAgent", (), {"run": lambda self, **_kwargs: QaAgentResult("unsupported answer", ["c001"], False)})(),
+        )
+        settings = Settings(
+            environment="test",
+            database_url="sqlite:///:memory:",
+            qa_agent_enabled=True,
+            llm_api_key="test-key",
+            llm_model="test-model",
+        )
+        try:
+            answer_question(session, paper.paper_id, "multi-head attention", settings=settings)
+        except PaperServiceError as exc:
+            assert exc.code == "NO_EVIDENCE"
+            assert exc.status_code == 422
+        else:
+            raise AssertionError("expected NO_EVIDENCE")
+
+
 def test_qa_api_payload_normalizes_numeric_citation_paper_id() -> None:
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="qa-contract-paper", title="QA Contract")]).items[0]
