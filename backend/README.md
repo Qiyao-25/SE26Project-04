@@ -28,6 +28,8 @@
 
     cp .env.example .env
 
+`.env.example` 只是可提交的配置模板，真正运行时读取的是 `backend/.env`；该文件已被 Git 忽略，不应提交。后端会按固定路径读取它，因此从项目根目录或 `backend` 目录启动，使用的都是同一份配置。若同名变量同时存在于终端环境和 `.env`，终端环境变量优先。
+
 默认使用 data/dev.db。测试使用内存 SQLite，不会污染开发数据库。PostgreSQL 只需替换：
 
     PAPERMATE_ENV=dev
@@ -43,7 +45,13 @@ python -m pip install -e ".[postgres]"
     PAPERMATE_LLM_MODEL=模型名称
     PAPERMATE_LLM_API_BASE=https://api.openai.com/v1
 
-未配置模型时，解析仍会执行 PDF 抽取和本地降级摘要；模型调用失败时也会自动降级，不会让任务永久停留在 queued。`PAPERMATE_AGENT_*` 旧变量名仍兼容。
+问答接口要求配置并启用 QA Agent；未配置时会明确返回 Agent 未配置，模型调用失败时会返回调用失败，不会使用不可靠的本地抽取内容冒充智能问答。论文解析仍可执行 PDF 抽取和本地结果整理。`PAPERMATE_AGENT_*` 旧变量名仍兼容，但新配置建议统一使用 `PAPERMATE_LLM_*` 和 `PAPERMATE_*_AGENT_*`。
+
+可用下面的命令检查当前生效配置（只输出是否配置，不输出密钥）：
+
+```bash
+python -c "from app.core.config import get_settings; s=get_settings(); print({'env_file':'backend/.env','environment':s.environment,'llm_model':s.llm_model,'llm_api_base':s.llm_api_base,'qa_agent_enabled':s.qa_agent_enabled,'qa_agent_ready':s.qa_agent_ready,'api_key_configured':bool(s.llm_api_key.strip())})"
+```
 
 认证接口：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/account`。前端登录后通过 Bearer Token 访问后端。
 
