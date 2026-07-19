@@ -21,6 +21,10 @@ _QUERY_EXPANSION = {
     "注意力": ["attention", "self-attention", "multi-head"],
     "训练": ["training", "optimizer", "learn"],
 }
+_ACADEMIC_HINTS = (
+    "论文", "模型", "方法", "实验", "结果", "训练", "注意力", "创新", "局限",
+    "数据集", "作者", "结论", "性能", "架构", "参数", "贡献", "讲了什么",
+)
 
 
 def tokens(value: str) -> set[str]:
@@ -42,7 +46,11 @@ def expand_query_tokens(query: str) -> set[str]:
         if keyword in query:
             for addition in additions:
                 expanded.update(tokens(addition))
-    if not any(re.search(r"[a-z]", item) for item in expanded) and re.search(r"[\u4e00-\u9fff]", query):
+    if (
+        not any(re.search(r"[a-z]", item) for item in expanded)
+        and re.search(r"[\u4e00-\u9fff]", query)
+        and any(hint in query for hint in _ACADEMIC_HINTS)
+    ):
         expanded.update({"method", "model", "attention", "result", "experiment"})
     return expanded
 

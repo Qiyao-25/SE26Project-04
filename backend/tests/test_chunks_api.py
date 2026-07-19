@@ -76,6 +76,28 @@ def test_qa_rejects_weak_long_chunk_without_query_match() -> None:
             raise AssertionError("expected NO_EVIDENCE")
 
 
+def test_qa_rejects_non_paper_question_in_chinese() -> None:
+    with make_session() as session:
+        paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="non-paper-question", title="Non Paper Question", abstract="abstract")]).items[0]
+        upsert_chunks(
+            session,
+            paper.paper_id,
+            TextChunkBatch(chunks=[TextChunkInput(
+                chunk_id="c001",
+                page_no=1,
+                section="Method",
+                content="The transformer uses multi-head attention for representation learning.",
+            )]),
+        )
+        try:
+            answer_question(session, paper.paper_id, "我今晚吃什么")
+        except PaperServiceError as exc:
+            assert exc.code == "NO_EVIDENCE"
+            assert exc.status_code == 422
+        else:
+            raise AssertionError("expected NO_EVIDENCE")
+
+
 def test_qa_rejects_agent_answer_without_valid_citation(monkeypatch) -> None:
     from app.agents.qa_agent import QaAgentResult
     import app.service.papers as papers_service
