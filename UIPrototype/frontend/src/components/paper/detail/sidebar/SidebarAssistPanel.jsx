@@ -1,9 +1,9 @@
-import { Alert, Typography, Segmented } from 'antd';
-import { useCallback, useEffect, useState } from 'react';
+import { Alert, Tag, Typography, Segmented, Spin } from 'antd';
+import { useEffect, useState } from 'react';
 import { useApp } from '../../../../context/AppContext';
-import { MODE_DESC, PERSONAS } from '../../../../data/papers';
+import { PERSONAS } from '../../../../data/papers';
 import { getReadingAssist } from '../../../../services/paperService';
-import ReadingAssistView from '../ReadingAssistView';
+import { isPersistedPaperId } from '../../../../services/learningService';
 
 const { Text } = Typography;
 
@@ -11,11 +11,30 @@ export default function SidebarAssistPanel({ paper, paperId }) {
   const { persona, setPersona } = useApp();
   const resolvedId = paperId || paper?.paperId || paper?.id;
   const parsed = ['completed', 'qa_ready'].includes(paper.parseStatus);
+  const [assist, setAssist] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!parsed || !isPersistedPaperId(paperId)) {
+      setAssist(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    getReadingAssist(paperId, { mode: persona })
+      .then((data) => { if (!cancelled) setAssist(data); })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message || '辅助阅读加载失败'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [paperId, parsed, persona]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
 
-  const load = useCallback(async ({ force = false, mode = persona } = {}) => {
+  const load = async ({ force = false, mode = persona } = {}) => {
     if (!resolvedId || !parsed) return;
     setLoading(true);
     setError('');
@@ -28,7 +47,7 @@ export default function SidebarAssistPanel({ paper, paperId }) {
     } finally {
       setLoading(false);
     }
-  }, [parsed, persona, resolvedId]);
+  };
 
   useEffect(() => {
     if (!parsed) {
@@ -38,7 +57,7 @@ export default function SidebarAssistPanel({ paper, paperId }) {
     }
     load({ force: false, mode: persona });
     return undefined;
-  }, [load, parsed, persona]);
+  }, [resolvedId, persona, parsed]);
 
   return (
     <div>
@@ -60,13 +79,15 @@ export default function SidebarAssistPanel({ paper, paperId }) {
         description={MODE_DESC[persona]}
       />
       {parsed ? (
-        <ReadingAssistView
-          data={data}
-          loading={loading}
-          error={error}
-          onRetry={() => load({ force: true, mode: persona })}
-          onRefresh={() => load({ force: true, mode: persona })}
-        />
+        <>
+          <Text className="block-label">个性化总结 · <Tag>{persona}模式</Tag></Text>
+          {loading && <Spin size="small" tip="正在生成辅助阅读..." />}
+          {error && <Alert type="error" showIcon message="辅助阅读加载失败" description={error} />}
+          {!loading && !error && assist && <>
+            <Text strong>{assist.headline}</Text>
+            {assist.sections.map((section) => <div key={section.title} style={{ marginTop: 10 }}><Text strong>{section.title}</Text><ul>{(section.bullets || []).map((bullet) => <li key={bullet}><Paragraph style={{ margin: 0, fontSize: 12 }}>{bullet}</Paragraph></li>)}</ul></div>)}
+          </>}
+        </>
       ) : (
         <Alert
           type="info"

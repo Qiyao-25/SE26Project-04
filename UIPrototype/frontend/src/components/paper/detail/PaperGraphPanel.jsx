@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
@@ -130,7 +130,7 @@ export default function PaperGraphPanel({ paperId, paperTitle }) {
   const [error, setError] = useState('');
   const [graph, setGraph] = useState(null);
 
-  const load = useCallback(async ({ force = false } = {}) => {
+  const load = async ({ force = false } = {}) => {
     setError('');
     if (force) setRebuilding(true);
     else setLoading(true);
@@ -144,11 +144,11 @@ export default function PaperGraphPanel({ paperId, paperTitle }) {
       setLoading(false);
       setRebuilding(false);
     }
-  }, [paperId]);
+  };
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [paperId]);
 
   const view = useMemo(() => partitionGraph(graph, paperId), [graph, paperId]);
   const nodeMap = useMemo(() => {
