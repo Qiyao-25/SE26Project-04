@@ -11,6 +11,7 @@ from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseReque
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
+from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
 
