@@ -1,0 +1,4 @@
+# Local secrets and runtime artifacts (repo root)
+dist/
+*.tar.gz
+.DS_Store

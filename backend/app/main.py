@@ -43,13 +43,14 @@ async def lifespan(app: FastAPI):
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    docs_enabled = bool(settings.enable_docs)
     app = FastAPI(
         title="PaperMate Backend API",
-        description="PaperMate 技术原型迭代二后端 API",
+        description="PaperMate 技术原型后端 API",
         version=settings.version,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
         lifespan=lifespan,
     )
     app.state.settings = settings
