@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     graph_agent_timeout_s: float = 60.0
     assist_agent_enabled: bool = True
     assist_agent_timeout_s: float = 60.0
+    # Scheduled arXiv subscription crawl (Demo)
+    crawl_enabled: bool = True
+    crawl_interval_s: int = 21600  # 6 hours
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -75,6 +78,8 @@ class Settings(BaseSettings):
             self.llm_model = self.agent_model.strip()
         if self.agent_timeout_s != 30.0:
             self.qa_agent_timeout_s = self.agent_timeout_s
+        if self.environment == "test":
+            self.crawl_enabled = False
         return self
 
     @property

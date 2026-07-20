@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import PaperItem
-from app.service.recommendations import daily_picks, profile_recommendations
+from app.service.recommendations import daily_picks, profile_recommendations, subscription_recommendations
 
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
@@ -40,5 +40,22 @@ def profile(
             db, user_id=user_id, persona=persona, topics=topic_values,
             limit=limit, exclude_ids=excluded,
         ),
+        request_id=request.state.request_id,
+    )
+
+
+@router.get("/subscriptions", response_model=ApiResponse[list[PaperItem]], summary="读取订阅同步论文推荐")
+def from_subscriptions(
+    request: Request,
+    user_id: str = Query(min_length=1, max_length=128),
+    limit: int = Query(default=6, ge=1, le=20),
+    exclude_ids: str | None = Query(default=None, max_length=500),
+    current_user: AuthUser = Depends(require_current_user),
+    db: Session = Depends(db_session),
+):
+    ensure_same_user(user_id, current_user)
+    excluded = [int(item) for item in (exclude_ids or "").split(",") if item.strip().isdigit()]
+    return ApiResponse(
+        data=subscription_recommendations(db, user_id=user_id, limit=limit, exclude_ids=excluded),
         request_id=request.state.request_id,
     )

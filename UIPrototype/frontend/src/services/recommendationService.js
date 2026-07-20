@@ -33,7 +33,9 @@ function normalizeRecommendedPaper(paper) {
     chunkCount: paper.chunkCount ?? paper.chunk_count ?? 0,
     qaReady: Boolean(paper.qaReady ?? paper.qa_ready),
     sourceUrl: paper.sourceUrl || paper.source_url || '',
-    pdfUrl: paper.pdfUrl || paper.pdf_url || ''
+    pdfUrl: paper.pdfUrl || paper.pdf_url || '',
+    reason: paper.reason || '',
+    recommendSource: paper.recommendSource || paper.recommend_source || ''
   };
 }
 
@@ -90,4 +92,33 @@ export async function fetchProfileRecommendations({
     }
   });
   return normalizeRecommendations(data);
+}
+
+/** 订阅同步论文流 */
+export async function fetchSubscriptionRecommendations({
+  userId = 'demo-user',
+  limit = 6,
+  excludeIds = []
+} = {}) {
+  if (USE_MOCK) {
+    const data = await searchPapers({ page: 1, pageSize: 12, sortBy: 'date' });
+    return shuffle(data.items || []).slice(0, limit);
+  }
+  const data = await apiClient.get('/recommendations/subscriptions', {
+    params: {
+      user_id: userId,
+      limit,
+      exclude_ids: excludeIds.join(',')
+    }
+  });
+  return normalizeRecommendations(data);
+}
+
+export async function syncSubscriptions(userId, { maxPerSubscription = 5 } = {}) {
+  if (USE_MOCK) {
+    return { fetched: 0, created: 0, updated: 0, message: 'Mock 模式跳过同步', paper_ids: [] };
+  }
+  return apiClient.post('/subscriptions/sync', {}, {
+    params: { user_id: userId, max_per_subscription: maxPerSubscription }
+  });
 }

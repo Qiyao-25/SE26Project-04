@@ -86,6 +86,7 @@ export default function PaperCard({ paperId, paper: paperProp, compact = false }
           <Tag color="blue">{category}</Tag>
           <Tag>arXiv:{arxivId}</Tag>
           <Tag icon={<CalendarOutlined />}>{publishedAt}</Tag>
+          {paper.reason ? <Tag color="purple">{paper.reason}</Tag> : null}
         </Space>
 
         <Paragraph

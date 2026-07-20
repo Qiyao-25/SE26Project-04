@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, useCallback, useEffect } from 'react';
-import { DEFAULT_PAPER_NOTES, getDefaultCompareTarget } from '../data/papers';
+import { DEFAULT_PAPER_NOTES } from '../data/papers';
 import { getCurrentUser, loginUser, registerUser } from '../services/authService';
+import { getLearningProfile } from '../services/learningService';
 import { USE_MOCK } from '../services/runtimeConfig';
 
 const WIREFRAME_DEMO = false;
@@ -34,6 +35,17 @@ export function AppProvider({ children }) {
     localStorage.removeItem('papermate.role');
   }, []);
 
+  const hydrateProfile = useCallback(async (nextUserId) => {
+    if (USE_MOCK || !nextUserId) return;
+    try {
+      const profile = await getLearningProfile(nextUserId);
+      if (profile?.persona) setPersona(profile.persona);
+      if (Array.isArray(profile?.topics)) setTopics(profile.topics);
+    } catch {
+      // Profile hydrate is best-effort; onboarding / Learning can still set it.
+    }
+  }, []);
+
   const applyUser = useCallback((user) => {
     setLoggedIn(true);
     setIsAdmin(user.role === 'admin');
@@ -54,8 +66,10 @@ export function AppProvider({ children }) {
     }
     let cancelled = false;
     getCurrentUser()
-      .then((user) => {
-        if (!cancelled) applyUser(user);
+      .then(async (user) => {
+        if (cancelled) return;
+        applyUser(user);
+        await hydrateProfile(user.user_id);
       })
       .catch(() => {
         if (!cancelled) clearAuth();
@@ -67,13 +81,14 @@ export function AppProvider({ children }) {
       cancelled = true;
       window.removeEventListener('papermate:auth-expired', onAuthExpired);
     };
-  }, [applyUser, clearAuth]);
+  }, [applyUser, clearAuth, hydrateProfile]);
 
   const applyAuth = useCallback((data) => {
     applyUser(data.user);
     localStorage.setItem('papermate.accessToken', data.access_token);
     setAuthReady(true);
-  }, [applyUser]);
+    hydrateProfile(data.user.user_id);
+  }, [applyUser, hydrateProfile]);
 
   const login = useCallback(async (loginEmail, password) => {
     const data = await loginUser(loginEmail, password);
@@ -111,10 +126,20 @@ export function AppProvider({ children }) {
       return { ...prev, [paperId]: data };
     });
   }, []);
+  // Entering a paper must not reshuffle A/B: if it is already A or B, keep slots.
   const setCompareForPaper = useCallback((paperId) => {
+    const id = String(paperId);
+    if (String(comparePaperA) === id) {
+      setCompareActiveSlot('a');
+      return;
+    }
+    if (String(comparePaperB) === id) {
+      setCompareActiveSlot('b');
+      return;
+    }
     setComparePaperA(paperId);
-    setComparePaperB((b) => (b === paperId ? getDefaultCompareTarget(paperId) : b));
-  }, []);
+    setCompareActiveSlot('a');
+  }, [comparePaperA, comparePaperB]);
   const exitLockedPaper = useCallback(() => {
     setLockedPaperId(null);
   }, []);

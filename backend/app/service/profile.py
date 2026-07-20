@@ -25,31 +25,53 @@ def _to_data(profile: UserProfile) -> UserProfileData:
     )
 
 
-def get_profile(session: Session, user_id: str) -> UserProfileData:
-    user_id = user_id.strip()
-    if not user_id:
-        raise ValueError("USER_ID_INVALID")
+def _get_or_create(session: Session, user_id: str) -> UserProfile:
     profile = session.get(UserProfile, user_id)
     if profile is None:
         profile = UserProfile(user_id=user_id, persona="研究", topics=[], preferences={})
         session.add(profile)
         session.commit()
         session.refresh(profile)
-    return _to_data(profile)
+    return profile
+
+
+def get_profile(session: Session, user_id: str) -> UserProfileData:
+    user_id = user_id.strip()
+    if not user_id:
+        raise ValueError("USER_ID_INVALID")
+    return _to_data(_get_or_create(session, user_id))
 
 
 def update_profile(session: Session, user_id: str, payload: UserProfileUpdate) -> UserProfileData:
     user_id = user_id.strip()
     if not user_id:
         raise ValueError("USER_ID_INVALID")
-    persona = payload.persona if payload.persona in PERSONAS else "研究"
-    profile = session.get(UserProfile, user_id)
-    if profile is None:
-        profile = UserProfile(user_id=user_id)
-        session.add(profile)
-    profile.persona = persona
-    profile.topics = _normalize_topics(payload.topics)
-    profile.preferences = payload.preferences
+    profile = _get_or_create(session, user_id)
+
+    if payload.persona is not None:
+        profile.persona = payload.persona if payload.persona in PERSONAS else profile.persona
+    if payload.topics is not None:
+        profile.topics = _normalize_topics(payload.topics)
+    if payload.preferences is not None:
+        merged = dict(profile.preferences or {})
+        merged.update(payload.preferences)
+        profile.preferences = merged
+
+    profile.updated_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(profile)
+    return _to_data(profile)
+
+
+def patch_profile_preferences(session: Session, user_id: str, patch: dict) -> UserProfileData:
+    """Merge top-level preference keys without touching persona/topics."""
+    user_id = user_id.strip()
+    if not user_id:
+        raise ValueError("USER_ID_INVALID")
+    profile = _get_or_create(session, user_id)
+    merged = dict(profile.preferences or {})
+    merged.update(patch or {})
+    profile.preferences = merged
     profile.updated_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(profile)
