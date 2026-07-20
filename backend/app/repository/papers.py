@@ -12,19 +12,39 @@ def normalize_author_name(value: str) -> str:
 
 
 def upsert_paper(session: Session, payload: PaperUpsert) -> tuple[Paper, bool]:
-    paper = session.scalar(select(Paper).where(Paper.arxiv_id == payload.arxiv_id))
-    created = paper is None
-    if paper is None:
-        paper = Paper(arxiv_id=payload.arxiv_id, title=payload.title)
-        session.add(paper)
+    from app.service.dedupe import normalize_arxiv_id, normalize_title
 
+    arxiv_id = normalize_arxiv_id(payload.arxiv_id)
+    paper = session.scalar(select(Paper).where(Paper.arxiv_id == arxiv_id))
+    created = False
+
+    # Secondary dedup: same normalized title → update existing row instead of insert
+    if paper is None:
+        title_key = normalize_title(payload.title)
+        if title_key:
+            candidates = session.scalars(
+                select(Paper).where(Paper.deleted_at.is_(None)).order_by(Paper.id.desc()).limit(300)
+            ).all()
+            for candidate in candidates:
+                if normalize_title(candidate.title or "") == title_key:
+                    paper = candidate
+                    break
+
+    if paper is None:
+        paper = Paper(arxiv_id=arxiv_id, title=payload.title)
+        session.add(paper)
+        created = True
+
+    paper.arxiv_id = paper.arxiv_id or arxiv_id
     paper.title = payload.title
     paper.abstract = payload.abstract
     paper.published_at = payload.published_at
     paper.primary_category = payload.primary_category
     paper.pdf_url = payload.pdf_url
     paper.source_url = payload.source_url
-    paper.ingest_status = payload.ingest_status
+    # Do not downgrade a richer ingest_status on title-merge updates
+    if created or paper.ingest_status in {None, "", "metadata_only"}:
+        paper.ingest_status = payload.ingest_status
 
     if payload.authors:
         paper.authors.clear()

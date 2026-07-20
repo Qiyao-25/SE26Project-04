@@ -102,7 +102,21 @@ def sync_subscriptions(
     client = client or ArxivClient(min_interval_s=3.0)
     payloads: list[PaperUpsert] = []
     seen_ids: set[str] = set()
+    seen_titles: set[str] = set()
     errors: list[str] = []
+    skipped_dupes = 0
+
+    from app.service.dedupe import normalize_title
+    from app.model import Paper
+    from sqlalchemy import select
+
+    existing_by_title: dict[str, int] = {}
+    for paper in session.scalars(select(Paper).where(Paper.deleted_at.is_(None))).all():
+        key = normalize_title(paper.title or "")
+        if key and key not in existing_by_title:
+            existing_by_title[key] = paper.id
+
+    reused_ids: list[int] = []
 
     for item in enabled:
         query = _build_query(item)
@@ -114,8 +128,20 @@ def sync_subscriptions(
             continue
         for meta in metas:
             if meta.arxiv_id in seen_ids:
+                skipped_dupes += 1
+                continue
+            title_key = normalize_title(meta.title or "")
+            if title_key and title_key in seen_titles:
+                skipped_dupes += 1
+                continue
+            if title_key and title_key in existing_by_title:
+                skipped_dupes += 1
+                reused_ids.append(existing_by_title[title_key])
+                seen_titles.add(title_key)
                 continue
             seen_ids.add(meta.arxiv_id)
+            if title_key:
+                seen_titles.add(title_key)
             payloads.append(
                 PaperUpsert(
                     arxiv_id=meta.arxiv_id,
@@ -138,7 +164,8 @@ def sync_subscriptions(
         updated = result.updated
         paper_ids = [item.paper_id for item in result.items]
 
-        # Tag recently synced ids for subscription feed
+    paper_ids = list(dict.fromkeys([*paper_ids, *reused_ids]))
+    if paper_ids or skipped_dupes or errors:
         recent = list(dict.fromkeys([*(prefs.get("subscription_paper_ids") or []), *paper_ids]))[-200:]
         patch_profile_preferences(
             session,
@@ -148,15 +175,18 @@ def sync_subscriptions(
                 "subscription_paper_ids": recent,
                 "last_subscription_sync_at": datetime.now(timezone.utc).isoformat(),
                 "last_subscription_sync_stats": {
-                    "fetched": len(payloads),
+                    "fetched": len(payloads) + skipped_dupes,
                     "created": created,
                     "updated": updated,
+                    "deduped": skipped_dupes,
                     "errors": errors[:5],
                 },
             },
         )
 
     message = f"同步完成：抓取 {len(payloads)} 篇，新建 {created}，更新 {updated}"
+    if skipped_dupes:
+        message += f"，去重跳过 {skipped_dupes}"
     if errors:
         message += f"；部分失败 {len(errors)} 项"
     return SubscriptionSyncResult(
@@ -164,6 +194,7 @@ def sync_subscriptions(
         fetched=len(payloads),
         created=created,
         updated=updated,
+        deduped=skipped_dupes,
         paper_ids=paper_ids,
         message=message,
         synced_at=datetime.now(timezone.utc),

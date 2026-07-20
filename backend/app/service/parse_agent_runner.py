@@ -16,6 +16,7 @@ from app.agents.graph_agent import GraphAgent
 from app.core.config import Settings, get_settings
 from app.model import ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
+from app.service.content_validator import ContentValidationAgent
 from app.service.papers import get_related_paper_payloads
 from app.service.tasks import save_parse_result
 
@@ -82,6 +83,21 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
             arxiv_id=paper.arxiv_id or str(paper.id),
         )
 
+    _mark_running(session, task, paper, stage="validate")
+    body_chars = len((body_text or paper.abstract or "").strip())
+    report = ContentValidationAgent().validate_wiki(
+        summary=wiki.summary,
+        concepts=wiki.concepts,
+        methods=wiki.methods,
+        experiments=wiki.experiments,
+        limitations=wiki.limitations,
+        page_count=page_count,
+        body_chars=body_chars,
+        existing_flags=wiki.validation_flags,
+        source=wiki.source,
+    )
+    wiki.validation_flags = report.flags
+
     _mark_running(session, task, paper, stage="graph")
     related = get_related_paper_payloads(session, paper)
     graph = GraphAgent(settings).run(
@@ -100,7 +116,10 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
 
     _mark_running(session, task, paper, stage="persist")
     chunks = _text_to_chunks(body_text or paper.abstract or "", max_chunks=80)
-    result_rows = [*wiki.to_structured_rows(page_count=page_count), *graph.to_structured_rows()]
+    result_rows = [
+        *wiki.to_structured_rows(page_count=page_count, uncertain_fields=report.uncertain_fields),
+        *graph.to_structured_rows(),
+    ]
     results = [
         StructuredResultInput(
             result_type=row["result_type"],
@@ -241,7 +260,7 @@ def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
                     {
                         "chunk_id": f"p{page_no}-{len(chunks) + 1}",
                         "page_no": int(page_no),
-                        "section": "body",
+                        "section": _guess_section(piece),
                         "content": piece,
                     }
                 )
@@ -254,11 +273,27 @@ def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
             {
                 "chunk_id": f"c-{len(chunks) + 1}",
                 "page_no": 1,
-                "section": "body",
+                "section": _guess_section(piece),
                 "content": piece,
             }
         )
     return chunks
+
+
+def _guess_section(text: str) -> str:
+    head = (text or "")[:220].casefold()
+    rules = (
+        (("abstract", "摘要"), "abstract"),
+        (("introduction", "引言", "背景"), "introduction"),
+        (("related work", "related works", "相关工作"), "related_work"),
+        (("method", "approach", "architecture", "模型", "方法"), "method"),
+        (("experiment", "evaluation", "result", "实验", "结果"), "experiments"),
+        (("limitation", "discussion", "conclusion", "局限", "讨论", "结论"), "discussion"),
+    )
+    for keywords, label in rules:
+        if any(keyword in head for keyword in keywords):
+            return label
+    return "body"
 
 
 def _split_pieces(text: str, *, size: int) -> list[str]:

@@ -24,21 +24,22 @@ export default function ChatPanel({ messages, minHeight = 120 }) {
             {citations.map((citation, citationIndex) => (
               <div
                 key={citation.citationId || `${citation.paperId}-${citationIndex}`}
+                className="qa-citation"
                 style={{
                   marginTop: 8,
                   padding: '8px 10px',
-                  borderLeft: '3px solid #8b5cf6',
+                  borderLeft: '3px solid #3b63f4',
                   borderRadius: 4,
-                  background: 'rgba(139, 92, 246, 0.06)'
+                  background: 'rgba(59, 99, 244, 0.06)'
                 }}
               >
                 <Text strong style={{ fontSize: 11 }}>
-                  引用 {citationIndex + 1}：{citation.sectionTitle || '论文原文'}
+                  出处 {citationIndex + 1}：{citation.sectionTitle || '论文原文'}
+                  {citation.pageNumber ? ` · 第 ${citation.pageNumber} 页` : ''}
                 </Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  {citation.pageNumber ? `第 ${citation.pageNumber} 页 · ` : ''}
-                  {citation.quote}
+                  “{citation.quote}”
                 </Text>
               </div>
             ))}

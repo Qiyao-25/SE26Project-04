@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from math import ceil
 from uuid import uuid4
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +15,8 @@ from app.model import Paper, StructuredResult
 from app.repository.chunks import search_chunks
 from app.repository.papers import get_paper, list_papers, upsert_paper
 from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
+
+logger = logging.getLogger("papermate.qa")
 
 
 class PaperServiceError(Exception):
@@ -192,6 +195,9 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
     method_content = methods.content_json.get("items", []) if parsed and methods else (wiki.content_json.get("methods", "") if parsed and wiki else [])
     experiment_content = experiments.content_json.get("items", []) if parsed and experiments else []
     validation_flags = validation.content_json.get("flags", []) if parsed and validation else []
+    uncertain_fields = validation.content_json.get("uncertain_fields", []) if parsed and validation else []
+    from app.service.content_validator import flag_labels
+
     if isinstance(concept_content, str):
         concept_content = [{"conceptId": f"{paper.id}-concept-1", "name": "Core Concept", "description": concept_content}]
     if isinstance(method_content, str):
@@ -205,6 +211,8 @@ def get_wiki(session: Session, paper_id: int) -> WikiData:
         experiments=experiment_content,
         limitations=(by_type.get("limitations").content_json.get("items", []) if parsed and by_type.get("limitations") else []),
         validation_flags=validation_flags,
+        validation_labels=flag_labels(validation_flags),
+        uncertain_fields=list(uncertain_fields or []),
         source_locator=(wiki.source_locator if parsed and wiki else (summary.source_locator if parsed and summary else {})),
         chunk_count=paper.chunk_count,
         qa_ready=paper.ingest_status == "qa_ready" and paper.chunk_count > 0,
@@ -455,28 +463,33 @@ def answer_question(
     ]
 
     if agent is None:
-        raise PaperServiceError("QA_AGENT_UNAVAILABLE", "问答 Agent 未配置或未启用，请检查模型配置", 503)
-    try:
-        generated = agent.run(
-            title=paper.title or "",
-            question=question,
-            evidence=evidence,
-            history=history_payload,
-        )
-    except LlmError as exc:
-        raise PaperServiceError("QA_AGENT_FAILED", f"问答生成失败：{exc}", 502) from exc
-    if generated.refuse:
-        raise PaperServiceError("NO_EVIDENCE", generated.answer or "依据不足，无法核验该问题", 422)
-    if not generated.citation_ids:
-        raise PaperServiceError("NO_EVIDENCE", "问答 Agent 没有返回有效引用，无法核验回答", 422)
-    answer = generated.answer
-    selected_ids = select_relevant_chunk_ids(
-        answer=answer,
-        evidence=evidence,
-        preferred_ids=generated.citation_ids,
-        min_overlap=0.06,
-        max_citations=3,
-    )
+        answer, citation_ids = _extractive_answer(question, evidence)
+        selected_ids = citation_ids[:3]
+    else:
+        try:
+            generated = agent.run(
+                title=paper.title or "",
+                question=question,
+                evidence=evidence,
+                history=history_payload,
+            )
+        except LlmError as exc:
+            logger.warning("qa_agent_fallback paper_id=%s err=%s", paper_id, exc)
+            answer, citation_ids = _extractive_answer(question, evidence)
+            selected_ids = citation_ids[:3]
+        else:
+            if generated.refuse:
+                raise PaperServiceError("NO_EVIDENCE", generated.answer or "依据不足，无法核验该问题", 422)
+            if not generated.citation_ids:
+                raise PaperServiceError("NO_EVIDENCE", "问答 Agent 没有返回有效引用，无法核验回答", 422)
+            answer = generated.answer
+            selected_ids = select_relevant_chunk_ids(
+                answer=answer,
+                evidence=evidence,
+                preferred_ids=generated.citation_ids,
+                min_overlap=0.06,
+                max_citations=3,
+            )
 
     citations = []
     for chunk_id in selected_ids:
@@ -509,3 +522,30 @@ def answer_question(
         created_at=datetime.now(timezone.utc),
         citations=citations,
     )
+
+
+def _extractive_answer(question: str, evidence: list[dict]) -> tuple[str, list[str]]:
+    """Build a grounded answer from top evidence chunks when LLM Agent is unavailable."""
+    from app.service.qa_citations import polish_quote
+
+    top = evidence[:3]
+    if not top:
+        raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
+    quotes = []
+    ids = []
+    for item in top:
+        quote = polish_quote(item.get("content") or "", answer=question, max_len=180)
+        if not quote:
+            continue
+        page = item.get("page_no")
+        page_hint = f"（第 {page} 页）" if page else ""
+        quotes.append(f"- {quote}{page_hint}")
+        ids.append(str(item["chunk_id"]))
+    if not quotes:
+        raise PaperServiceError("NO_EVIDENCE", "检索到的原文片段不足以支撑回答", 422)
+    answer = (
+        "基于论文原文片段（抽取式回答，未调用问答 Agent）：\n"
+        + "\n".join(quotes)
+        + "\n\n如需更完整的归纳，请配置 LLM 后重试。"
+    )
+    return answer, ids

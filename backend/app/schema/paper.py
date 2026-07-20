@@ -92,5 +92,7 @@ class PaperSummary(BaseModel):
     experiments: list[ExperimentItem] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     validationFlags: list[str] = Field(default_factory=list)
+    validationLabels: list[str] = Field(default_factory=list)
+    uncertainFields: list[str] = Field(default_factory=list)
     chunkCount: int = 0
     qaReady: bool = False

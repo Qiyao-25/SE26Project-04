@@ -9,6 +9,7 @@ from .arxiv_client import PaperMeta
 
 _SPACE = re.compile(r"\s+")
 _VERSION = re.compile(r"v\d+$", re.I)
+_PUNCT = re.compile(r"[^\w\u4e00-\u9fff]+", re.UNICODE)
 
 
 def clean_text(value: str) -> str:
@@ -19,6 +20,11 @@ def normalize_arxiv_id(arxiv_id: str) -> str:
     aid = (arxiv_id or "").strip()
     aid = aid.rsplit("/", 1)[-1]
     return _VERSION.sub("", aid)
+
+
+def normalize_title(title: str) -> str:
+    value = clean_text(title).casefold()
+    return _PUNCT.sub("", value)
 
 
 def clean_paper(paper: PaperMeta) -> PaperMeta | None:
@@ -52,3 +58,20 @@ def dedupe_by_id(papers: Iterable[PaperMeta]) -> list[PaperMeta]:
         seen.add(p.arxiv_id)
         out.append(p)
     return out
+
+
+def dedupe_by_title(papers: Iterable[PaperMeta]) -> list[PaperMeta]:
+    """Keep first paper per normalized title (secondary guard after arxiv_id)."""
+    seen: set[str] = set()
+    out: list[PaperMeta] = []
+    for paper in papers:
+        key = normalize_title(paper.title)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(paper)
+    return out
+
+
+def dedupe_papers(papers: Iterable[PaperMeta]) -> list[PaperMeta]:
+    return dedupe_by_title(dedupe_by_id(papers))

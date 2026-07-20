@@ -20,7 +20,7 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 from pipeline.crawler.arxiv_client import ArxivClient  # noqa: E402
-from pipeline.crawler.clean import clean_paper, dedupe_by_id  # noqa: E402
+from pipeline.crawler.clean import clean_paper, dedupe_papers  # noqa: E402
 from pipeline.crawler.ingest import ingest_papers  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]  # PaperPipeline
@@ -80,7 +80,7 @@ def crawl_until(
                     )
                     continue
                 collected.append(cleaned)
-            collected = dedupe_by_id(collected)
+            collected = dedupe_papers(collected)
             start += len(batch)
             if len(batch) < need:
                 break

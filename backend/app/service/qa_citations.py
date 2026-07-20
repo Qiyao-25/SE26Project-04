@@ -187,6 +187,16 @@ def select_relevant_chunk_ids(
 
 
 def section_label(section: str | None, content: str) -> str:
+    labels = {
+        "abstract": "Abstract",
+        "introduction": "Introduction",
+        "related_work": "Related Work",
+        "method": "Method",
+        "experiments": "Experiments",
+        "discussion": "Discussion",
+    }
+    if section and section in labels:
+        return labels[section]
     if section and section not in {"body", "unknown"}:
         return section
     lowered = (content or "")[:200].casefold()

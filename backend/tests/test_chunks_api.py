@@ -223,7 +223,7 @@ def test_qa_api_payload_normalizes_numeric_citation_paper_id(monkeypatch) -> Non
         assert validated.citations[0].paperId == str(paper.paper_id)
 
 
-def test_qa_does_not_use_extractive_fallback_when_agent_unavailable() -> None:
+def test_qa_uses_extractive_fallback_when_agent_unavailable() -> None:
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="agent-required", title="Agent Required", abstract="abstract")]).items[0]
         upsert_chunks(
@@ -236,10 +236,16 @@ def test_qa_does_not_use_extractive_fallback_when_agent_unavailable() -> None:
                 content="The model uses attention for representation learning.",
             )]),
         )
-        try:
-            answer_question(session, paper.paper_id, "attention")
-        except PaperServiceError as exc:
-            assert exc.code == "QA_AGENT_UNAVAILABLE"
-            assert exc.status_code == 503
-        else:
-            raise AssertionError("expected QA_AGENT_UNAVAILABLE")
+        settings = Settings(
+            environment="test",
+            database_url="sqlite:///:memory:",
+            agent_enabled=False,
+            qa_agent_enabled=False,
+            llm_api_key="",
+            llm_model="",
+        )
+        result = answer_question(session, paper.paper_id, "attention", settings=settings)
+        assert result.citations
+        assert result.citations[0]["pageNumber"] == 1
+        assert result.citations[0]["quote"]
+        assert "attention" in result.answer.casefold() or "抽取式" in result.answer

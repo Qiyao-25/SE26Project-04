@@ -367,10 +367,14 @@ export default function PaperDetailPage() {
 
           {structuredSummaryReady ? (
             <>
-              <Title level={5}>结构化摘要</Title>
+              <Title level={5}>
+                结构化摘要 {summaryData.uncertainFields?.includes('summary') ? <Tag color="orange">不确定</Tag> : null}
+              </Title>
               <Paragraph>{summaryData.summary}</Paragraph>
 
-              <Title level={5}>核心概念</Title>
+              <Title level={5}>
+                核心概念 {summaryData.uncertainFields?.includes('concepts') ? <Tag color="orange">不确定</Tag> : null}
+              </Title>
               <Space direction="vertical" style={{ width: '100%' }}>
                 {(summaryData.concepts || []).map((concept) => (
                   <Card size="small" key={concept.conceptId}>
@@ -383,7 +387,7 @@ export default function PaperDetailPage() {
               </Space>
 
               <Title level={5} style={{ marginTop: 20 }}>
-                方法步骤
+                方法步骤 {summaryData.uncertainFields?.includes('methods') ? <Tag color="orange">不确定</Tag> : null}
               </Title>
               <ol style={{ paddingLeft: 22 }}>
                 {(summaryData.methods || []).map((method) => (
@@ -394,7 +398,9 @@ export default function PaperDetailPage() {
                 ))}
               </ol>
 
-              <Title level={5}>实验与结果</Title>
+              <Title level={5}>
+                实验与结果 {summaryData.uncertainFields?.includes('experiments') ? <Tag color="orange">不确定</Tag> : null}
+              </Title>
               {(summaryData.experiments || []).length > 0 ? (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {summaryData.experiments.map((experiment, index) => (
@@ -410,7 +416,9 @@ export default function PaperDetailPage() {
                 <Text type="secondary">暂无实验结果解析。</Text>
               )}
 
-              <Title level={5}>局限性</Title>
+              <Title level={5}>
+                局限性 {summaryData.uncertainFields?.includes('limitations') ? <Tag color="orange">不确定</Tag> : null}
+              </Title>
               {(summaryData.limitations || []).length > 0 ? (
                 <ul style={{ paddingLeft: 22 }}>
                   {summaryData.limitations.map((limitation) => (
@@ -427,8 +435,21 @@ export default function PaperDetailPage() {
                 <Alert
                   type="warning"
                   showIcon
-                  message="解析校验提示"
-                  description={summaryData.validationFlags.join('；')}
+                  message="内容校验 Agent：不确定内容已标记"
+                  description={
+                    <div>
+                      <div style={{ marginBottom: 8 }}>
+                        {(summaryData.validationLabels || summaryData.validationFlags).map((label) => (
+                          <Tag key={label} color="gold" style={{ marginBottom: 4 }}>{label}</Tag>
+                        ))}
+                      </div>
+                      {(summaryData.uncertainFields || []).length > 0 && (
+                        <Text type="secondary">
+                          待复核字段：{summaryData.uncertainFields.join('、')}
+                        </Text>
+                      )}
+                    </div>
+                  }
                   style={{ marginTop: 16 }}
                 />
               )}
