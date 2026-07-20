@@ -14,7 +14,7 @@ import { HomeOutlined } from '@ant-design/icons';
 import { Navigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { smartSearchPapers } from '../../services/paperService';
-import { fetchDailyArxivPicks, fetchProfileRecommendations } from '../../services/recommendationService';
+import { fetchDailyArxivPicks, fetchProfileRecommendations, fetchSubscriptionRecommendations } from '../../services/recommendationService';
 import { ChatBox } from '../../components/common/ChatBox';
 import PaperCard from '../../components/paper/PaperCard';
 
@@ -48,6 +48,7 @@ export default function WorkspacePage() {
   const [searchError, setSearchError] = useState('');
   const [dailyPapers, setDailyPapers] = useState([]);
   const [profilePapers, setProfilePapers] = useState([]);
+  const [subscriptionPapers, setSubscriptionPapers] = useState([]);
   const [recommendStatus, setRecommendStatus] = useState('idle');
   const [recommendError, setRecommendError] = useState('');
 
@@ -95,11 +96,19 @@ export default function WorkspacePage() {
         });
         if (cancelled) return;
         setProfilePapers(recommended);
-        setRecommendStatus(daily.length || recommended.length ? 'success' : 'empty');
+        const subscribed = await fetchSubscriptionRecommendations({
+          userId,
+          limit: 6,
+          excludeIds: [...daily, ...recommended].map((paper) => paper.paperId)
+        });
+        if (cancelled) return;
+        setSubscriptionPapers(subscribed);
+        setRecommendStatus(daily.length || recommended.length || subscribed.length ? 'success' : 'empty');
       } catch (error) {
         if (cancelled) return;
         setDailyPapers([]);
         setProfilePapers([]);
+        setSubscriptionPapers([]);
         setRecommendStatus('failed');
         setRecommendError(error.message || '推荐加载失败');
       }
@@ -182,7 +191,8 @@ export default function WorkspacePage() {
           {recommendStatus === 'failed' && <Alert type="error" showIcon message="推荐加载失败" description={recommendError} style={{ marginBottom: 16 }} />}
           {recommendStatus !== 'loading' && <>
             <Card title="每日 ArXiv 精选" className="section-card">{dailyPapers.length ? renderPaperGrid(dailyPapers) : <Empty description="暂无可用论文，请先导入种子数据或入库论文" />}</Card>
-            <Card title="基于画像推荐的论文" className="section-card" extra={<Text type="secondary" style={{ fontSize: 12 }}>当前为库内推荐 · 画像 AI 接口已预留</Text>}>{profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文" />}</Card>
+            <Card title="基于画像推荐的论文" className="section-card" extra={<Text type="secondary" style={{ fontSize: 12 }}>兴趣主题 + 阅读历史</Text>}>{profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文，请先在学习页设置兴趣主题" />}</Card>
+            <Card title="订阅更新" className="section-card" extra={<Text type="secondary" style={{ fontSize: 12 }}>来自设置页订阅 · 可立即同步 arXiv</Text>}>{subscriptionPapers.length ? renderPaperGrid(subscriptionPapers) : <Empty description="暂无订阅更新，请到设置页添加订阅并点击「立即同步」" />}</Card>
           </>}
         </>
       ) : (

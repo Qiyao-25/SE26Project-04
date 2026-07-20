@@ -25,6 +25,7 @@ import {
 } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
+import { syncSubscriptions } from '../../services/recommendationService';
 import { updateAccount } from '../../services/authService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 
@@ -125,6 +126,8 @@ export default function SettingsPage() {
   const [selectedCategory, setSelectedCategory] = useState(undefined);
   const [profileReady, setProfileReady] = useState(USE_MOCK);
   const [savedPreferences, setSavedPreferences] = useState({});
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncMessage, setLastSyncMessage] = useState('');
 
   useEffect(() => {
     try {
@@ -146,6 +149,10 @@ export default function SettingsPage() {
         if (Array.isArray(preferences.subscriptions)) setSubscriptions(preferences.subscriptions);
         if (preferences.crawl) crawlForm.setFieldsValue(preferences.crawl);
         if (preferences.web) webForm.setFieldsValue(preferences.web);
+        if (preferences.last_subscription_sync_stats) {
+          const stats = preferences.last_subscription_sync_stats;
+          setLastSyncMessage(`上次同步：抓取 ${stats.fetched ?? 0}，新建 ${stats.created ?? 0}`);
+        }
         setProfileReady(true);
       })
       .catch(() => setProfileReady(true));
@@ -157,21 +164,41 @@ export default function SettingsPage() {
     const preferences = { ...savedPreferences, subscriptions };
     if (JSON.stringify(preferences) === JSON.stringify(savedPreferences)) return;
     setSavedPreferences(preferences);
-    updateLearningProfile(userId, {
-      persona: '研究',
-      topics: [],
-      preferences
-    }).catch(() => {});
+    // Partial update: do not overwrite persona / topics
+    updateLearningProfile(userId, { preferences }).catch(() => {});
   }, [profileReady, savedPreferences, subscriptions, userId]);
 
   const savePreferences = async (patch, successMessage) => {
     const preferences = { ...savedPreferences, ...patch, subscriptions };
     try {
-      const profile = await updateLearningProfile(userId, { persona: '研究', topics: [], preferences });
+      const profile = await updateLearningProfile(userId, { preferences });
       setSavedPreferences(profile.preferences || preferences);
       message.success(successMessage);
     } catch (error) {
       message.error(error.message || '设置保存失败');
+    }
+  };
+
+  const handleSyncNow = async () => {
+    if (USE_MOCK) {
+      message.info('Mock 模式无法同步 arXiv');
+      return;
+    }
+    setSyncing(true);
+    try {
+      // Persist latest subscriptions before sync
+      await updateLearningProfile(userId, {
+        preferences: { ...savedPreferences, subscriptions }
+      });
+      const result = await syncSubscriptions(userId, { maxPerSubscription: 5 });
+      setLastSyncMessage(result.message || '同步完成');
+      message.success(result.message || '订阅同步完成');
+      const profile = await getLearningProfile(userId);
+      setSavedPreferences(profile.preferences || {});
+    } catch (error) {
+      message.error(error.message || '同步失败');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -201,6 +228,7 @@ export default function SettingsPage() {
           key: `keyword-${Date.now()}`,
           type: 'keyword',
           value,
+          enabled: true,
         },
       ]);
 
@@ -231,6 +259,7 @@ export default function SettingsPage() {
         key: `category-${Date.now()}`,
         type: 'category',
         value: selectedCategory,
+        enabled: true,
       },
     ]);
 
@@ -424,12 +453,22 @@ export default function SettingsPage() {
                   <Switch />
                 </Form.Item>
 
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                >
-                  保存配置
-                </Button>
+                <Space>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                  >
+                    保存配置
+                  </Button>
+                  <Button loading={syncing} onClick={handleSyncNow}>
+                    立即同步 arXiv
+                  </Button>
+                </Space>
+                {lastSyncMessage ? (
+                  <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+                    {lastSyncMessage}
+                  </Typography.Paragraph>
+                ) : null}
               </Form>
             </Card>
           </Col>

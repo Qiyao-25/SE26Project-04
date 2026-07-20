@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -14,15 +16,42 @@ from app.api.papers import router as papers_router
 from app.api.profile import router as profile_router
 from app.api.recommendations import router as recommendations_router
 from app.api.search import router as search_router
+from app.api.subscriptions import router as subscriptions_router
 from app.api.tasks import router as tasks_router
 from app.core.config import Settings, get_settings
 from app.core.database import create_engine_for
 from app.schema.common import ApiResponse
+from app.service.crawl_scheduler import run_crawl_scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(run_crawl_scheduler(app, stop_event))
+    app.state.crawl_stop_event = stop_event
+    app.state.crawl_task = task
+    try:
+        yield
+    finally:
+        stop_event.set()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    app = FastAPI(title="PaperMate Backend API", description="PaperMate 技术原型迭代二后端 API", version=settings.version, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+    app = FastAPI(
+        title="PaperMate Backend API",
+        description="PaperMate 技术原型迭代二后端 API",
+        version=settings.version,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        lifespan=lifespan,
+    )
     app.state.settings = settings
     app.state.engine = create_engine_for(settings)
     app.add_middleware(
@@ -58,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(papers_router)
     app.include_router(profile_router)
     app.include_router(recommendations_router)
+    app.include_router(subscriptions_router)
     app.include_router(search_router)
     app.include_router(tasks_router)
     return app

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, Empty, Spin, Alert } from 'antd';
+import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, Select, Empty, Spin, Alert, message } from 'antd';
 import { READING_HISTORY, PERSONAS, MODE_DESC, PAPERS } from '../../data/papers';
 import { useApp } from '../../context/AppContext';
 import { getPaperDetail } from '../../services/paperService';
@@ -8,6 +8,8 @@ import { USE_MOCK } from '../../services/runtimeConfig';
 import PaperCard from '../../components/paper/PaperCard';
 
 const { Text, Paragraph } = Typography;
+
+const TOPIC_OPTIONS = ['cs.AI', 'cs.CL', 'cs.CV', 'cs.LG', 'cs.IR', 'cs.SE', 'Transformer', 'RAG', 'LLM', 'Diffusion'];
 
 function emptyLibrary() {
   return { favorites: [], notes: [], history: [] };
@@ -43,9 +45,22 @@ export default function LearningPage() {
   const handlePersonaChange = (nextPersona) => {
     setPersona(nextPersona);
     if (!USE_MOCK) {
-      updateLearningProfile(userId, { persona: nextPersona, topics, preferences: profile?.preferences || {} })
+      updateLearningProfile(userId, { persona: nextPersona })
         .then(setProfile)
         .catch((requestError) => setError(requestError.message || '画像保存失败'));
+    }
+  };
+
+  const handleTopicsChange = (nextTopics) => {
+    const normalized = (nextTopics || []).map((item) => String(item).trim()).filter(Boolean).slice(0, 20);
+    setTopics(normalized);
+    if (!USE_MOCK) {
+      updateLearningProfile(userId, { topics: normalized })
+        .then((nextProfile) => {
+          setProfile(nextProfile);
+          message.success('兴趣主题已更新');
+        })
+        .catch((requestError) => setError(requestError.message || '兴趣主题保存失败'));
     }
   };
 
@@ -183,7 +198,54 @@ export default function LearningPage() {
     {
       key: 'profile',
       label: '个人画像',
-      children: <Row gutter={16}><Col xs={24} md={12}><Card title="画像标签（系统自动）" size="small"><div><Text type="secondary">常看方向</Text> {(profile?.topics?.length ? profile.topics : ['尚未设置']).map((topic) => <Tag key={topic}>{topic}</Tag>)}</div><div style={{ marginTop: 8 }}><Text type="secondary">当前模式</Text> <Tag color="processing">{profile?.persona || persona}</Tag></div></Card></Col><Col xs={24} md={12}><Card title="偏好设置" size="small"><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>偏好有代码</span><Switch checked={profile?.preferences?.code ?? true} onChange={(checked) => { const next = { persona, topics, preferences: { ...(profile?.preferences || {}), code: checked } }; updateLearningProfile(userId, next).then(setProfile); }} /></div><div style={{ marginTop: 8 }}><Text type="secondary">关注作者/机构</Text> <Input defaultValue={profile?.preferences?.authors || ''} onBlur={(event) => updateLearningProfile(userId, { persona, topics, preferences: { ...(profile?.preferences || {}), authors: event.target.value } }).then(setProfile)} style={{ marginTop: 4 }} /></div></Card></Col></Row>
+      children: (
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Card title="兴趣主题" size="small">
+              <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                用于个性化推荐；可选择常见方向或自定义输入。
+              </Paragraph>
+              <Select
+                mode="tags"
+                style={{ width: '100%' }}
+                placeholder="例如 cs.CL、Transformer"
+                value={topics}
+                options={TOPIC_OPTIONS.map((value) => ({ value, label: value }))}
+                onChange={handleTopicsChange}
+                tokenSeparators={[',']}
+              />
+              <div style={{ marginTop: 12 }}>
+                <Text type="secondary">当前模式 </Text>
+                <Tag color="processing">{profile?.persona || persona}</Tag>
+              </div>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card title="偏好设置" size="small">
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>偏好有代码</span>
+                <Switch
+                  checked={profile?.preferences?.code ?? true}
+                  onChange={(checked) => {
+                    updateLearningProfile(userId, { preferences: { ...(profile?.preferences || {}), code: checked } })
+                      .then(setProfile);
+                  }}
+                />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <Text type="secondary">关注作者/机构</Text>
+                <Input
+                  defaultValue={profile?.preferences?.authors || ''}
+                  onBlur={(event) => updateLearningProfile(userId, {
+                    preferences: { ...(profile?.preferences || {}), authors: event.target.value }
+                  }).then(setProfile)}
+                  style={{ marginTop: 4 }}
+                />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )
     },
     {
       key: 'mode',

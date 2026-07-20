@@ -45,6 +45,8 @@ class PaperItem(BaseModel):
     parse_status: str
     chunk_count: int = 0
     qa_ready: bool = False
+    reason: str | None = None
+    recommend_source: str | None = None
 
 
 class PaperPage(BaseModel):
@@ -182,13 +184,40 @@ PERSONAS = ("新手", "研究", "工程", "教学", "管理")
 
 
 class UserProfileUpdate(BaseModel):
+    """Partial update: omitted fields keep existing values."""
+
+    persona: str | None = Field(default=None, max_length=32)
+    topics: list[str] | None = Field(default=None, max_length=20)
+    preferences: dict | None = None
+
+
+class UserProfileData(BaseModel):
+    user_id: str
     persona: str = Field(default="研究", max_length=32)
     topics: list[str] = Field(default_factory=list, max_length=20)
     preferences: dict = Field(default_factory=dict)
 
 
-class UserProfileData(UserProfileUpdate):
+class SubscriptionItem(BaseModel):
+    key: str
+    type: Literal["keyword", "category"]
+    value: str
+    enabled: bool = True
+
+
+class SubscriptionSaveRequest(BaseModel):
+    subscriptions: list[SubscriptionItem] = Field(default_factory=list, max_length=30)
+
+
+class SubscriptionSyncResult(BaseModel):
     user_id: str
+    fetched: int = 0
+    created: int = 0
+    updated: int = 0
+    paper_ids: list[int] = Field(default_factory=list)
+    message: str = ""
+    synced_at: datetime | None = None
+    errors: list[str] = Field(default_factory=list)
 
 
 class DictionaryEntry(BaseModel):
