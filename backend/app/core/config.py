@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # Scheduled arXiv subscription crawl (Demo)
     crawl_enabled: bool = True
     crawl_interval_s: int = 21600  # 6 hours
+    # Production: set false to hide /docs /redoc /openapi.json
+    enable_docs: bool | None = None
 
     model_config = SettingsConfigDict(
         env_prefix="PAPERMATE_",
@@ -80,6 +82,8 @@ class Settings(BaseSettings):
             self.qa_agent_timeout_s = self.agent_timeout_s
         if self.environment == "test":
             self.crawl_enabled = False
+        if self.enable_docs is None:
+            self.enable_docs = self.environment not in {"prod", "production"}
         return self
 
     @property
@@ -105,6 +109,10 @@ class Settings(BaseSettings):
     @property
     def is_test(self) -> bool:
         return self.environment == "test"
+
+    @property
+    def is_prod(self) -> bool:
+        return self.environment in {"prod", "production"}
 
     @property
     def cors_origin_list(self) -> list[str]:

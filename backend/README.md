@@ -182,6 +182,8 @@ python -m pytest --capture=no
     app/core        配置和数据库连接
     harness         固定命令、场景编排和验收输出
 
+生产部署步骤见仓库根目录 `docs/部署说明.md` 与 `deploy/` 样例配置。
+
 Harness 只编排和验证，不复制 service 业务规则；后续论文导入、解析和检索都应沿用这一边界。
 
 在后端目录执行空库验收和本地并发测试：

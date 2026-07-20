@@ -1,0 +1,15 @@
+# Build / package outputs
+dist/
+**/dist/
+*.tar.gz
+
+# Local env secrets
+.env
+.env.local
+**/.env
+!**/.env.example
+!**/.env.*.example
+!**/env.*.example
+
+__pycache__/
+*.py[cod]
