@@ -35,15 +35,22 @@ class AgentWiki:
     validation_flags: list[str]
     source: str = "llm_summarize_agent"
 
-    def to_structured_rows(self, *, page_count: int = 0) -> list[dict[str, Any]]:
+    def to_structured_rows(self, *, page_count: int = 0, uncertain_fields: list[str] | None = None) -> list[dict[str, Any]]:
         locator = {"page_count": page_count, "source": self.source}
+        uncertain = list(uncertain_fields or [])
         return [
             {"result_type": "summary", "version": 1, "content_json": {"summary": self.summary}, "source_locator": locator, "confidence": 0.8},
             {"result_type": "concepts", "version": 1, "content_json": {"items": self.concepts}, "source_locator": locator, "confidence": 0.75},
             {"result_type": "methods", "version": 1, "content_json": {"items": self.methods}, "source_locator": locator, "confidence": 0.75},
             {"result_type": "experiments", "version": 1, "content_json": {"items": self.experiments}, "source_locator": locator, "confidence": 0.7},
             {"result_type": "limitations", "version": 1, "content_json": {"items": self.limitations}, "source_locator": locator, "confidence": 0.7},
-            {"result_type": "validation", "version": 1, "content_json": {"flags": self.validation_flags}, "source_locator": locator, "confidence": 1.0},
+            {
+                "result_type": "validation",
+                "version": 1,
+                "content_json": {"flags": self.validation_flags, "uncertain_fields": uncertain},
+                "source_locator": locator,
+                "confidence": 1.0,
+            },
         ]
 
 

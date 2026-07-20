@@ -205,6 +205,8 @@ export async function getPaperSummary(paperId) {
     })),
     limitations: data.limitations || [],
     validationFlags: data.validationFlags || data.validation_flags || [],
+    validationLabels: data.validationLabels || data.validation_labels || [],
+    uncertainFields: data.uncertainFields || data.uncertain_fields || [],
     chunkCount: data.chunkCount ?? data.chunk_count ?? 0,
     qaReady: Boolean(data.qaReady ?? data.qa_ready)
   };

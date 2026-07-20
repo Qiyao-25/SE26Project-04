@@ -214,6 +214,7 @@ class SubscriptionSyncResult(BaseModel):
     fetched: int = 0
     created: int = 0
     updated: int = 0
+    deduped: int = 0
     paper_ids: list[int] = Field(default_factory=list)
     message: str = ""
     synced_at: datetime | None = None
@@ -236,6 +237,8 @@ class WikiData(BaseModel):
     experiments: list[dict]
     limitations: list[str]
     validation_flags: list[str]
+    validation_labels: list[str] = Field(default_factory=list)
+    uncertain_fields: list[str] = Field(default_factory=list)
     source_locator: dict
     chunk_count: int = 0
     qa_ready: bool = False

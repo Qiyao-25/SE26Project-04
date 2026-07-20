@@ -160,6 +160,8 @@ def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
             experiments=wiki.experiments,
             limitations=wiki.limitations,
             validationFlags=wiki.validation_flags,
+            validationLabels=wiki.validation_labels,
+            uncertainFields=wiki.uncertain_fields,
             chunkCount=wiki.chunk_count,
             qaReady=wiki.qa_ready,
         )

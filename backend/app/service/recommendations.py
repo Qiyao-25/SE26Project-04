@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.model import Paper, UserAction
+from app.model import Paper, StructuredResult, UserAction
 from app.repository.papers import list_papers
 from app.schema.papers import PaperItem
 from app.service.papers import to_item
@@ -25,19 +27,30 @@ def daily_picks(session: Session, limit: int = 3) -> list[PaperItem]:
         page=1,
         page_size=min(max(limit * 3, limit), 50),
     )
-    items = []
-    for paper in papers[:limit]:
+    scored = []
+    for paper in papers:
         item = to_item(paper)
         item.reason = "每日精选 · 库内最新论文"
         item.recommend_source = "daily"
-        items.append(item)
-    return items
+        scored.append((_recency_boost(paper), item))
+    scored.sort(key=lambda row: row[0], reverse=True)
+    return [item for _, item in scored[:limit]]
 
 
 def _annotate(item: PaperItem, *, reason: str, source: str) -> PaperItem:
     item.reason = reason
     item.recommend_source = source
     return item
+
+
+def _recency_boost(paper: Paper) -> float:
+    if not paper.published_at:
+        return 0.0
+    published = paper.published_at
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=timezone.utc)
+    days = max(0, (datetime.now(timezone.utc) - published).days)
+    return max(0.0, 1.0 - days / 365.0)
 
 
 def _history_topics(session: Session, user_id: str) -> list[str]:
@@ -59,6 +72,46 @@ def _history_topics(session: Session, user_id: str) -> list[str]:
         if cat and cat not in topics:
             topics.append(cat)
     return topics[:8]
+
+
+def _concept_names(session: Session, paper_id: int) -> list[str]:
+    result = session.scalar(
+        select(StructuredResult)
+        .where(StructuredResult.paper_id == paper_id, StructuredResult.result_type == "concepts")
+        .order_by(StructuredResult.version.desc())
+    )
+    if not result:
+        return []
+    names = []
+    for item in (result.content_json or {}).get("items", []) or []:
+        if isinstance(item, dict):
+            name = str(item.get("name") or "").strip()
+            if name:
+                names.append(name)
+    return names[:8]
+
+
+def _score_paper(paper: Paper, wanted_topics: list[str], concept_names: list[str] | None = None) -> tuple[float, list[str]]:
+    blob = " ".join([paper.title or "", paper.abstract or "", paper.primary_category or ""]).casefold()
+    matched: list[str] = []
+    score = 0.0
+    for topic in wanted_topics:
+        key = topic.casefold()
+        if not key:
+            continue
+        if key in blob:
+            matched.append(topic)
+            score += 3.0 if key in (paper.title or "").casefold() else 2.0
+            if key == (paper.primary_category or "").casefold():
+                score += 1.5
+    for name in concept_names or []:
+        if any(topic.casefold() in name.casefold() or name.casefold() in topic.casefold() for topic in wanted_topics):
+            matched.append(name)
+            score += 1.2
+    score += _recency_boost(paper)
+    if paper.ingest_status == "qa_ready":
+        score += 0.5
+    return score, list(dict.fromkeys(matched))
 
 
 def profile_recommendations(
@@ -112,30 +165,21 @@ def profile_recommendations(
             page_size=50,
         )
 
-    items: list[PaperItem] = []
+    ranked: list[tuple[float, PaperItem]] = []
     for paper in papers:
         if paper.id in excluded:
             continue
-        matched = [
-            topic
-            for topic in wanted_topics
-            if topic
-            and (
-                topic.casefold() in (paper.title or "").casefold()
-                or topic.casefold() in (paper.abstract or "").casefold()
-                or topic.casefold() in (paper.primary_category or "").casefold()
-            )
-        ]
+        concepts = _concept_names(session, paper.id) if wanted_topics else []
+        score, matched = _score_paper(paper, wanted_topics, concepts)
         if matched:
             reason = f"匹配兴趣：{', '.join(matched[:3])} · {persona_label}模式"
         elif wanted_topics:
             reason = f"按画像方向补充 · {persona_label}模式"
         else:
             reason = f"热门补充 · {persona_label}模式"
-        items.append(_annotate(to_item(paper), reason=reason, source="profile"))
-        if len(items) >= limit:
-            break
-    return items
+        ranked.append((score, _annotate(to_item(paper), reason=reason, source="profile")))
+    ranked.sort(key=lambda row: row[0], reverse=True)
+    return [item for _, item in ranked[:limit]]
 
 
 def subscription_recommendations(
@@ -162,22 +206,25 @@ def subscription_recommendations(
             .order_by(Paper.published_at.desc().nullslast(), Paper.id.desc())
         ).all()
         by_id = {paper.id: paper for paper in papers}
+        scored = []
         for pid in reversed(recent_ids):
             paper = by_id.get(pid)
             if not paper:
                 continue
-            label = paper.primary_category or "订阅"
-            items.append(
-                _annotate(
-                    to_item(paper),
-                    reason=f"来自订阅同步 · {label}",
-                    source="subscription",
+            keywords = [item["value"] for item in enabled]
+            score, matched = _score_paper(paper, keywords)
+            label = matched[0] if matched else (paper.primary_category or "订阅")
+            scored.append(
+                (
+                    score + _recency_boost(paper),
+                    _annotate(to_item(paper), reason=f"来自订阅同步 · {label}", source="subscription"),
                 )
             )
-            if len(items) >= limit:
-                return items
+        scored.sort(key=lambda row: row[0], reverse=True)
+        items = [item for _, item in scored[:limit]]
+        if len(items) >= limit:
+            return items
 
-    # Fallback: match enabled subscription values against library
     keywords = [item["value"] for item in enabled]
     if not keywords:
         return items
@@ -193,26 +240,18 @@ def subscription_recommendations(
         page_size=40,
     )
     seen = {item.paper_id for item in items}
+    ranked = []
     for paper in papers:
         if paper.id in excluded or paper.id in seen:
             continue
-        matched = next(
-            (
-                item["value"]
-                for item in enabled
-                if item["value"].casefold() in " ".join(
-                    [paper.title or "", paper.abstract or "", paper.primary_category or ""]
-                ).casefold()
-            ),
-            keywords[0],
+        score, matched = _score_paper(paper, keywords)
+        label = matched[0] if matched else keywords[0]
+        ranked.append(
+            (score, _annotate(to_item(paper), reason=f"匹配订阅「{label}」", source="subscription"))
         )
-        items.append(
-            _annotate(
-                to_item(paper),
-                reason=f"匹配订阅「{matched}」",
-                source="subscription",
-            )
-        )
+    ranked.sort(key=lambda row: row[0], reverse=True)
+    for _, item in ranked:
+        items.append(item)
         if len(items) >= limit:
             break
     return items

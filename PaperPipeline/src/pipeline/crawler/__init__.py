@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 
 from .arxiv_client import ArxivClient, PaperMeta
-from .clean import clean_paper, clean_text, dedupe_by_id, normalize_arxiv_id
+from .clean import clean_paper, clean_text, dedupe_by_id, dedupe_by_title, dedupe_papers, normalize_arxiv_id, normalize_title
 
 __all__ = [
     "ArxivClient",
@@ -16,7 +16,10 @@ __all__ = [
     "clean_paper",
     "clean_text",
     "dedupe_by_id",
+    "dedupe_by_title",
+    "dedupe_papers",
     "normalize_arxiv_id",
+    "normalize_title",
 ]
 
 
