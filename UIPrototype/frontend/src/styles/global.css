@@ -1353,6 +1353,75 @@ body {
   color: #ffffff !important;
 }
 
+/* 深色模式下统一突出工作空间的各个内容板块 */
+:root[data-theme='dark'] .page-workspace > .section-card {
+  border: 1px solid rgba(209, 136, 147, 0.48) !important;
+  box-shadow:
+    0 0 0 1px rgba(209, 136, 147, 0.08),
+    0 12px 30px rgba(0, 0, 0, 0.30) !important;
+}
+
+:root[data-theme='dark'] .page-workspace > .section-card:hover {
+  border-color: rgba(220, 152, 163, 0.72) !important;
+  box-shadow:
+    0 0 0 1px rgba(209, 136, 147, 0.14),
+    0 16px 36px rgba(0, 0, 0, 0.38) !important;
+}
+
+/* 深色模式下突出工作空间的核心智能检索入口 */
+:root[data-theme='dark'] .smart-search-card {
+  border: 1px solid color-mix(in srgb, var(--pm-accent) 78%, #ffffff 10%) !important;
+  background:
+    linear-gradient(135deg, rgba(209, 136, 147, 0.10), transparent 42%),
+    var(--pm-surface) !important;
+  box-shadow:
+    0 0 0 1px rgba(209, 136, 147, 0.14),
+    0 16px 38px rgba(0, 0, 0, 0.38) !important;
+}
+
+:root[data-theme='dark'] .smart-search-card .ant-card-head {
+  border-bottom-color: rgba(209, 136, 147, 0.42) !important;
+  background: linear-gradient(90deg, rgba(209, 136, 147, 0.20), var(--pm-surface-2)) !important;
+}
+
+:root[data-theme='dark'] .smart-search-card .ant-card-head-title {
+  color: #fff7f9 !important;
+}
+
+:root[data-theme='dark'] .smart-search-card .chat-panel {
+  border-color: rgba(209, 136, 147, 0.38) !important;
+  background: #100d10 !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+:root[data-theme='dark'] .smart-search-card .ant-input-affix-wrapper,
+:root[data-theme='dark'] .smart-search-card .ant-input {
+  border-color: rgba(209, 136, 147, 0.60) !important;
+  background: #0f0c0f !important;
+}
+
+:root[data-theme='dark'] .smart-search-card .ant-input:hover,
+:root[data-theme='dark'] .smart-search-card .ant-input:focus {
+  border-color: var(--pm-accent-hover) !important;
+}
+
+/* 管理后台统计数字在深色背景上保持足够对比度 */
+:root[data-theme='dark'] .page-admin .ant-statistic-title {
+  color: #cfc2c8 !important;
+}
+
+:root[data-theme='dark'] .page-admin .ant-statistic-content,
+:root[data-theme='dark'] .page-admin .ant-statistic-content-value,
+:root[data-theme='dark'] .page-admin .ant-statistic-content-prefix,
+:root[data-theme='dark'] .page-admin .ant-statistic-content-suffix {
+  color: #fff4f6 !important;
+  text-shadow: 0 0 18px rgba(209, 136, 147, 0.18);
+}
+
+:root[data-theme='dark'] .page-admin .ant-statistic-content-suffix .ant-typography-secondary {
+  color: #c7b8bf !important;
+}
+
 /* PDF / 图谱占位 */
 .pdf-placeholder,
 .graph-placeholder {
