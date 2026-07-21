@@ -1,4 +1,4 @@
-"""Minimal arXiv Atom API client for subscription sync / scheduled crawl."""
+"""Minimal arXiv Atom API + RSS client for subscription sync / scheduled crawl."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from dataclasses import dataclass
 logger = logging.getLogger("papermate.arxiv")
 
 DEFAULT_ARXIV_API = "https://export.arxiv.org/api/query"
+DEFAULT_ARXIV_RSS_BASE = "https://rss.arxiv.org/rss"
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+# RSS 2.0 has no default namespace; some feeds use atom too.
 
 
 @dataclass
@@ -34,14 +36,18 @@ class ArxivClient:
         self,
         *,
         api_base: str = DEFAULT_ARXIV_API,
+        rss_base: str = DEFAULT_ARXIV_RSS_BASE,
         timeout_s: float = 60.0,
         min_interval_s: float = 3.0,
-        max_retries: int = 2,
+        max_retries: int = 4,
+        rate_limit_wait_s: float = 45.0,
     ) -> None:
         self.api_base = (api_base or DEFAULT_ARXIV_API).rstrip("?")
+        self.rss_base = (rss_base or DEFAULT_ARXIV_RSS_BASE).rstrip("/")
         self.timeout_s = timeout_s
         self.min_interval_s = min_interval_s
         self.max_retries = max_retries
+        self.rate_limit_wait_s = rate_limit_wait_s
         self._last_request_at = 0.0
 
     def _throttle(self) -> None:
@@ -51,15 +57,34 @@ class ArxivClient:
 
     def _http_get(self, url: str) -> bytes:
         self._throttle()
-        req = urllib.request.Request(url, headers={"User-Agent": "PaperMate-Backend/0.2 (course demo)"})
+        req = urllib.request.Request(url, headers={"User-Agent": "PaperMate-Backend/0.2 (course demo; mailto:course@local)"})
         attempt = 0
-        backoff = 1.5
+        backoff = 2.0
         while True:
             attempt += 1
             try:
                 self._last_request_at = time.perf_counter()
                 with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                     return resp.read()
+            except urllib.error.HTTPError as exc:
+                body = ""
+                try:
+                    body = exc.read().decode("utf-8", errors="replace")[:200]
+                except Exception:  # noqa: BLE001
+                    pass
+                logger.warning(
+                    "arxiv_http_status attempt=%s/%s code=%s body=%s",
+                    attempt,
+                    self.max_retries,
+                    exc.code,
+                    body,
+                )
+                if exc.code == 429 and attempt < self.max_retries:
+                    wait = self.rate_limit_wait_s * attempt
+                    logger.info("arxiv_rate_limited waiting_s=%s", wait)
+                    time.sleep(wait)
+                    continue
+                raise
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 logger.warning("arxiv_http_error attempt=%s/%s err=%s", attempt, self.max_retries, exc)
                 if attempt >= self.max_retries:
@@ -77,15 +102,38 @@ class ArxivClient:
                 "sortOrder": "descending",
             }
         )
-        return _parse_feed(self._http_get(f"{self.api_base}?{params}"))
+        return _parse_atom_feed(self._http_get(f"{self.api_base}?{params}"))[:max_results]
+
+    def fetch_category_rss(self, category: str, *, max_results: int = 5) -> list[ArxivPaperMeta]:
+        """Prefer RSS for category sync — often reachable when API is 429-throttled."""
+        cat = category.strip()
+        if not cat:
+            return []
+        url = f"{self.rss_base}/{urllib.parse.quote(cat)}"
+        raw = self._http_get(url)
+        papers = _parse_rss_or_atom(raw)
+        for paper in papers:
+            if cat and cat not in paper.categories:
+                paper.categories = [cat, *paper.categories]
+        return papers[:max_results]
 
 
-def _parse_feed(xml_bytes: bytes) -> list[ArxivPaperMeta]:
+def _arxiv_id_from_text(value: str) -> str:
+    text = (value or "").strip()
+    if "/abs/" in text:
+        text = text.rsplit("/abs/", 1)[-1]
+    if "/pdf/" in text:
+        text = text.rsplit("/pdf/", 1)[-1]
+    text = text.replace(".pdf", "")
+    return re.sub(r"v\d+$", "", text.strip())
+
+
+def _parse_atom_feed(xml_bytes: bytes) -> list[ArxivPaperMeta]:
     root = ET.fromstring(xml_bytes)
     papers: list[ArxivPaperMeta] = []
     for entry in root.findall("atom:entry", ATOM_NS):
         raw_id = entry.findtext("atom:id", default="", namespaces=ATOM_NS)
-        arxiv_id = re.sub(r"v\d+$", "", raw_id.rsplit("/abs/", 1)[-1])
+        arxiv_id = _arxiv_id_from_text(raw_id)
         title = " ".join((entry.findtext("atom:title", default="", namespaces=ATOM_NS) or "").split())
         abstract = " ".join((entry.findtext("atom:summary", default="", namespaces=ATOM_NS) or "").split())
         authors = [
@@ -94,6 +142,8 @@ def _parse_feed(xml_bytes: bytes) -> list[ArxivPaperMeta]:
         ]
         categories = [c.get("term", "") for c in entry.findall("atom:category", ATOM_NS)]
         published = entry.findtext("atom:published", default="", namespaces=ATOM_NS) or ""
+        if not arxiv_id:
+            continue
         papers.append(
             ArxivPaperMeta(
                 arxiv_id=arxiv_id,
@@ -104,6 +154,76 @@ def _parse_feed(xml_bytes: bytes) -> list[ArxivPaperMeta]:
                 pdf_url=f"https://arxiv.org/pdf/{arxiv_id}.pdf",
                 abs_url=f"https://arxiv.org/abs/{arxiv_id}",
                 published=published,
+            )
+        )
+    return papers
+
+
+def _local(tag: str) -> str:
+    if "}" in tag:
+        return tag.rsplit("}", 1)[-1]
+    return tag
+
+
+def _parse_rss_or_atom(xml_bytes: bytes) -> list[ArxivPaperMeta]:
+    """Parse arXiv RSS 2.0 (common on rss.arxiv.org) or Atom."""
+    root = ET.fromstring(xml_bytes)
+    root_name = _local(root.tag).lower()
+    if root_name == "feed" or root.findall("atom:entry", ATOM_NS):
+        return _parse_atom_feed(xml_bytes)
+
+    channel = root.find("channel")
+    if channel is None:
+        # namespaced channel
+        for child in list(root):
+            if _local(child.tag).lower() == "channel":
+                channel = child
+                break
+    if channel is None:
+        return _parse_atom_feed(xml_bytes)
+
+    papers: list[ArxivPaperMeta] = []
+    for item in list(channel):
+        if _local(item.tag).lower() != "item":
+            continue
+        title = ""
+        link = ""
+        description = ""
+        guid = ""
+        pub_date = ""
+        creators: list[str] = []
+        categories: list[str] = []
+        for child in list(item):
+            name = _local(child.tag).lower()
+            text = (child.text or "").strip()
+            if name == "title":
+                title = " ".join(text.split())
+            elif name == "link":
+                link = text
+            elif name in {"description", "summary"}:
+                description = " ".join(text.split())
+            elif name == "guid":
+                guid = text
+            elif name in {"pubdate", "published", "updated"}:
+                pub_date = text
+            elif name in {"creator", "author"}:
+                if text:
+                    creators.append(text)
+            elif name == "category" and text:
+                categories.append(text)
+        arxiv_id = _arxiv_id_from_text(guid or link)
+        if not arxiv_id:
+            continue
+        papers.append(
+            ArxivPaperMeta(
+                arxiv_id=arxiv_id,
+                title=title or arxiv_id,
+                authors=creators,
+                abstract=description,
+                categories=categories,
+                pdf_url=f"https://arxiv.org/pdf/{arxiv_id}.pdf",
+                abs_url=f"https://arxiv.org/abs/{arxiv_id}",
+                published=pub_date,
             )
         )
     return papers

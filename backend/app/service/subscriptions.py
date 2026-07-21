@@ -104,9 +104,11 @@ def sync_subscriptions(
         if settings is not None:
             client = ArxivClient(
                 api_base=getattr(settings, "arxiv_api_base", "https://export.arxiv.org/api/query"),
+                rss_base=getattr(settings, "arxiv_rss_base", "https://rss.arxiv.org/rss"),
                 timeout_s=float(getattr(settings, "arxiv_timeout_s", 60.0)),
-                min_interval_s=float(getattr(settings, "arxiv_min_interval_s", 3.0)),
-                max_retries=int(getattr(settings, "arxiv_max_retries", 2)),
+                min_interval_s=float(getattr(settings, "arxiv_min_interval_s", 5.0)),
+                max_retries=int(getattr(settings, "arxiv_max_retries", 4)),
+                rate_limit_wait_s=float(getattr(settings, "arxiv_rate_limit_wait_s", 45.0)),
             )
         else:
             client = ArxivClient()
@@ -131,7 +133,26 @@ def sync_subscriptions(
     for item in enabled:
         query = _build_query(item)
         try:
-            metas = client.search(search_query=query, max_results=max_per_subscription)
+            if item["type"] == "category":
+                # RSS is more reliable when export.arxiv.org API returns 429.
+                try:
+                    metas = client.fetch_category_rss(item["value"], max_results=max_per_subscription)
+                    logger.info(
+                        "subscription_fetch_rss user=%s cat=%s n=%s",
+                        user_id,
+                        item["value"],
+                        len(metas),
+                    )
+                except Exception as rss_exc:  # noqa: BLE001
+                    logger.warning(
+                        "subscription_rss_failed user=%s cat=%s err=%s; fallback_api",
+                        user_id,
+                        item["value"],
+                        rss_exc,
+                    )
+                    metas = client.search(search_query=query, max_results=max_per_subscription)
+            else:
+                metas = client.search(search_query=query, max_results=max_per_subscription)
         except Exception as exc:  # noqa: BLE001
             logger.warning("subscription_fetch_failed user=%s query=%s err=%s", user_id, query, exc)
             errors.append(f"{item['type']}:{item['value']} -> {exc}")
