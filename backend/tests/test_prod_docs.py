@@ -17,6 +17,16 @@ def test_prod_disables_docs_by_default() -> None:
     assert app.openapi_url is None
 
 
+def test_prod_rejects_default_auth_secret() -> None:
+    settings = Settings(environment="prod", database_url="sqlite:///:memory:", enable_docs=None)
+    try:
+        create_app(settings)
+    except RuntimeError as exc:
+        assert "PAPERMATE_AUTH_SECRET" in str(exc)
+    else:
+        raise AssertionError("production must reject the development auth secret")
+
+
 def test_dev_keeps_docs() -> None:
     settings = Settings(environment="dev", database_url="sqlite:///:memory:")
     assert settings.enable_docs is True

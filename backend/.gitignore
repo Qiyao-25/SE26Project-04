@@ -6,5 +6,5 @@ __pycache__/
 htmlcov/
 data/*.db
 data/*.sqlite
+data/pdfs/
 .venv/
-

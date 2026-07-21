@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
-import tempfile
 import urllib.request
+from html.parser import HTMLParser
 from pathlib import Path
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,7 +15,7 @@ from app.agents.llm_client import LlmError
 from app.agents.summarize_agent import SummarizeAgent, build_fallback_summary
 from app.agents.graph_agent import GraphAgent
 from app.core.config import Settings, get_settings
-from app.model import ParseTask, Paper
+from app.model import PaperContent, ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
 from app.service.content_validator import ContentValidationAgent
 from app.service.papers import get_related_paper_payloads
@@ -52,7 +53,9 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         return
 
     _mark_running(session, task, paper, stage="fetch")
-    body_text, page_count, source = _extract_paper_text(paper, settings)
+    body_text, page_count, source, storage_path = _extract_paper_text(paper, settings)
+    if storage_path:
+        _persist_paper_content(session, paper, storage_path)
     if not body_text.strip() and not (paper.abstract or "").strip():
         _fail(session, task_id, "PARSE_FAILED")
         return
@@ -190,24 +193,46 @@ def _fail(session: Session, task_id: int, error_code: str) -> None:
     session.commit()
 
 
-def _extract_paper_text(paper: Paper, settings: Settings) -> tuple[str, int, str]:
+def _extract_paper_text(paper: Paper, settings: Settings) -> tuple[str, int, str, str | None]:
     pdf_url = (paper.pdf_url or "").strip()
     if not pdf_url and paper.arxiv_id:
         pdf_url = f"https://arxiv.org/pdf/{paper.arxiv_id}.pdf"
 
     if pdf_url:
         try:
-            text, pages = _download_and_extract_pdf(pdf_url, max_pages=settings.parse_agent_max_pages)
+            text, pages, storage_path = _download_and_extract_pdf(
+                pdf_url,
+                arxiv_id=paper.arxiv_id or str(paper.id),
+                storage_dir=Path(settings.paper_storage_dir),
+                max_pages=settings.parse_agent_max_pages,
+            )
             if text.strip():
-                return text, pages, "pdf"
+                return text, pages, "pdf", storage_path
+            Path(storage_path).unlink(missing_ok=True)
         except Exception as exc:  # noqa: BLE001
             logger.warning("pdf_extract_failed arxiv_id=%s err=%s", paper.arxiv_id, exc)
 
+    # ar5iv keeps section structure when PDF text extraction is empty or malformed.
+    if paper.arxiv_id:
+        html_url = f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}"
+        try:
+            text = _download_and_extract_html(html_url)
+            if text.strip():
+                return text, 1, "ar5iv_html", None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("html_extract_failed arxiv_id=%s err=%s", paper.arxiv_id, exc)
+
     abstract = (paper.abstract or "").strip()
-    return abstract, 0, "abstract_fallback"
+    return abstract, 0, "abstract_fallback", None
 
 
-def _download_and_extract_pdf(url: str, *, max_pages: int) -> tuple[str, int]:
+def _download_and_extract_pdf(
+    url: str,
+    *,
+    arxiv_id: str,
+    storage_dir: Path,
+    max_pages: int,
+) -> tuple[str, int, str]:
     request = urllib.request.Request(url, headers={"User-Agent": "PaperMate-ParseAgent/0.1"})
     with urllib.request.urlopen(request, timeout=60) as response:
         pdf_bytes = response.read()
@@ -217,28 +242,114 @@ def _download_and_extract_pdf(url: str, *, max_pages: int) -> tuple[str, int]:
     except ImportError as exc:
         raise RuntimeError("未安装 pypdf，无法解析 PDF") from exc
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(pdf_bytes)
-        tmp_path = Path(tmp.name)
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    safe_id = re.sub(r"[^A-Za-z0-9._-]", "_", arxiv_id)
+    storage_path = storage_dir / f"{safe_id}.pdf"
+    storage_path.write_bytes(pdf_bytes)
 
     try:
-        reader = PdfReader(str(tmp_path))
-        pages = min(len(reader.pages), max_pages)
-        parts: list[str] = []
-        for index in range(pages):
-            try:
-                text = reader.pages[index].extract_text() or ""
-            except Exception:  # noqa: BLE001
-                text = ""
-            text = re.sub(r"\s+", " ", text).strip()
-            if text:
-                parts.append(f"[page {index + 1}] {text}")
-        return "\n\n".join(parts), pages
-    finally:
+        reader = PdfReader(str(storage_path))
+    except Exception:
+        storage_path.unlink(missing_ok=True)
+        raise
+    pages = min(len(reader.pages), max_pages)
+    parts: list[str] = []
+    for index in range(pages):
         try:
-            tmp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+            text = reader.pages[index].extract_text() or ""
+        except Exception:  # noqa: BLE001
+            text = ""
+        text = re.sub(r"\s+", " ", text).strip()
+        if text:
+            parts.append(f"[page {index + 1}] {text}")
+    return "\n\n".join(parts), pages, str(storage_path)
+
+
+def _persist_paper_content(session: Session, paper: Paper, storage_path: str) -> None:
+    path = Path(storage_path)
+    checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+    content = session.get(PaperContent, paper.id)
+    if content is None:
+        content = PaperContent(
+            paper_id=paper.id,
+            storage_path=str(path),
+            checksum=checksum,
+            mime_type="application/pdf",
+        )
+        session.add(content)
+    else:
+        content.storage_path = str(path)
+        content.checksum = checksum
+        content.mime_type = "application/pdf"
+    from datetime import datetime, timezone
+    content.downloaded_at = datetime.now(timezone.utc)
+    session.commit()
+
+
+class _ArxivHtmlTextParser(HTMLParser):
+    _BLOCK_TAGS = {"article", "div", "li", "p", "section", "td", "th"}
+    _HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    _SKIP_TAGS = {"script", "style", "svg", "noscript"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.section = "body"
+        self._skip_depth = 0
+        self._buffer: list[str] = []
+        self._paragraphs: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        tag = tag.lower()
+        if tag in self._SKIP_TAGS:
+            self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+        if tag in self._HEADING_TAGS:
+            self._flush()
+            self._buffer.append("\n")
+        elif tag in self._BLOCK_TAGS:
+            self._flush()
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in self._SKIP_TAGS and self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+        if tag in self._HEADING_TAGS:
+            heading = re.sub(r"^\d+(?:\.\d+)*\.?\s*", "", " ".join(self._buffer).strip()).strip()
+            self._buffer.clear()
+            if heading:
+                self.section = heading.casefold()[:64]
+        elif tag in self._BLOCK_TAGS:
+            self._flush()
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth and data.strip():
+            self._buffer.append(data)
+
+    def _flush(self) -> None:
+        text = re.sub(r"\s+", " ", " ".join(self._buffer)).strip()
+        self._buffer.clear()
+        if len(text) >= 40:
+            self._paragraphs.append((self.section, text[:2000]))
+
+    def text(self) -> str:
+        self._flush()
+        return "\n\n".join(f"[page 1] [{section}] {text}" for section, text in self._paragraphs)
+
+
+def _download_and_extract_html(url: str) -> str:
+    request = urllib.request.Request(url, headers={"User-Agent": "PaperMate-ParseAgent/0.1"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        html = response.read()
+    if b"<html" not in html.lower() and b"<!doctype" not in html.lower():
+        raise RuntimeError("下载内容不是 HTML")
+    parser = _ArxivHtmlTextParser()
+    parser.feed(html.decode("utf-8", errors="replace"))
+    return parser.text()
 
 
 def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
