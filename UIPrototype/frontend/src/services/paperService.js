@@ -117,6 +117,14 @@ export async function searchPapers(params = {}) {
   return { searchId: `search-${Date.now()}`, query, searchType: 'keyword', sortBy: 'relevance', total: data.total, page: data.page, pageSize: data.page_size, searchTimeMs: 0, items: data.items.map(toPaperListItem) };
 }
 
+export async function deletePaper(paperId) {
+  if (USE_MOCK) {
+    await delay(120);
+    return { paperId };
+  }
+  return apiClient.delete(`/papers/${paperId}`);
+}
+
 export async function searchPaperWiki(query, { pageSize = 20 } = {}) {
   if (USE_MOCK) return [];
   const data = await apiClient.get('/papers', {

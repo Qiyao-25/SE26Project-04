@@ -371,6 +371,11 @@ select {
 }
 
 .main-sider {
+  position: sticky !important;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh !important;
+  max-height: 100vh;
   border-right: 1px solid rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.74) !important;
   box-shadow: 16px 0 42px rgba(16, 24, 40, 0.06);
@@ -378,6 +383,7 @@ select {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  z-index: 20;
 }
 
 .main-sider .ant-layout-sider-children {
@@ -988,6 +994,13 @@ body {
 
 /* 左侧边栏 */
 .main-sider {
+  position: sticky !important;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh !important;
+  max-height: 100vh;
+  overflow: hidden;
+  z-index: 20;
   background: var(--pm-sider) !important;
   border-right: 1px solid var(--pm-border) !important;
   box-shadow: none !important;
@@ -1514,8 +1527,8 @@ body {
 
 .paper-graph-canvas {
   position: relative;
-  min-height: 420px;
-  overflow: hidden;
+  min-height: 560px;
+  overflow: visible;
   border: 1px solid var(--pm-border);
   border-radius: 12px;
   background:
@@ -1523,6 +1536,7 @@ body {
     linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
     var(--pm-surface);
   background-size: 24px 24px;
+  padding: 28px 18px 36px;
 }
 
 .paper-graph-edges {
@@ -1531,27 +1545,35 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 0;
 }
 
 .paper-graph-node {
   position: absolute;
   z-index: 1;
   display: flex;
-  width: min(156px, 27%);
-  min-height: 62px;
+  width: min(168px, 24%);
+  min-height: 68px;
   transform: translate(-50%, -50%);
   flex-direction: column;
   justify-content: center;
   gap: 4px;
-  padding: 8px 10px;
-  overflow: hidden;
+  padding: 10px 12px;
+  overflow: visible;
   border: 1px solid color-mix(in srgb, var(--node-color) 45%, var(--pm-border));
   border-left: 4px solid var(--node-color);
   border-radius: 8px;
-  background: var(--pm-surface);
+  background: color-mix(in srgb, var(--pm-surface) 92%, white);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
   color: var(--pm-text);
   text-align: left;
+}
+
+.paper-graph-node.is-current {
+  z-index: 3;
+  width: min(190px, 28%);
+  min-height: 78px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
 }
 
 .paper-graph-node.is-link {
@@ -1560,13 +1582,14 @@ body {
 
 .paper-graph-node.is-link:hover,
 .paper-graph-node.is-link:focus-visible {
+  z-index: 5;
   border-color: var(--node-color);
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.18);
   outline: none;
 }
 
 .paper-graph-node-paper[style*="--node-color"] {
-  min-height: 72px;
+  min-height: 74px;
 }
 
 .paper-graph-node-type {
@@ -1580,19 +1603,50 @@ body {
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
+  word-break: break-word;
 }
 
 .paper-graph-legend,
-.paper-graph-edge-list {
+.paper-graph-edge-list,
+.paper-graph-jumps {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
-  margin-top: 10px;
+  margin-top: 12px;
   color: var(--pm-text-muted);
   font-size: 12px;
+}
+
+.paper-graph-jumps {
+  align-items: center;
+}
+
+.paper-graph-jumps-label {
+  color: var(--pm-text);
+  font-weight: 600;
+}
+
+.paper-graph-jump-chip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--pm-border);
+  border-radius: 999px;
+  background: var(--pm-surface);
+  color: var(--pm-text);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.paper-graph-jump-chip:hover,
+.paper-graph-jump-chip:focus-visible {
+  border-color: var(--pm-accent);
+  color: var(--pm-accent);
+  outline: none;
 }
 
 .paper-graph-legend-item {
@@ -1628,16 +1682,18 @@ body {
 
 @media (max-width: 640px) {
   .paper-graph-canvas {
-    min-height: 360px;
+    min-height: 420px;
+    padding: 20px 10px 28px;
   }
 
   .paper-graph-node {
-    width: min(132px, 32%);
-    min-height: 56px;
+    width: min(140px, 34%);
+    min-height: 58px;
     padding: 7px 8px;
   }
 
   .paper-graph-node-label {
     font-size: 12px;
+    -webkit-line-clamp: 2;
   }
 }

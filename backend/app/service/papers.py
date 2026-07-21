@@ -12,7 +12,7 @@ from app.agents.qa_agent import QaAgent
 from app.agents.graph_agent import GraphAgent
 from app.model import Paper, StructuredResult
 from app.repository.chunks import search_chunks
-from app.repository.papers import get_paper, list_papers, upsert_paper
+from app.repository.papers import get_paper, list_papers, soft_delete_paper, upsert_paper
 from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
 
 class PaperServiceError(Exception):
@@ -62,6 +62,13 @@ def search_papers(session: Session, **filters) -> PaperPage:
     page_size = filters["page_size"]
     papers, total = list_papers(session, **filters)
     return PaperPage(items=[to_item(paper) for paper in papers], total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0)
+
+
+def delete_paper(session: Session, paper_id: int) -> PaperItem:
+    paper = soft_delete_paper(session, paper_id)
+    if paper is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", f"论文不存在：{paper_id}", 404)
+    return to_item(paper)
 
 
 def smart_search_papers(
