@@ -264,7 +264,7 @@ export default function MainLayout({
         </Header>
 
         <Content className="main-content">
-          <Outlet />
+          <Outlet context={{ themeMode, setThemeMode }} />
         </Content>
       </Layout>
     </Layout>

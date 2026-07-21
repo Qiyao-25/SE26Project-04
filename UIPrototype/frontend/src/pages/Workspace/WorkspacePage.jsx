@@ -18,6 +18,7 @@ import { smartSearchPapers } from '../../services/paperService';
 import { fetchDailyArxivPicks, fetchProfileRecommendations, fetchSubscriptionRecommendations } from '../../services/recommendationService';
 import { ChatBox } from '../../components/common/ChatBox';
 import PaperCard from '../../components/paper/PaperCard';
+import { getWorkspacePageSize } from '../../utils/uiPrefs';
 
 const { Text } = Typography;
 
@@ -75,7 +76,7 @@ export default function WorkspacePage() {
     if (!workspaceSearched || !lastSearchQuery) return undefined;
     let cancelled = false;
     setSearchStatus('loading');
-    smartSearchPapers({ query: lastSearchQuery, page: 1, pageSize: 12 })
+    smartSearchPapers({ query: lastSearchQuery, page: 1, pageSize: getWorkspacePageSize(12) })
       .then((data) => {
         if (cancelled) return;
         setResults(data.items);
@@ -187,7 +188,7 @@ export default function WorkspacePage() {
     setSearchStatus('loading');
     setSearchError('');
     try {
-      const data = await smartSearchPapers({ query: text, page: 1, pageSize: 12 });
+      const data = await smartSearchPapers({ query: text, page: 1, pageSize: getWorkspacePageSize(12) });
       setResults(data.items);
       setResultTotal(data.total);
       setSearchStatus(data.total > 0 ? 'success' : 'empty');

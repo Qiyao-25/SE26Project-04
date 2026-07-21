@@ -94,6 +94,23 @@ def _parse_published(value: str) -> datetime | None:
         return None
 
 
+CODE_SIGNALS = (
+    "github.com",
+    "gitlab.com",
+    "code available",
+    "source code",
+    "open-source",
+    "opensource",
+    "implementation available",
+    "code release",
+)
+
+
+def _has_code_signal(meta) -> bool:
+    blob = f"{meta.title or ''} {meta.abstract or ''}".casefold()
+    return any(signal in blob for signal in CODE_SIGNALS)
+
+
 def _collect_new_metas(
     client: ArxivClient,
     item: dict,
@@ -103,6 +120,7 @@ def _collect_new_metas(
     batch_seen_ids: set[str],
     page_size: int = 25,
     max_pages: int = 5,
+    require_code: bool = False,
 ) -> tuple[list, int]:
     """Fetch newest-first and keep only papers not already in DB / this sync batch.
 
@@ -125,6 +143,9 @@ def _collect_new_metas(
         if aid in existing_ids or aid in batch_seen_ids:
             skipped += 1
             return False
+        if require_code and not _has_code_signal(meta):
+            skipped += 1
+            return False
         batch_seen_ids.add(aid)
         meta.arxiv_id = aid
         collected.append(meta)
@@ -139,10 +160,11 @@ def _collect_new_metas(
                 if len(collected) >= want:
                     return collected[:want], skipped
             logger.info(
-                "subscription_rss_new cat=%s new=%s skipped=%s",
+                "subscription_rss_new cat=%s new=%s skipped=%s require_code=%s",
                 item["value"],
                 len(collected),
                 skipped,
+                require_code,
             )
         except Exception as rss_exc:  # noqa: BLE001
             logger.warning(
@@ -233,7 +255,8 @@ def sync_subscriptions(
 
     reused_ids: list[int] = []
     page_size = max(10, min(50, max_per_subscription * 5))
-    max_pages = 6
+    max_pages = 8 if (prefs.get("crawl") or {}).get("codeOnly") else 6
+    require_code = bool((prefs.get("crawl") or {}).get("codeOnly"))
 
     for item in enabled:
         try:
@@ -245,6 +268,7 @@ def sync_subscriptions(
                 batch_seen_ids=seen_ids,
                 page_size=page_size,
                 max_pages=max_pages,
+                require_code=require_code,
             )
             skipped_dupes += skipped
             logger.info(

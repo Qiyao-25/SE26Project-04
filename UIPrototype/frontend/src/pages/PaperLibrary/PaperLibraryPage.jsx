@@ -14,6 +14,7 @@ import { DeleteOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icon
 import { useNavigate } from 'react-router-dom';
 import { deletePaper, searchPapers } from '../../services/paperService';
 import { formatDateTime } from '../../utils/datetime';
+import { getLibraryPageSize } from '../../utils/uiPrefs';
 
 const { Text } = Typography;
 
@@ -22,7 +23,7 @@ export default function PaperLibraryPage() {
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(() => getLibraryPageSize(20));
   const [total, setTotal] = useState(0);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);

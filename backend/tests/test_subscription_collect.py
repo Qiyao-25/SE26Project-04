@@ -77,3 +77,35 @@ def test_collect_keyword_uses_api_pages():
     )
     assert [m.arxiv_id for m in metas] == ["2501.00002", "2501.00003"]
     assert skipped == 1
+
+
+def test_collect_require_code_filters():
+    client = FakeClient(
+        pages=[
+            [
+                _meta("2601.00001", "No code paper"),
+                ArxivPaperMeta(
+                    arxiv_id="2601.00002",
+                    title="With Code",
+                    authors=["A"],
+                    abstract="Code available at https://github.com/example/repo",
+                    categories=["cs.LG"],
+                    pdf_url="https://arxiv.org/pdf/2601.00002.pdf",
+                    abs_url="https://arxiv.org/abs/2601.00002",
+                    published="2024-01-01T00:00:00Z",
+                ),
+            ]
+        ]
+    )
+    metas, skipped = _collect_new_metas(
+        client,
+        {"type": "keyword", "value": "code"},
+        want=1,
+        existing_ids=set(),
+        batch_seen_ids=set(),
+        page_size=10,
+        max_pages=2,
+        require_code=True,
+    )
+    assert [m.arxiv_id for m in metas] == ["2601.00002"]
+    assert skipped >= 1

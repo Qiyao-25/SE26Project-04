@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Col,
   Form,
   Input,
+  InputNumber,
   message,
   Row,
   Segmented,
@@ -15,80 +17,49 @@ import {
   Tabs,
   Tag,
   Typography,
-} from "antd";
-
+} from 'antd';
 import {
   AppstoreOutlined,
   DeleteOutlined,
   PlusOutlined,
   TagsOutlined,
 } from '@ant-design/icons';
+import { useOutletContext } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { updateAccount } from '../../services/authService';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
 import { syncSubscriptions } from '../../services/recommendationService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { ARXIV_CATEGORIES, ARXIV_CATEGORY_LABEL_MAP } from '../../data/arxivCategories';
+import {
+  getLibraryPageSize,
+  getUiPrefs,
+  getWorkspacePageSize,
+  setUiPrefs,
+} from '../../utils/uiPrefs';
 
-
-const SUBSCRIPTIONS_STORAGE_KEY = "papermate-session-subscriptions";
+const SUBSCRIPTIONS_STORAGE_KEY = 'papermate-session-subscriptions';
+const CATEGORY_LABEL_MAP = ARXIV_CATEGORY_LABEL_MAP;
 
 const DEFAULT_SUBSCRIPTIONS = [
-  {
-    key: "1",
-    type: "category",
-    value: "cs.CL",
-  },
-  {
-    key: "2",
-    type: "category",
-    value: "cs.LG",
-  },
-  {
-    key: "3",
-    type: "keyword",
-    value: "Transformer",
-  },
+  { key: '1', type: 'category', value: 'cs.CL', enabled: true },
+  { key: '2', type: 'category', value: 'cs.LG', enabled: true },
+  { key: '3', type: 'keyword', value: 'Transformer', enabled: true },
 ];
-
-const loadSessionSubscriptions = () => {
-  try {
-    const savedValue = sessionStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
-
-    if (!savedValue) {
-      return DEFAULT_SUBSCRIPTIONS;
-    }
-
-    const parsedValue = JSON.parse(savedValue);
-
-    if (!Array.isArray(parsedValue)) {
-      return DEFAULT_SUBSCRIPTIONS;
-    }
-
-    return parsedValue;
-  } catch (error) {
-    console.error("读取订阅设置失败：", error);
-    return DEFAULT_SUBSCRIPTIONS;
-  }
-};
-
-const CATEGORY_LABEL_MAP = ARXIV_CATEGORY_LABEL_MAP;
 
 const SUBSCRIPTION_SEGMENTED_STYLES = `
   html[data-theme='dark'] .subscription-type-segmented.ant-segmented {
     background: rgba(209, 136, 147, 0.14) !important;
     border: 1px solid rgba(225, 164, 175, 0.24);
   }
-
   html[data-theme='dark'] .subscription-type-segmented .ant-segmented-thumb,
   html[data-theme='dark'] .subscription-type-segmented .ant-segmented-item-selected {
     background: #f1d8de !important;
     box-shadow: 0 4px 14px rgba(209, 136, 147, 0.18) !important;
   }
-
   html[data-theme='dark'] .subscription-type-segmented .ant-segmented-item {
     color: #e8dde1 !important;
   }
-
   html[data-theme='dark'] .subscription-type-segmented .ant-segmented-item-selected,
   html[data-theme='dark'] .subscription-type-segmented .ant-segmented-item-selected .ant-segmented-item-label {
     color: #57343e !important;
@@ -96,30 +67,59 @@ const SUBSCRIPTION_SEGMENTED_STYLES = `
   }
 `;
 
-export default function SettingsPage() {
-  const { userId } = useApp();
-  const [crawlForm] = Form.useForm();
-  const [subscriptions, setSubscriptions] = useState(loadSessionSubscriptions);
+function loadSessionSubscriptions() {
+  try {
+    const savedValue = sessionStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+    if (!savedValue) return DEFAULT_SUBSCRIPTIONS;
+    const parsedValue = JSON.parse(savedValue);
+    return Array.isArray(parsedValue) ? parsedValue : DEFAULT_SUBSCRIPTIONS;
+  } catch {
+    return DEFAULT_SUBSCRIPTIONS;
+  }
+}
 
-  const [subscriptionType, setSubscriptionType] = useState("keyword");
-  const [keywordInput, setKeywordInput] = useState("");
+export default function SettingsPage() {
+  const { userId, email, applyAuthResponse, logout } = useApp();
+  const outlet = useOutletContext() || {};
+  const themeMode = outlet.themeMode || localStorage.getItem('papermate-theme') || 'dark';
+  const setThemeMode = outlet.setThemeMode;
+
+  const [crawlForm] = Form.useForm();
+  const [accountForm] = Form.useForm();
+  const [uiForm] = Form.useForm();
+
+  const [subscriptions, setSubscriptions] = useState(loadSessionSubscriptions);
+  const [subscriptionType, setSubscriptionType] = useState('keyword');
+  const [keywordInput, setKeywordInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(undefined);
-  const [categorySearch, setCategorySearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState('');
   const [profileReady, setProfileReady] = useState(USE_MOCK);
   const [savedPreferences, setSavedPreferences] = useState({});
   const [syncing, setSyncing] = useState(false);
-  const [lastSyncMessage, setLastSyncMessage] = useState("");
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [lastSyncMessage, setLastSyncMessage] = useState('');
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(
-        SUBSCRIPTIONS_STORAGE_KEY,
-        JSON.stringify(subscriptions),
-      );
-    } catch (error) {
-      console.error("保存订阅设置失败：", error);
+      sessionStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptions));
+    } catch {
+      // ignore
     }
   }, [subscriptions]);
+
+  useEffect(() => {
+    accountForm.setFieldsValue({ email: email || '' });
+  }, [accountForm, email]);
+
+  useEffect(() => {
+    const ui = getUiPrefs();
+    uiForm.setFieldsValue({
+      theme: themeMode,
+      workspacePageSize: getWorkspacePageSize(12),
+      libraryPageSize: getLibraryPageSize(20),
+      ...(ui || {}),
+    });
+  }, [themeMode, uiForm]);
 
   useEffect(() => {
     if (USE_MOCK) return undefined;
@@ -128,20 +128,40 @@ export default function SettingsPage() {
         const preferences = profile.preferences || {};
         setSavedPreferences(preferences);
         if (Array.isArray(preferences.subscriptions)) {
-          setSubscriptions(preferences.subscriptions);
+          setSubscriptions(
+            preferences.subscriptions.map((item) => ({
+              ...item,
+              enabled: item.enabled !== false,
+            })),
+          );
         }
-        if (preferences.crawl) crawlForm.setFieldsValue(preferences.crawl);
+        const crawl = preferences.crawl || {};
+        crawlForm.setFieldsValue({
+          maxPerSubscription: crawl.maxPerSubscription || 5,
+          codeOnly: Boolean(crawl.codeOnly),
+        });
+        if (preferences.ui) {
+          setUiPrefs(preferences.ui);
+          uiForm.setFieldsValue({
+            theme: preferences.ui.theme || themeMode,
+            workspacePageSize: preferences.ui.workspacePageSize || getWorkspacePageSize(12),
+            libraryPageSize: preferences.ui.libraryPageSize || getLibraryPageSize(20),
+          });
+          if (preferences.ui.theme && setThemeMode) {
+            setThemeMode(preferences.ui.theme);
+          }
+        }
         if (preferences.last_subscription_sync_stats) {
           const stats = preferences.last_subscription_sync_stats;
           setLastSyncMessage(
-            `上次同步：抓取 ${stats.fetched ?? 0}，新建 ${stats.created ?? 0}`,
+            `上次同步：抓取 ${stats.fetched ?? 0}，新建 ${stats.created ?? 0}${stats.deduped ? `，跳过 ${stats.deduped}` : ''}`,
           );
         }
         setProfileReady(true);
       })
       .catch(() => setProfileReady(true));
     return undefined;
-  }, [crawlForm, userId]);
+  }, [crawlForm, setThemeMode, themeMode, uiForm, userId]);
 
   useEffect(() => {
     if (!profileReady || USE_MOCK) return;
@@ -158,27 +178,36 @@ export default function SettingsPage() {
       setSavedPreferences(profile.preferences || preferences);
       message.success(successMessage);
     } catch (error) {
-      message.error(error.message || "设置保存失败");
+      message.error(error.message || '设置保存失败');
     }
   };
 
   const handleSyncNow = async () => {
     if (USE_MOCK) {
-      message.info("Mock 模式无法同步 arXiv");
+      message.info('Mock 模式无法同步 arXiv');
       return;
     }
     setSyncing(true);
     try {
+      const crawl = crawlForm.getFieldsValue();
+      const maxPerSubscription = Number(crawl.maxPerSubscription) || 5;
       await updateLearningProfile(userId, {
-        preferences: { ...savedPreferences, subscriptions },
+        preferences: {
+          ...savedPreferences,
+          subscriptions,
+          crawl: {
+            maxPerSubscription,
+            codeOnly: Boolean(crawl.codeOnly),
+          },
+        },
       });
-      const result = await syncSubscriptions(userId, { maxPerSubscription: 5 });
-      setLastSyncMessage(result.message || "同步完成");
-      message.success(result.message || "订阅同步完成");
+      const result = await syncSubscriptions(userId, { maxPerSubscription });
+      setLastSyncMessage(result.message || '同步完成');
+      message.success(result.message || '订阅同步完成');
       const profile = await getLearningProfile(userId);
       setSavedPreferences(profile.preferences || {});
     } catch (error) {
-      message.error(error.message || "同步失败");
+      message.error(error.message || '同步失败');
     } finally {
       setSyncing(false);
     }
@@ -187,180 +216,189 @@ export default function SettingsPage() {
   const categoryOptions = useMemo(() => {
     const typed = categorySearch.trim();
     if (
-      typed &&
-      !ARXIV_CATEGORIES.some((item) => item.value.toLowerCase() === typed.toLowerCase())
+      typed
+      && !ARXIV_CATEGORIES.some((item) => item.value.toLowerCase() === typed.toLowerCase())
     ) {
-      return [{ value: typed, label: `${typed} · 自定义学科（回车或点选添加）` }, ...ARXIV_CATEGORIES];
+      return [{ value: typed, label: `${typed} · 自定义学科` }, ...ARXIV_CATEGORIES];
     }
     return ARXIV_CATEGORIES;
   }, [categorySearch]);
 
   const normalizeCategoryCode = (raw) => {
-    const value = String(raw || "").trim();
-    if (!value) return "";
-    // Allow "cs.NE · 说明" paste → take left token
+    const value = String(raw || '').trim();
+    if (!value) return '';
     return value.split(/[·\s]/)[0].trim();
   };
 
   const addSubscription = () => {
-    if (subscriptionType === "keyword") {
+    if (subscriptionType === 'keyword') {
       const value = keywordInput.trim();
-
       if (!value) {
-        message.warning("请输入订阅关键词");
+        message.warning('请输入订阅关键词');
         return;
       }
-
-      const alreadyExists = subscriptions.some(
-        (item) =>
-          item.type === "keyword" &&
-          item.value.toLowerCase() === value.toLowerCase(),
-      );
-
-      if (alreadyExists) {
-        message.warning("该关键词已经订阅");
+      if (subscriptions.some((item) => item.type === 'keyword' && item.value.toLowerCase() === value.toLowerCase())) {
+        message.warning('该关键词已经订阅');
         return;
       }
-
       setSubscriptions((current) => [
         ...current,
-        {
-          key: `keyword-${Date.now()}`,
-          type: "keyword",
-          value,
-          enabled: true,
-        },
+        { key: `keyword-${Date.now()}`, type: 'keyword', value, enabled: true },
       ]);
-
-      setKeywordInput("");
+      setKeywordInput('');
       message.success(`已添加关键词订阅：${value}`);
       return;
     }
 
     const categoryValue = normalizeCategoryCode(selectedCategory || categorySearch);
-
     if (!categoryValue) {
-      message.warning("请选择或输入一个学科分类（如 cs.NE、math.OC）");
+      message.warning('请选择或输入一个学科分类（如 cs.NE、math.OC）');
       return;
     }
-
-    const alreadyExists = subscriptions.some(
-      (item) => item.type === "category" && item.value.toLowerCase() === categoryValue.toLowerCase(),
-    );
-
-    if (alreadyExists) {
-      message.warning("该学科分类已经订阅");
+    if (subscriptions.some((item) => item.type === 'category' && item.value.toLowerCase() === categoryValue.toLowerCase())) {
+      message.warning('该学科分类已经订阅');
       return;
     }
-
     setSubscriptions((current) => [
       ...current,
-      {
-        key: `category-${Date.now()}`,
-        type: "category",
-        value: categoryValue,
-        enabled: true,
-      },
+      { key: `category-${Date.now()}`, type: 'category', value: categoryValue, enabled: true },
     ]);
-
-    message.success(
-      `已添加学科订阅：${
-        CATEGORY_LABEL_MAP[categoryValue] || categoryValue
-      }`,
-    );
-
+    message.success(`已添加学科订阅：${CATEGORY_LABEL_MAP[categoryValue] || categoryValue}`);
     setSelectedCategory(undefined);
-    setCategorySearch("");
+    setCategorySearch('');
+  };
+
+  const toggleSubscription = (key, enabled) => {
+    setSubscriptions((current) => current.map((item) => (item.key === key ? { ...item, enabled } : item)));
   };
 
   const removeSubscription = (key) => {
     setSubscriptions((current) => current.filter((item) => item.key !== key));
+    message.success('已删除订阅');
+  };
 
-    message.success("已删除订阅");
+  const handleAccountSave = async (values) => {
+    if (USE_MOCK) {
+      message.info('Mock 模式不支持修改账户');
+      return;
+    }
+    const nextEmail = (values.email || '').trim();
+    const currentPassword = values.currentPassword || '';
+    const newPassword = values.newPassword || '';
+    if (!nextEmail) {
+      message.warning('请输入邮箱');
+      return;
+    }
+    if (newPassword && !currentPassword) {
+      message.warning('修改密码需要填写当前密码');
+      return;
+    }
+    if (!newPassword && nextEmail === email) {
+      message.info('没有需要保存的更改');
+      return;
+    }
+    setAccountSaving(true);
+    try {
+      const data = await updateAccount({
+        email: nextEmail !== email ? nextEmail : undefined,
+        current_password: newPassword ? currentPassword : undefined,
+        password: newPassword || undefined,
+      });
+      if (applyAuthResponse) applyAuthResponse(data);
+      accountForm.setFieldsValue({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      message.success('账户信息已更新');
+    } catch (error) {
+      message.error(error.message || '账户更新失败');
+    } finally {
+      setAccountSaving(false);
+    }
+  };
+
+  const handleUiSave = async (values) => {
+    const ui = {
+      theme: values.theme || themeMode,
+      workspacePageSize: Number(values.workspacePageSize) || 12,
+      libraryPageSize: Number(values.libraryPageSize) || 20,
+    };
+    setUiPrefs(ui);
+    if (setThemeMode && ui.theme) setThemeMode(ui.theme);
+    await savePreferences({ ui }, '界面设置已保存');
   };
 
   const subscriptionColumns = [
     {
-      title: "类型",
-      dataIndex: "type",
-      width: 110,
-      render: (type) =>
-        type === "category" ? (
-          <Tag icon={<AppstoreOutlined />} color="magenta">
-            学科
-          </Tag>
-        ) : (
-          <Tag icon={<TagsOutlined />}>关键词</Tag>
-        ),
-    },
-    {
-      title: "订阅内容",
-      dataIndex: "value",
-      render: (value, record) => {
-        if (record.type === "category") {
-          return CATEGORY_LABEL_MAP[value] || value;
-        }
-
-        return value;
-      },
-    },
-    {
-      title: "操作",
-      width: 80,
-      align: "center",
-      render: (_, record) => (
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => removeSubscription(record.key)}
+      title: '启用',
+      dataIndex: 'enabled',
+      width: 72,
+      render: (enabled, record) => (
+        <Switch
+          size="small"
+          checked={enabled !== false}
+          onChange={(checked) => toggleSubscription(record.key, checked)}
         />
+      ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      width: 100,
+      render: (type) => (
+        type === 'category'
+          ? <Tag icon={<AppstoreOutlined />} color="magenta">学科</Tag>
+          : <Tag icon={<TagsOutlined />}>关键词</Tag>
+      ),
+    },
+    {
+      title: '订阅内容',
+      dataIndex: 'value',
+      render: (value, record) => (
+        record.type === 'category' ? (CATEGORY_LABEL_MAP[value] || value) : value
+      ),
+    },
+    {
+      title: '操作',
+      width: 72,
+      align: 'center',
+      render: (_, record) => (
+        <Button type="text" danger icon={<DeleteOutlined />} onClick={() => removeSubscription(record.key)} />
       ),
     },
   ];
 
+  const enabledCount = subscriptions.filter((item) => item.enabled !== false).length;
+
   const tabItems = [
     {
-      key: "fetch",
-      label: "抓取与订阅",
+      key: 'fetch',
+      label: '订阅与同步',
       children: (
         <Row gutter={[16, 16]}>
-          <Col xs={24} md={14}>
-            <Card title="订阅设置" size="small">
-              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Col xs={24} lg={14}>
+            <Card title="我的订阅" size="small">
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Typography.Text type="secondary">
-                  可订阅关键词或 arXiv 学科；学科支持从列表选择，也可直接输入任意分类代码（如 cs.NE、q-bio.NC）。
+                  关键词或 arXiv 学科均可订阅；学科可从列表选择，也可输入任意代码（如 cs.NE）。关闭「启用」后不会参与同步。
                 </Typography.Text>
-
                 <Segmented
                   className="subscription-type-segmented"
                   block
                   value={subscriptionType}
                   onChange={(value) => {
                     setSubscriptionType(value);
-                    setKeywordInput("");
+                    setKeywordInput('');
                     setSelectedCategory(undefined);
-                    setCategorySearch("");
+                    setCategorySearch('');
                   }}
                   options={[
-                    {
-                      label: "关键词",
-                      value: "keyword",
-                      icon: <TagsOutlined />,
-                    },
-                    {
-                      label: "学科分类",
-                      value: "category",
-                      icon: <AppstoreOutlined />,
-                    },
+                    { label: '关键词', value: 'keyword', icon: <TagsOutlined /> },
+                    { label: '学科分类', value: 'category', icon: <AppstoreOutlined /> },
                   ]}
                 />
-
-                <Space.Compact style={{ width: "100%" }}>
-                  {subscriptionType === "keyword" ? (
+                <Space.Compact style={{ width: '100%' }}>
+                  {subscriptionType === 'keyword' ? (
                     <Input
                       value={keywordInput}
-                      placeholder="输入关键词，例如：Transformer、RAG"
+                      placeholder="例如：Transformer、RAG"
                       onChange={(event) => setKeywordInput(event.target.value)}
                       onPressEnter={addSubscription}
                     />
@@ -369,117 +407,88 @@ export default function SettingsPage() {
                       showSearch
                       allowClear
                       value={selectedCategory}
-                      placeholder="选择或输入学科，例如：cs.CL、math.OC、physics.comp-ph"
+                      placeholder="选择或输入学科，例如 cs.CL、math.OC"
                       options={categoryOptions}
                       optionFilterProp="label"
                       filterOption={(input, option) => {
                         const q = input.toLowerCase();
                         return (
-                          String(option?.label || "").toLowerCase().includes(q) ||
-                          String(option?.value || "").toLowerCase().includes(q)
+                          String(option?.label || '').toLowerCase().includes(q)
+                          || String(option?.value || '').toLowerCase().includes(q)
                         );
                       }}
-                      style={{ width: "100%" }}
+                      style={{ width: '100%' }}
                       onSearch={setCategorySearch}
                       onChange={(value) => {
                         setSelectedCategory(value);
-                        setCategorySearch(value || "");
+                        setCategorySearch(value || '');
                       }}
                       onInputKeyDown={(event) => {
-                        if (event.key === "Enter") {
+                        if (event.key === 'Enter') {
                           event.preventDefault();
                           addSubscription();
                         }
                       }}
                       notFoundContent={
                         categorySearch.trim()
-                          ? `未在列表中：将添加自定义「${categorySearch.trim()}」`
-                          : "输入学科代码或从列表选择"
+                          ? `将添加自定义「${categorySearch.trim()}」`
+                          : '输入学科代码或从列表选择'
                       }
                     />
                   )}
-
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={addSubscription}
-                  >
-                    添加
-                  </Button>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={addSubscription}>添加</Button>
                 </Space.Compact>
-
                 <Table
                   rowKey="key"
                   size="small"
                   pagination={false}
                   dataSource={subscriptions}
                   columns={subscriptionColumns}
-                  locale={{
-                    emptyText: "暂无订阅内容",
-                  }}
+                  locale={{ emptyText: '暂无订阅内容' }}
                 />
               </Space>
             </Card>
           </Col>
-
-          <Col xs={24} md={10}>
-            <Card title="抓取资源配置" size="small">
+          <Col xs={24} lg={10}>
+            <Card title="同步设置" size="small">
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={`当前启用 ${enabledCount} 项订阅。定时抓取由服务器统一调度；此处可立即同步并配置过滤条件。`}
+              />
               <Form
                 form={crawlForm}
                 layout="vertical"
-                initialValues={{
-                  frequency: "每日",
-                  codeOnly: false,
-                  engineeringOnly: false,
-                }}
-                onFinish={(values) =>
-                  savePreferences({ crawl: values }, "抓取资源配置已保存")
-                }
+                initialValues={{ maxPerSubscription: 5, codeOnly: false }}
+                onFinish={(values) => savePreferences({
+                  crawl: {
+                    maxPerSubscription: Number(values.maxPerSubscription) || 5,
+                    codeOnly: Boolean(values.codeOnly),
+                  },
+                }, '同步设置已保存')}
               >
-                <Form.Item name="frequency" label="抓取频率">
-                  <Select
-                    options={[
-                      {
-                        value: "每日",
-                        label: "每日",
-                      },
-                      {
-                        value: "每周",
-                        label: "每周",
-                      },
-                    ]}
-                  />
+                <Form.Item
+                  name="maxPerSubscription"
+                  label="每个订阅每次抓取新论文数"
+                  extra="会跳过库中已有论文，尽量只入库新条目"
+                >
+                  <InputNumber min={1} max={15} style={{ width: '100%' }} />
                 </Form.Item>
-
                 <Form.Item
                   name="codeOnly"
-                  label="仅抓取有代码论文"
+                  label="仅同步疑似有代码的论文"
                   valuePropName="checked"
+                  extra="根据摘要/标题中的 GitHub、开源等信号过滤"
                 >
                   <Switch />
                 </Form.Item>
-
-                <Form.Item
-                  name="engineeringOnly"
-                  label="仅抓取工程型论文"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
-
-                <Space>
-                  <Button type="primary" htmlType="submit">
-                    保存配置
-                  </Button>
-                  <Button loading={syncing} onClick={handleSyncNow}>
-                    立即同步 arXiv
-                  </Button>
+                <Space wrap>
+                  <Button type="primary" htmlType="submit">保存设置</Button>
+                  <Button loading={syncing} onClick={handleSyncNow}>立即同步 arXiv</Button>
                 </Space>
                 {lastSyncMessage ? (
-                  <Typography.Paragraph
-                    type="secondary"
-                    style={{ marginTop: 12, marginBottom: 0 }}
-                  >
+                  <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
                     {lastSyncMessage}
                   </Typography.Paragraph>
                 ) : null}
@@ -490,92 +499,103 @@ export default function SettingsPage() {
       ),
     },
     {
-      key: "account",
-      label: "个人账户",
+      key: 'account',
+      label: '个人账户',
       children: (
-        <Card style={{ maxWidth: 480 }}>
+        <Card style={{ maxWidth: 480 }} size="small" title="账户安全">
           <Form
+            form={accountForm}
             layout="vertical"
-            initialValues={{
-              email: "user@example.com",
-              password: "******",
-            }}
-            onFinish={() => message.success("账户设置已保存")}
+            initialValues={{ email: email || '' }}
+            onFinish={handleAccountSave}
           >
             <Form.Item
               name="email"
-              label="邮箱"
+              label="登录邮箱"
               rules={[
-                {
-                  required: true,
-                  message: "请输入邮箱",
-                },
-                {
-                  type: "email",
-                  message: "请输入正确的邮箱格式",
-                },
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入正确的邮箱格式' },
               ]}
             >
-              <Input />
+              <Input placeholder="you@example.com" />
             </Form.Item>
-
-            <Form.Item name="password" label="密码">
-              <Input.Password />
+            <Form.Item name="currentPassword" label="当前密码" extra="仅在修改密码时需要">
+              <Input.Password autoComplete="current-password" placeholder="修改密码时填写" />
             </Form.Item>
-
-            <Button type="primary" htmlType="submit">
-              保存
-            </Button>
+            <Form.Item
+              name="newPassword"
+              label="新密码"
+              rules={[{ min: 6, message: '新密码至少 6 位' }]}
+            >
+              <Input.Password autoComplete="new-password" placeholder="不修改请留空" />
+            </Form.Item>
+            <Form.Item
+              name="confirmPassword"
+              label="确认新密码"
+              dependencies={['newPassword']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const next = getFieldValue('newPassword');
+                    if (!next || value === next) return Promise.resolve();
+                    return Promise.reject(new Error('两次输入的新密码不一致'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+            </Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={accountSaving}>保存账户</Button>
+              <Button danger onClick={() => { logout(); message.success('已退出登录'); }}>退出登录</Button>
+            </Space>
           </Form>
         </Card>
       ),
     },
     {
-      key: "web",
-      label: "网页设置",
+      key: 'web',
+      label: '界面',
       children: (
-        <Card style={{ maxWidth: 480 }}>
+        <Card style={{ maxWidth: 480 }} size="small" title="显示与列表">
           <Form
+            form={uiForm}
             layout="vertical"
             initialValues={{
-              language: "zh",
-              pageSize: "10",
+              theme: themeMode,
+              workspacePageSize: getWorkspacePageSize(12),
+              libraryPageSize: getLibraryPageSize(20),
             }}
-            onFinish={() => message.success("网页设置已保存")}
+            onFinish={handleUiSave}
           >
-            <Form.Item name="language" label="界面语言">
+            <Form.Item name="theme" label="主题">
               <Select
                 options={[
-                  {
-                    value: "zh",
-                    label: "简体中文",
-                  },
-                  {
-                    value: "en",
-                    label: "English",
-                  },
+                  { value: 'light', label: '浅色' },
+                  { value: 'dark', label: '深色' },
                 ]}
               />
             </Form.Item>
-
-            <Form.Item name="pageSize" label="每页条数">
+            <Form.Item name="workspacePageSize" label="工作台检索每页条数" extra="影响智能检索结果列表">
               <Select
                 options={[
-                  {
-                    value: "10",
-                    label: "10 条",
-                  },
-                  {
-                    value: "20",
-                    label: "20 条",
-                  },
+                  { value: 8, label: '8 条' },
+                  { value: 12, label: '12 条' },
+                  { value: 16, label: '16 条' },
+                  { value: 24, label: '24 条' },
                 ]}
               />
             </Form.Item>
-
-            <Button type="primary" htmlType="submit">
-              保存
-            </Button>
+            <Form.Item name="libraryPageSize" label="论文库默认每页条数" extra="仅管理员论文库页面">
+              <Select
+                options={[
+                  { value: 10, label: '10 条' },
+                  { value: 20, label: '20 条' },
+                  { value: 50, label: '50 条' },
+                ]}
+              />
+            </Form.Item>
+            <Button type="primary" htmlType="submit">保存界面设置</Button>
           </Form>
         </Card>
       ),
