@@ -27,17 +27,24 @@ def test_smart_search_uses_database_papers_without_llm() -> None:
             ],
         )
 
+        settings = Settings(
+            environment="test",
+            database_url="sqlite:///:memory:",
+            search_agent_enabled=False,
+            llm_api_key="",
+            agent_api_key=None,
+            deepseek_api_key="",
+        )
+        # Ignore host .env keys that would re-enable LLM mid-test.
+        settings.llm_api_key = ""
+        settings.search_agent_enabled = False
+
         result = smart_search_papers(
             session,
             query="attention transformer",
             page=1,
             page_size=12,
-            settings=Settings(
-                environment="test",
-                database_url="sqlite:///:memory:",
-                search_agent_enabled=False,
-                llm_api_key="",
-            ),
+            settings=settings,
         )
 
     assert result.total == 1
