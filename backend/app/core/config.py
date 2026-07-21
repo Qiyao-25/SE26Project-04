@@ -66,10 +66,10 @@ class Settings(BaseSettings):
     # Scheduled arXiv subscription crawl (Demo)
     crawl_enabled: bool = True
     crawl_interval_s: int = 21600  # 6 hours
-    # Background auto-parse of unparsed papers
+    # Background auto-parse: drain while work remains; interval is idle poll only
     parse_scheduler_enabled: bool = True
-    parse_scheduler_interval_s: int = 120
-    parse_scheduler_batch: int = 3
+    parse_scheduler_interval_s: int = 30
+    parse_scheduler_batch: int = 5
     # arXiv API (campus networks often need longer timeout; API may 429)
     arxiv_api_base: str = "https://export.arxiv.org/api/query"
     arxiv_rss_base: str = "https://rss.arxiv.org/rss"
