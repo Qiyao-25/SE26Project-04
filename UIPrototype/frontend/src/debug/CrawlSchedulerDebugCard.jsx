@@ -68,7 +68,7 @@ export default function CrawlSchedulerDebugCard() {
         showIcon
         style={{ marginBottom: 12 }}
         message="临时调试入口（便于删除）"
-        description="调用与后台调度器相同的 sync_all_users。删除 frontend/src/debug/ 并关闭 VITE_ENABLE_CRAWL_DEBUG 即可移除。"
+        description="调用与后台调度器相同的 sync_all_users（需管理员登录）。删除 frontend/src/debug/ 并关闭 VITE_ENABLE_CRAWL_DEBUG 即可移除。"
       />
       <Button type="dashed" danger loading={loading} onClick={onRun}>
         立即执行一轮全站订阅抓取

@@ -256,6 +256,8 @@ class QaResponse(BaseModel):
     answer: str
     created_at: datetime
     citations: list[dict]
+    # agent = LLM 问答；extractive_fallback = 原文摘录降级（非 Agent 总结）
+    answer_mode: str = "agent"
 
 
 class SmartSearchRequest(BaseModel):

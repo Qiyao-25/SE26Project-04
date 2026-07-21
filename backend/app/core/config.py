@@ -7,6 +7,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
+_WEAK_SECRET_PREFIXES = ("replace-with", "change_me", "changeme")
+_WEAK_SECRETS = {
+    "",
+    "papermate-dev-secret",
+    "CHANGE_ME_AFTER_INSTALL",
+    "CHANGE_ME_TO_A_LONG_RANDOM_SECRET",
+    "replace-with-a-long-random-secret",
+    "test-secret",
+}
+
+
+def _is_weak_secret(value: str) -> bool:
+    text = (value or "").strip()
+    if text in _WEAK_SECRETS:
+        return True
+    lowered = text.casefold()
+    return any(lowered.startswith(prefix) for prefix in _WEAK_SECRET_PREFIXES)
+
 
 class Settings(BaseSettings):
     environment: str = "dev"
@@ -69,7 +87,6 @@ class Settings(BaseSettings):
     def merge_agent_settings(self):
         """Accept both current PAPERMATE_AGENT_* and remote LLM names."""
         if self.agent_enabled is not None:
-            # The legacy switch controls every Agent when explicitly provided.
             self.parse_agent_enabled = self.agent_enabled
             self.qa_agent_enabled = self.agent_enabled
             self.search_agent_enabled = self.agent_enabled
@@ -126,6 +143,22 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+
+def validate_production_settings(settings: Settings) -> None:
+    """Refuse to boot production with placeholder secrets or empty CORS."""
+    if not settings.is_prod:
+        return
+    if _is_weak_secret(settings.auth_secret):
+        raise RuntimeError(
+            "PAPERMATE_AUTH_SECRET must be a strong non-placeholder value when PAPERMATE_ENV=prod"
+        )
+    if _is_weak_secret(settings.worker_token):
+        raise RuntimeError(
+            "PAPERMATE_WORKER_TOKEN must be a strong non-placeholder value when PAPERMATE_ENV=prod"
+        )
+    if not settings.cors_origin_list:
+        raise RuntimeError("PAPERMATE_CORS_ORIGINS must be non-empty when PAPERMATE_ENV=prod")
 
 
 @lru_cache

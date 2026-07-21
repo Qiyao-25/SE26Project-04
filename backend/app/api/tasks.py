@@ -4,16 +4,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.core.auth import db_session, require_admin, require_current_user
 from app.core.database import get_db
+from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import ParseResultCommit, StructuredResultBatch, TaskClaimRequest, TaskQueueStats, TaskResponse, TaskUpdate
 from app.service.tasks import claim_task, create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
-
-
-def db_session(request: Request):
-    yield from get_db(request.app.state.engine)
 
 
 def error_response(request: Request, code: str, message: str, status_code: int):
@@ -43,8 +41,8 @@ def require_worker_access(
 ) -> None:
     settings = request.app.state.settings
     expected = settings.worker_token.strip()
-    # Local development does not need a second secret. Production must set one.
-    if settings.environment == "dev" and (not expected or expected.startswith("replace-with-")):
+    # Local development / tests may omit Worker token. Production always requires it.
+    if settings.environment in {"dev", "test"} and (not expected or expected.startswith("replace-with-")):
         return
     if not expected or not worker_token or not secrets.compare_digest(worker_token, expected):
         raise HTTPException(status_code=403, detail="Worker 内部接口未授权")
@@ -55,6 +53,7 @@ def task_stats(
     request: Request,
     db: Session = Depends(db_session),
     timeout_seconds: int = Query(default=900, ge=60, le=86400),
+    _user: AuthUser = Depends(require_current_user),
 ):
     return ApiResponse(
         data=queue_stats(db, timeout_seconds),
@@ -74,7 +73,12 @@ def task_claim(
 
 
 @router.get("/{task_id}", response_model=ApiResponse[TaskResponse], summary="查询解析任务")
-def task_detail(task_id: int, request: Request, db: Session = Depends(db_session)):
+def task_detail(
+    task_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
+):
     try:
         data = get_task(db, task_id)
     except ValueError as exc:
@@ -88,6 +92,7 @@ def task_list(
     db: Session = Depends(db_session),
     status: str | None = Query(default=None, max_length=32),
     limit: int = Query(default=20, ge=1, le=100),
+    _user: AuthUser = Depends(require_current_user),
 ):
     try:
         data = list_tasks(db, status=status, limit=limit)
@@ -115,6 +120,7 @@ def enqueue_pending(
     request: Request,
     db: Session = Depends(db_session),
     limit: int = Query(default=20, ge=1, le=100),
+    _admin: AuthUser = Depends(require_admin),
 ):
     tasks = enqueue_pending_tasks(db, limit)
     return ApiResponse(
@@ -133,7 +139,12 @@ def task_update(task_id: int, payload: TaskUpdate, request: Request, _worker: No
 
 
 @router.post("/{task_id}/retry", response_model=ApiResponse[TaskResponse], summary="重试失败解析任务")
-def task_retry(task_id: int, request: Request, db: Session = Depends(db_session)):
+def task_retry(
+    task_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
+):
     try:
         data = retry_task(db, task_id)
     except ValueError as exc:

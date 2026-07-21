@@ -16,7 +16,11 @@ def normalize_arxiv_id(arxiv_id: str) -> str:
 
 
 def normalize_title(title: str) -> str:
-    """Casefold + strip punctuation/whitespace for near-duplicate title matching."""
+    """Casefold + strip punctuation/whitespace for near-duplicate title matching.
+
+    Upsert rule: identical normalized titles reuse the existing Paper row
+    (even when arXiv IDs differ). Primary key remains arxiv_id when present.
+    """
     value = _SPACE.sub(" ", (title or "").replace("\n", " ")).strip().casefold()
     value = _PUNCT.sub("", value)
     return value
