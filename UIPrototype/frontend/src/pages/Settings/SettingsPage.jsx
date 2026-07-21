@@ -27,8 +27,6 @@ import { useApp } from '../../context/AppContext';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
 import { syncSubscriptions } from '../../services/recommendationService';
 import { USE_MOCK } from '../../services/runtimeConfig';
-// DEBUG crawl: remove this import + <CrawlSchedulerDebugCard /> below to drop UI
-import CrawlSchedulerDebugCard from '../../debug/CrawlSchedulerDebugCard';
 
 
 const ARXIV_CATEGORIES = [
@@ -477,8 +475,6 @@ export default function SettingsPage() {
                   </Typography.Paragraph>
                 ) : null}
               </Form>
-              {/* DEBUG crawl: remove next line + src/debug/ folder to drop */}
-              <CrawlSchedulerDebugCard />
             </Card>
           </Col>
         </Row>
