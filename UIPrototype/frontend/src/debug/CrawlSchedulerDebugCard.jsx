@@ -14,6 +14,7 @@ export const CRAWL_DEBUG_UI_ENABLED =
 async function runCrawlDebugTick(maxPerSubscription = 3) {
   return apiClient.post('/debug/crawl/run', {}, {
     params: { max_per_subscription: maxPerSubscription },
+    timeout: 180000,
   });
 }
 

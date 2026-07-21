@@ -118,7 +118,9 @@ export async function syncSubscriptions(userId, { maxPerSubscription = 5 } = {})
   if (USE_MOCK) {
     return { fetched: 0, created: 0, updated: 0, message: 'Mock 模式跳过同步', paper_ids: [] };
   }
+  // arXiv 可能限流/慢响应；同步单独放宽超时（默认 API_TIMEOUT 可能只有 90s）
   return apiClient.post('/subscriptions/sync', {}, {
-    params: { user_id: userId, max_per_subscription: maxPerSubscription }
+    params: { user_id: userId, max_per_subscription: maxPerSubscription },
+    timeout: 180000,
   });
 }
