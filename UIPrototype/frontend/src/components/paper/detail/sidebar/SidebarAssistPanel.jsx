@@ -57,7 +57,7 @@ export default function SidebarAssistPanel({ paper, paperId }) {
         showIcon
         style={{ marginBottom: 12 }}
         message={`${persona}模式`}
-        description={MODE_DESC[persona]}
+        description={`${MODE_DESC[persona]}；优先由 ReadingMode Agent 生成，不可用时降级为规则模板。`}
       />
       {parsed ? (
         <ReadingAssistView

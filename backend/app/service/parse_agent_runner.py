@@ -352,6 +352,75 @@ def _download_and_extract_html(url: str) -> str:
     return parser.text()
 
 
+class _Ar5ivHtmlParser(HTMLParser):
+    """Lightweight ar5iv/HTML body extractor (stdlib only)."""
+
+    _BLOCK = {"article", "div", "li", "p", "section", "td", "th"}
+    _HEADING = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    _SKIP = {"script", "style", "svg", "noscript", "nav", "footer", "header"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.section = "body"
+        self._skip_depth = 0
+        self._buffer: list[str] = []
+        self.paragraphs: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:  # noqa: ANN001
+        tag = tag.lower()
+        if tag in self._SKIP:
+            self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+        if tag in self._HEADING or tag in self._BLOCK:
+            self._flush()
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in self._SKIP and self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+        if tag in self._HEADING:
+            text = re.sub(r"\s+", " ", " ".join(self._buffer)).strip()
+            self._buffer.clear()
+            if text:
+                self.section = re.sub(r"^\d+(?:\.\d+)*\.?\s*", "", text).strip()[:64] or "body"
+        elif tag in self._BLOCK:
+            self._flush()
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth and data.strip():
+            self._buffer.append(data)
+
+    def _flush(self) -> None:
+        text = re.sub(r"\s+", " ", " ".join(self._buffer)).strip()
+        self._buffer.clear()
+        if len(text) >= 40:
+            self.paragraphs.append((self.section, text[:2000]))
+
+
+def _download_and_extract_html(url: str, *, max_chars: int = 120_000) -> tuple[str, int]:
+    request = urllib.request.Request(url, headers={"User-Agent": "PaperMate-ParseAgent/0.1"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        raw = response.read()
+    html = raw.decode("utf-8", errors="replace")
+    parser = _Ar5ivHtmlParser()
+    parser.feed(html)
+    parser.close()
+    parts: list[str] = []
+    total = 0
+    for section, body in parser.paragraphs:
+        piece = f"[section: {section}] {body}"
+        if total + len(piece) > max_chars:
+            break
+        parts.append(piece)
+        total += len(piece) + 2
+    return "\n\n".join(parts), len(parts)
+
+
 def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
     cleaned = re.sub(r"\s+", " ", text or "").strip()
     if not cleaned:
@@ -372,6 +441,25 @@ def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
                         "chunk_id": f"p{page_no}-{len(chunks) + 1}",
                         "page_no": int(page_no),
                         "section": _guess_section(piece),
+                        "content": piece,
+                    }
+                )
+        return chunks
+
+    # HTML section markers from ar5iv extract
+    section_blocks = re.split(r"\[section:\s*([^\]]+)\]\s*", cleaned)
+    if len(section_blocks) > 1:
+        it = iter(section_blocks[1:])
+        for section_name, body in zip(it, it):
+            section = (section_name or "body").strip()[:64] or "body"
+            for piece in _split_pieces(body, size=700):
+                if len(chunks) >= max_chunks:
+                    return chunks
+                chunks.append(
+                    {
+                        "chunk_id": f"s-{len(chunks) + 1}",
+                        "page_no": 1,
+                        "section": section,
                         "content": piece,
                     }
                 )
