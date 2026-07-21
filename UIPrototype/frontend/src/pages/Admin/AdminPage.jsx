@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
-  Card, Tabs, Row, Col, Statistic, List, Tag, Table, Progress, Select, Button,
-  Input, Typography, message, Space
+  Alert, Card, Tabs, Row, Col, Statistic, List, Tag, Table, Progress, Select, Button,
+  Input, Typography, message, Space, Popconfirm
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { TASK_STATUS_LABELS } from '../../data/admin';
-import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus, retryAdminParseTask, enqueuePendingParseTasks, forceParsePaper } from '../../services/adminService';
+import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus, deleteAdminUser, retryAdminParseTask, enqueuePendingParseTasks, forceParsePaper } from '../../services/adminService';
 import { formatDateTime } from '../../utils/datetime';
 
 const { Text } = Typography;
@@ -78,37 +78,45 @@ function FleetTab({ agents = [] }) {
   const agent = agents.find((a) => a.id === selected);
 
   return (
-    <Row gutter={16}>
-      <Col xs={24} lg={14}>
-        <Table
-          size="small"
-          rowKey="id"
-          dataSource={agents}
-          onRow={(r) => ({ onClick: () => setSelected(r.id), style: { cursor: 'pointer' } })}
-          columns={[
-            { title: 'Agent', dataIndex: 'name', render: (n, r) => <><Tag color={healthColor[r.health]} />{n}</> },
-            { title: '状态', dataIndex: 'status' },
-            { title: '当前任务', dataIndex: 'task', ellipsis: true },
-            { title: '最后活跃', dataIndex: 'lastActive' },
-          ]}
-          pagination={false}
-        />
-      </Col>
-      <Col xs={24} lg={10}>
-        <Card title="Agent 详细指标 · 24h" size="small">
-          {agent ? (
-            <List size="small" dataSource={[
-              ['状态', agent.status],
-              ['当前任务', agent.task || '—'],
-              ['配置状态', agent.ready ? '已配置' : '降级模式'],
-              ['监控指标', '后端暂未采集']
-            ]} renderItem={([k, v]) => <List.Item><Text type="secondary">{k}</Text><Text strong>{v}</Text></List.Item>} />
-          ) : (
-            <Text type="secondary">点击左侧 Agent 查看指标</Text>
-          )}
-        </Card>
-      </Col>
-    </Row>
+    <>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="此处展示 Agent 配置就绪状态（LLM/开关），不是实时 CPU/延迟监控；latency/cpu 未采集属正常。"
+      />
+      <Row gutter={16}>
+        <Col xs={24} lg={14}>
+          <Table
+            size="small"
+            rowKey="id"
+            dataSource={agents}
+            onRow={(r) => ({ onClick: () => setSelected(r.id), style: { cursor: 'pointer' } })}
+            columns={[
+              { title: 'Agent', dataIndex: 'name', render: (n, r) => <><Tag color={healthColor[r.health]} />{n}</> },
+              { title: '状态', dataIndex: 'status' },
+              { title: '当前任务', dataIndex: 'task', ellipsis: true },
+              { title: '最后活跃', dataIndex: 'lastActive' },
+            ]}
+            pagination={false}
+          />
+        </Col>
+        <Col xs={24} lg={10}>
+          <Card title="Agent 详细指标 · 24h" size="small">
+            {agent ? (
+              <List size="small" dataSource={[
+                ['状态', agent.status],
+                ['当前任务', agent.task || '—'],
+                ['配置状态', agent.ready ? '已配置' : '降级模式'],
+                ['监控指标', '后端暂未采集']
+              ]} renderItem={([k, v]) => <List.Item><Text type="secondary">{k}</Text><Text strong>{v}</Text></List.Item>} />
+            ) : (
+              <Text type="secondary">点击左侧 Agent 查看指标</Text>
+            )}
+          </Card>
+        </Col>
+      </Row>
+    </>
   );
 }
 
@@ -167,6 +175,14 @@ function QualityTab({ quality, onRefresh }) {
 
   return (
     <Row gutter={16}>
+      <Col span={24} style={{ marginBottom: 16 }}>
+        <Alert
+          type="info"
+          showIcon
+          message="质量异常处理说明"
+          description="重试=失败任务再跑；强制解析=新建任务；入队待解析=把未解析论文入队；打开论文=人工查看。"
+        />
+      </Col>
       <Col xs={24} lg={14}>
         <Card
           title="异常论文工作台"
@@ -257,7 +273,7 @@ function QualityTab({ quality, onRefresh }) {
   );
 }
 
-function UsersTab({ users = [], onStatusChange }) {
+function UsersTab({ users = [], onStatusChange, onDelete }) {
   return (
     <Card title="用户管理" size="small">
       <Table size="small" pagination={false} rowKey="email" dataSource={users} locale={{ emptyText: '暂无注册用户' }} columns={[
@@ -267,7 +283,14 @@ function UsersTab({ users = [], onStatusChange }) {
         { title: '操作', render: (_, user) => (
           user.role === 'admin'
             ? <Text type="secondary">不可禁用</Text>
-            : <Button size="small" onClick={() => onStatusChange(user)}>{user.status === '启用' ? '禁用' : '启用'}</Button>
+            : (
+              <Space>
+                <Button size="small" onClick={() => onStatusChange(user)}>{user.status === '启用' ? '禁用' : '启用'}</Button>
+                <Popconfirm title={`确定删除用户 ${user.email}？`} onConfirm={() => onDelete?.(user)}>
+                  <Button size="small" danger>删除</Button>
+                </Popconfirm>
+              </Space>
+            )
         ) }
       ]} />
     </Card>
@@ -317,6 +340,16 @@ export default function AdminPage() {
     }
   };
 
+  const handleUserDelete = async (user) => {
+    try {
+      await deleteAdminUser(user.id);
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      message.success(`已删除用户 ${user.email}`);
+    } catch (requestError) {
+      message.error(requestError.message || '用户删除失败');
+    }
+  };
+
   const refreshAdminData = async () => {
     const [nextOverview, nextTasks, nextQuality, nextUsers, nextAudit] = await Promise.all([
       getAdminOverview(), getAdminTasks(), getAdminQuality(), getAdminUsers(), getAdminAudit()
@@ -345,7 +378,7 @@ export default function AdminPage() {
     { key: 'fleet', label: 'Agent舰队', children: <FleetTab agents={(overview?.agents || []).map((agent) => ({ ...agent, health: agent.ready ? 'ok' : 'warn', task: agent.status, latency: '—', cpu: '—' }))} /> },
     { key: 'tasks', label: '任务队列', children: <TasksTab tasks={tasks || []} /> },
     { key: 'quality', label: '质量异常', children: <QualityTab quality={quality} onRefresh={refreshAdminData} /> },
-    { key: 'users', label: '用户管理', children: <UsersTab users={users} onStatusChange={handleUserStatusChange} /> },
+    { key: 'users', label: '用户管理', children: <UsersTab users={users} onStatusChange={handleUserStatusChange} onDelete={handleUserDelete} /> },
     { key: 'audit', label: '审计日志', children: <AuditTab logs={audit} /> }
   ];
 

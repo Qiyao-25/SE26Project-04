@@ -1528,7 +1528,7 @@ body {
 .paper-graph-canvas {
   position: relative;
   min-height: 560px;
-  overflow: visible;
+  overflow: auto;
   border: 1px solid var(--pm-border);
   border-radius: 12px;
   background:
@@ -1537,6 +1537,39 @@ body {
     var(--pm-surface);
   background-size: 24px 24px;
   padding: 28px 18px 36px;
+}
+
+.paper-graph-canvas-swim {
+  min-height: 320px;
+  padding: 12px;
+}
+
+.paper-graph-hint {
+  margin-bottom: 8px;
+  color: var(--pm-muted, #64748b);
+  font-size: 12px;
+}
+
+.paper-graph-lane-title {
+  fill: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.paper-graph-node-card {
+  width: 132px;
+  min-height: 56px;
+  transform: none;
+}
+
+.paper-graph-node.is-dimmed {
+  opacity: 0.35;
+}
+
+.paper-graph-node.is-active {
+  z-index: 6;
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.28);
+  border-color: #2563eb;
 }
 
 .paper-graph-edges {

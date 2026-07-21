@@ -24,6 +24,10 @@ export async function updateAdminUserStatus(userId, isActive) {
   return apiClient.patch(`/admin/users/${userId}`, { is_active: isActive });
 }
 
+export async function deleteAdminUser(userId) {
+  return apiClient.delete(`/admin/users/${userId}`);
+}
+
 export async function retryAdminParseTask(taskId) {
   return apiClient.post(`/tasks/${taskId}/retry`);
 }

@@ -311,6 +311,7 @@ class GraphNode(BaseModel):
     paper_id: int | None = None
     arxiv_id: str | None = None
     role: str | None = None
+    lane: str | None = None
     published_at: str | None = None
     description: str | None = None
     score: float | None = Field(default=None, ge=0, le=1)
@@ -322,6 +323,7 @@ class GraphEdge(BaseModel):
     target: str
     type: str
     label: str = ""
+    tier: str | None = None
     weight: float | None = Field(default=None, ge=0, le=1)
     evidence: list[str] = Field(default_factory=list)
 

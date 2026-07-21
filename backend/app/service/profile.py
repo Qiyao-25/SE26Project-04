@@ -79,6 +79,12 @@ def patch_profile_preferences(session: Session, user_id: str, patch: dict) -> Us
 
 
 def get_dictionary(session: Session, user_id: str, limit: int = 40) -> list[DictionaryEntry]:
+    profile = _get_or_create(session, user_id)
+    hidden = {
+        str(term).casefold().strip()
+        for term in (dict(profile.preferences or {}).get("hidden_dictionary_terms") or [])
+        if str(term).strip()
+    }
     action_paper_ids = session.scalars(
         select(UserAction.paper_id)
         .where(UserAction.user_id == user_id, UserAction.action_type.in_(("favorite", "reading_history")))
@@ -107,7 +113,7 @@ def get_dictionary(session: Session, user_id: str, limit: int = 40) -> list[Dict
             if not isinstance(item, dict):
                 continue
             term = str(item.get("name") or "").strip()
-            if not term:
+            if not term or term.casefold() in hidden:
                 continue
             entry = entries.setdefault(term.casefold(), DictionaryEntry(term=term, description=str(item.get("description") or term)))
             if paper.id not in entry.paper_ids:

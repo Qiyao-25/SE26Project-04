@@ -79,7 +79,7 @@ function loadSessionSubscriptions() {
 }
 
 export default function SettingsPage() {
-  const { userId, email, applyAuthResponse, logout } = useApp();
+  const { userId, email, applyAuthResponse } = useApp();
   const outlet = useOutletContext() || {};
   const themeMode = outlet.themeMode || localStorage.getItem('papermate-theme') || 'dark';
   const setThemeMode = outlet.setThemeMode;
@@ -114,7 +114,6 @@ export default function SettingsPage() {
   useEffect(() => {
     const ui = getUiPrefs();
     uiForm.setFieldsValue({
-      theme: themeMode,
       workspacePageSize: getWorkspacePageSize(12),
       libraryPageSize: getLibraryPageSize(20),
       ...(ui || {}),
@@ -143,7 +142,6 @@ export default function SettingsPage() {
         if (preferences.ui) {
           setUiPrefs(preferences.ui);
           uiForm.setFieldsValue({
-            theme: preferences.ui.theme || themeMode,
             workspacePageSize: preferences.ui.workspacePageSize || getWorkspacePageSize(12),
             libraryPageSize: preferences.ui.libraryPageSize || getLibraryPageSize(20),
           });
@@ -316,12 +314,11 @@ export default function SettingsPage() {
 
   const handleUiSave = async (values) => {
     const ui = {
-      theme: values.theme || themeMode,
+      theme: themeMode,
       workspacePageSize: Number(values.workspacePageSize) || 12,
       libraryPageSize: Number(values.libraryPageSize) || 20,
     };
     setUiPrefs(ui);
-    if (setThemeMode && ui.theme) setThemeMode(ui.theme);
     await savePreferences({ ui }, '界面设置已保存');
   };
 
@@ -547,7 +544,6 @@ export default function SettingsPage() {
             </Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={accountSaving}>保存账户</Button>
-              <Button danger onClick={() => { logout(); message.success('已退出登录'); }}>退出登录</Button>
             </Space>
           </Form>
         </Card>
@@ -562,20 +558,11 @@ export default function SettingsPage() {
             form={uiForm}
             layout="vertical"
             initialValues={{
-              theme: themeMode,
               workspacePageSize: getWorkspacePageSize(12),
               libraryPageSize: getLibraryPageSize(20),
             }}
             onFinish={handleUiSave}
           >
-            <Form.Item name="theme" label="主题">
-              <Select
-                options={[
-                  { value: 'light', label: '浅色' },
-                  { value: 'dark', label: '深色' },
-                ]}
-              />
-            </Form.Item>
             <Form.Item name="workspacePageSize" label="工作台检索每页条数" extra="影响智能检索结果列表">
               <Select
                 options={[

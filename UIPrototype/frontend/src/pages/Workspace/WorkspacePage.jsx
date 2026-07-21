@@ -7,6 +7,7 @@ import {
   Card,
   Col,
   Empty,
+  Pagination,
   Row,
   Space,
   Spin,
@@ -22,6 +23,8 @@ import { getWorkspacePageSize } from '../../utils/uiPrefs';
 
 const { Text } = Typography;
 
+const WORKSPACE_SEARCH_CACHE_KEY = 'papermate-workspace-search-v1';
+
 const WELCOME_MESSAGE = {
   messageId: 'workspace-welcome',
   role: 'assistant',
@@ -32,6 +35,33 @@ const WELCOME_MESSAGE = {
 
 function paperIds(papers = []) {
   return papers.map((paper) => paper.paperId).filter((id) => id !== undefined && id !== null);
+}
+
+function readSearchCache() {
+  try {
+    const raw = sessionStorage.getItem(WORKSPACE_SEARCH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSearchCache(payload) {
+  try {
+    sessionStorage.setItem(WORKSPACE_SEARCH_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function clearSearchCache() {
+  try {
+    sessionStorage.removeItem(WORKSPACE_SEARCH_CACHE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export default function WorkspacePage() {
@@ -50,6 +80,8 @@ export default function WorkspacePage() {
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [results, setResults] = useState([]);
   const [resultTotal, setResultTotal] = useState(0);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchPageSize] = useState(() => getWorkspacePageSize(12));
   const [searchStatus, setSearchStatus] = useState('idle');
   const [searchError, setSearchError] = useState('');
   const [dailyPapers, setDailyPapers] = useState([]);
@@ -68,20 +100,62 @@ export default function WorkspacePage() {
   useEffect(() => { profileRef.current = profilePapers; }, [profilePapers]);
   useEffect(() => { subscriptionRef.current = subscriptionPapers; }, [subscriptionPapers]);
 
+  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot } = {}) => {
+    const nextPage = page || data.page || 1;
+    const nextItems = data.items || [];
+    const nextTotal = data.total || 0;
+    const nextAnswer = answerText
+      || data.answer
+      || (nextTotal > 0
+        ? `检索完成，共找到 ${nextTotal} 篇相关论文。`
+        : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
+    setResults(nextItems);
+    setResultTotal(nextTotal);
+    setSearchPage(nextPage);
+    setSearchStatus(nextTotal > 0 ? 'success' : 'empty');
+    if (messagesSnapshot) setMessages(messagesSnapshot);
+    const previous = readSearchCache();
+    writeSearchCache({
+      query,
+      page: nextPage,
+      pageSize: data.pageSize || searchPageSize,
+      total: nextTotal,
+      items: nextItems,
+      answer: nextAnswer,
+      messages: messagesSnapshot || previous?.messages
+    });
+    return nextAnswer;
+  }, [searchPageSize]);
+
   useEffect(() => {
     if (skipRestoreRef.current) {
       skipRestoreRef.current = false;
       return undefined;
     }
     if (!workspaceSearched || !lastSearchQuery) return undefined;
+
+    const cache = readSearchCache();
+    if (
+      cache
+      && cache.query === lastSearchQuery
+      && Array.isArray(cache.items)
+    ) {
+      setResults(cache.items);
+      setResultTotal(cache.total || cache.items.length);
+      setSearchPage(cache.page || 1);
+      setSearchStatus((cache.total || cache.items.length) > 0 ? 'success' : 'empty');
+      if (Array.isArray(cache.messages) && cache.messages.length) {
+        setMessages(cache.messages);
+      }
+      return undefined;
+    }
+
     let cancelled = false;
     setSearchStatus('loading');
-    smartSearchPapers({ query: lastSearchQuery, page: 1, pageSize: getWorkspacePageSize(12) })
+    smartSearchPapers({ query: lastSearchQuery, page: cache?.page || 1, pageSize: searchPageSize })
       .then((data) => {
         if (cancelled) return;
-        setResults(data.items);
-        setResultTotal(data.total);
-        setSearchStatus(data.total > 0 ? 'success' : 'empty');
+        applySearchResult(data, { query: lastSearchQuery, page: data.page || cache?.page || 1 });
       })
       .catch((error) => {
         if (cancelled) return;
@@ -91,7 +165,7 @@ export default function WorkspacePage() {
         setSearchError(error.message || '检索失败');
       });
     return () => { cancelled = true; };
-  }, [workspaceSearched, lastSearchQuery]);
+  }, [workspaceSearched, lastSearchQuery, applySearchResult, searchPageSize]);
 
   const refreshDaily = useCallback(async ({ excludeCurrent = true } = {}) => {
     setDailyLoading(true);
@@ -174,47 +248,74 @@ export default function WorkspacePage() {
     return () => { cancelled = true; };
   }, [workspaceSearched, lockedPaperId, refreshDaily, refreshProfile, refreshSubscriptions]);
 
-  const handleSearch = async (text) => {
-    setMessages((current) => [...current, {
-      messageId: `workspace-user-${Date.now()}`,
-      role: 'user',
-      content: text,
-      status: 'success',
-      citations: []
-    }]);
+  const runSearch = async ({ query, page = 1, appendUser = false }) => {
+    let nextMessages = messages;
+    if (appendUser) {
+      nextMessages = [...messages, {
+        messageId: `workspace-user-${Date.now()}`,
+        role: 'user',
+        content: query,
+        status: 'success',
+        citations: []
+      }];
+      setMessages(nextMessages);
+    }
     skipRestoreRef.current = true;
-    setLastSearchQuery(text);
+    setLastSearchQuery(query);
     setWorkspaceSearched(true);
     setSearchStatus('loading');
     setSearchError('');
+    setSearchPage(page);
     try {
-      const data = await smartSearchPapers({ query: text, page: 1, pageSize: getWorkspacePageSize(12) });
-      setResults(data.items);
-      setResultTotal(data.total);
-      setSearchStatus(data.total > 0 ? 'success' : 'empty');
+      const data = await smartSearchPapers({ query, page, pageSize: searchPageSize });
       const keywordHint = data.keywords?.length ? `（匹配词：${data.keywords.slice(0, 5).join('、')}）` : '';
-      setMessages((current) => [...current, {
-        messageId: `workspace-assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.answer || (data.total > 0 ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}` : `未找到与“${text}”匹配的论文，请尝试缩短关键词或更换研究方向。`),
-        status: 'success',
-        citations: []
-      }]);
-      message.success(`检索完成，共 ${data.total} 篇`);
+      const answerText = data.answer || (data.total > 0
+        ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}`
+        : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
+      const withAssistant = appendUser
+        ? [...nextMessages, {
+          messageId: `workspace-assistant-${Date.now()}`,
+          role: 'assistant',
+          content: answerText,
+          status: 'success',
+          citations: []
+        }]
+        : nextMessages;
+      applySearchResult(data, {
+        query,
+        page,
+        answerText,
+        messagesSnapshot: withAssistant
+      });
+      if (appendUser) {
+        setMessages(withAssistant);
+        message.success(`检索完成，共 ${data.total} 篇`);
+      }
     } catch (error) {
       setResults([]);
       setResultTotal(0);
       setSearchStatus('failed');
       setSearchError(error.message || '检索失败');
-      setMessages((current) => [...current, {
-        messageId: `workspace-error-${Date.now()}`,
-        role: 'assistant',
-        content: '检索请求失败，请稍后重试。',
-        status: 'failed',
-        errorMessage: error.message || '检索失败',
-        citations: []
-      }]);
+      if (appendUser) {
+        setMessages((current) => [...current, {
+          messageId: `workspace-error-${Date.now()}`,
+          role: 'assistant',
+          content: '检索请求失败，请稍后重试。',
+          status: 'failed',
+          errorMessage: error.message || '检索失败',
+          citations: []
+        }]);
+      }
     }
+  };
+
+  const handleSearch = async (text) => {
+    await runSearch({ query: text, page: 1, appendUser: true });
+  };
+
+  const handlePageChange = async (page) => {
+    if (!lastSearchQuery || page === searchPage) return;
+    await runSearch({ query: lastSearchQuery, page, appendUser: false });
   };
 
   const handleBackHome = () => {
@@ -222,9 +323,11 @@ export default function WorkspacePage() {
     setLastSearchQuery('');
     setResults([]);
     setResultTotal(0);
+    setSearchPage(1);
     setSearchStatus('idle');
     setSearchError('');
     setMessages([WELCOME_MESSAGE]);
+    clearSearchCache();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     message.success('已返回首页');
   };
@@ -317,11 +420,29 @@ export default function WorkspacePage() {
           )}
         </>
       ) : (
-        <Card title={`检索结果${lastSearchQuery ? ` · 「${lastSearchQuery}」` : ''} · 共 ${resultTotal} 篇`} extra={<Button icon={<HomeOutlined />} onClick={handleBackHome}>返回首页</Button>} className="section-card">
+        <Card
+          title={`检索结果${lastSearchQuery ? ` · 「${lastSearchQuery}」` : ''} · 共 ${resultTotal} 篇，当前第 ${searchPage} 页`}
+          extra={<Button icon={<HomeOutlined />} onClick={handleBackHome}>返回首页</Button>}
+          className="section-card"
+        >
           {searchStatus === 'loading' && <div style={{ textAlign: 'center', padding: 40 }}><Spin tip="正在智能检索论文..." /></div>}
           {searchStatus === 'failed' && <Alert type="error" showIcon message="检索失败" description={searchError} />}
           {searchStatus === 'empty' && <Empty description="未找到匹配论文，请修改检索词后重试" />}
-          {searchStatus === 'success' && renderPaperGrid(results)}
+          {searchStatus === 'success' && (
+            <>
+              {renderPaperGrid(results)}
+              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <Text type="secondary">共 {resultTotal} 篇，当前第 {searchPage} 页</Text>
+                <Pagination
+                  current={searchPage}
+                  pageSize={searchPageSize}
+                  total={resultTotal}
+                  onChange={handlePageChange}
+                  showSizeChanger={false}
+                />
+              </div>
+            </>
+          )}
         </Card>
       )}
     </div>

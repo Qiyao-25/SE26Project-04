@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import UserActionInput, UserActionItem, UserActionUpdate
-from app.service.learning import create_action, delete_action, list_actions, update_action
+from app.service.learning import create_action, delete_action, delete_actions_by_type, list_actions, update_action
 
 router = APIRouter(prefix="/api/learning/actions", tags=["learning"])
 
@@ -68,6 +68,22 @@ def action_update(action_id: int, payload: UserActionUpdate, request: Request, c
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.delete("/bulk", response_model=ApiResponse[dict], summary="按类型批量删除学习行为")
+def action_delete_bulk(
+    request: Request,
+    action_type: str = Query(min_length=1, max_length=64),
+    user_id: str = Query(min_length=1, max_length=128),
+    current_user: AuthUser = Depends(require_current_user),
+    db: Session = Depends(db_session),
+):
+    ensure_same_user(user_id, current_user)
+    try:
+        deleted = delete_actions_by_type(db, user_id, action_type)
+    except ValueError as exc:
+        return map_error(request, exc)
+    return ApiResponse(data={"deleted": deleted, "action_type": action_type}, request_id=request.state.request_id)
 
 
 @router.delete("/{action_id}", response_model=ApiResponse[dict], summary="删除学习行为")

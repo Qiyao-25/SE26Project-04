@@ -5,7 +5,25 @@ import { getLearningProfile } from '../services/learningService';
 import { USE_MOCK } from '../services/runtimeConfig';
 
 const WIREFRAME_DEMO = false;
+const WORKSPACE_SEARCH_FLAG_KEY = 'papermate-workspace-searched-v1';
+const WORKSPACE_LAST_QUERY_KEY = 'papermate-workspace-last-query-v1';
 const AppContext = createContext(null);
+
+function readSessionFlag(key) {
+  try {
+    return sessionStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function readSessionText(key) {
+  try {
+    return sessionStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+}
 
 export function AppProvider({ children }) {
   const hasToken = Boolean(localStorage.getItem('papermate.accessToken'));
@@ -16,8 +34,8 @@ export function AppProvider({ children }) {
   const [email, setEmail] = useState(() => localStorage.getItem('papermate.email') || '');
   const [persona, setPersona] = useState('研究');
   const [topics, setTopics] = useState(['cs.CL']);
-  const [workspaceSearched, setWorkspaceSearched] = useState(false);
-  const [lastSearchQuery, setLastSearchQuery] = useState('');
+  const [workspaceSearched, setWorkspaceSearched] = useState(() => readSessionFlag(WORKSPACE_SEARCH_FLAG_KEY));
+  const [lastSearchQuery, setLastSearchQuery] = useState(() => readSessionText(WORKSPACE_LAST_QUERY_KEY));
   const [lockedPaperId, setLockedPaperId] = useState(null);
   const [paperNotes, setPaperNotes] = useState(() => JSON.parse(JSON.stringify(DEFAULT_PAPER_NOTES)));
   const [comparePaperA, setComparePaperA] = useState('attention');
@@ -108,6 +126,15 @@ export function AppProvider({ children }) {
     setLastSearchQuery('');
     setLockedPaperId(null);
   }, [clearAuth]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(WORKSPACE_SEARCH_FLAG_KEY, workspaceSearched ? '1' : '0');
+      sessionStorage.setItem(WORKSPACE_LAST_QUERY_KEY, lastSearchQuery || '');
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [workspaceSearched, lastSearchQuery]);
 
   const showAdminNav = WIREFRAME_DEMO || isAdmin;
   const getPaperNotes = useCallback((paperId) => paperNotes[paperId] || { notes: [], comments: [] }, [paperNotes]);

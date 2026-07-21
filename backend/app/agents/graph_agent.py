@@ -21,6 +21,11 @@ DATASET_HINTS = (
     "imagenet", "cifar", "coco", "glue", "superglue", "squad", "mnli", "wmt",
     "wikitext", "ms marco", "benchmark", "数据集",
 )
+RELATED_SCORE_THRESHOLD = 0.18
+MAX_RELATED_PAPERS = 5
+MAX_CONCEPTS = 6
+MAX_METHODS = 5
+MAX_DATASETS = 4
 
 
 @dataclass
@@ -59,18 +64,29 @@ def _tokens(text: str) -> set[str]:
     }
 
 
+def _normalize_label(label: str) -> str:
+    return re.sub(r"\s+", " ", (label or "").strip()).casefold()
+
+
 def _clean_items(items: list[dict[str, Any]] | None, label_keys: tuple[str, ...]) -> list[dict[str, str]]:
     output = []
+    seen: set[str] = set()
     for item in items or []:
         if isinstance(item, str) and item.strip():
-            output.append({"label": item.strip(), "description": item.strip()})
+            label = item.strip()
+            description = label
         elif isinstance(item, dict):
             label = next((str(item.get(key) or "").strip() for key in label_keys if item.get(key)), "")
-            if label:
-                output.append({
-                    "label": label,
-                    "description": str(item.get("description") or item.get("desc") or "").strip(),
-                })
+            if not label:
+                continue
+            description = str(item.get("description") or item.get("desc") or "").strip()
+        else:
+            continue
+        key = _normalize_label(label)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        output.append({"label": label, "description": description or label})
     return output
 
 
@@ -126,16 +142,18 @@ class GraphAgent:
             "id": f"paper-{paper_id}",
             "type": "paper",
             "label": title or arxiv_id or f"Paper {paper_id}",
+            "paperId": paper_id,
             "paper_id": paper_id,
             "arxiv_id": arxiv_id,
             "role": "current",
             "published_at": published_at,
+            "lane": "current",
         }
         nodes = [paper_node]
         edges = []
-        concept_items = _clean_items(concepts, ("name", "title", "label"))[:8]
-        method_items = _clean_items(methods, ("title", "name", "label"))[:6]
-        experiment_items = _clean_items(experiments, ("title", "name", "label"))[:4]
+        concept_items = _clean_items(concepts, ("name", "title", "label"))[:MAX_CONCEPTS]
+        method_items = _clean_items(methods, ("title", "name", "label"))[:MAX_METHODS]
+        experiment_items = _clean_items(experiments, ("title", "name", "label"))[:8]
         paper_text = " ".join([
             title,
             abstract,
@@ -152,6 +170,7 @@ class GraphAgent:
                 "label": item["label"][:80],
                 "description": item["description"][:240],
                 "role": "concept",
+                "lane": "concept",
             })
             edges.append({
                 "id": f"edge-concept-{index}",
@@ -159,6 +178,8 @@ class GraphAgent:
                 "target": node_id,
                 "type": "introduces",
                 "label": "提出/涉及",
+                "tier": "primary",
+                "weight": 1.0,
                 "evidence": [item["label"][:80]],
             })
 
@@ -170,6 +191,7 @@ class GraphAgent:
                 "label": item["label"][:80],
                 "description": item["description"][:240],
                 "role": "method",
+                "lane": "method",
             })
             edges.append({
                 "id": f"edge-method-{index}",
@@ -177,39 +199,61 @@ class GraphAgent:
                 "target": node_id,
                 "type": "uses",
                 "label": "使用方法",
+                "tier": "primary",
+                "weight": 1.0,
                 "evidence": [item["label"][:80]],
             })
 
+        dataset_seen: set[str] = set()
+        dataset_count = 0
         for index, item in enumerate(experiment_items, 1):
+            if dataset_count >= MAX_DATASETS:
+                break
             experiment_text = f"{item['label']} {item['description']}".casefold()
             dataset = next((hint for hint in DATASET_HINTS if hint in experiment_text), None)
             if not dataset:
                 continue
-            node_id = f"dataset-{index}"
+            key = _normalize_label(dataset)
+            if key in dataset_seen:
+                continue
+            dataset_seen.add(key)
+            dataset_count += 1
+            node_id = f"dataset-{dataset_count}"
             nodes.append({
                 "id": node_id,
                 "type": "dataset",
                 "label": dataset.upper() if dataset.isascii() else dataset,
                 "description": item["description"][:240],
                 "role": "dataset",
+                "lane": "domain",
             })
             edges.append({
-                "id": f"edge-dataset-{index}",
+                "id": f"edge-dataset-{dataset_count}",
                 "source": paper_node["id"],
                 "target": node_id,
                 "type": "evaluates_on",
                 "label": "评测数据",
+                "tier": "primary",
+                "weight": 0.9,
                 "evidence": [item["label"][:80]],
             })
 
         if primary_category:
-            nodes.append({"id": "category-1", "type": "task", "label": primary_category, "role": "domain"})
+            nodes.append({
+                "id": "category-1",
+                "type": "task",
+                "label": primary_category,
+                "role": "domain",
+                "lane": "domain",
+            })
             edges.append({
                 "id": "edge-category",
                 "source": paper_node["id"],
                 "target": "category-1",
                 "type": "in_domain",
                 "label": "研究领域",
+                "tier": "primary",
+                "weight": 0.85,
                 "evidence": [primary_category],
             })
 
@@ -225,6 +269,8 @@ class GraphAgent:
                         "target": concept["id"],
                         "type": "implements",
                         "label": "实现概念",
+                        "tier": "secondary",
+                        "weight": 0.4,
                         "evidence": shared[:4],
                     })
 
@@ -242,10 +288,12 @@ class GraphAgent:
             if item.get("paper_id") == paper_id:
                 continue
             score, shared = _related_score(paper_text, item, primary_category)
+            if score < RELATED_SCORE_THRESHOLD:
+                continue
             scored_related.append((score, shared, item))
 
         for index, (score, shared, item) in enumerate(
-            sorted(scored_related, key=lambda value: value[0], reverse=True)[:8], 1
+            sorted(scored_related, key=lambda value: value[0], reverse=True)[:MAX_RELATED_PAPERS], 1
         ):
             related_id = f"paper-{item.get('paper_id')}"
             related_date = _date_value(item.get("published_at"))
@@ -259,10 +307,12 @@ class GraphAgent:
                 "id": related_id,
                 "type": "paper",
                 "label": item.get("title") or item.get("arxiv_id") or f"论文 {item.get('paper_id')}",
+                "paperId": item.get("paper_id"),
                 "paper_id": item.get("paper_id"),
                 "arxiv_id": item.get("arxiv_id") or "",
                 "published_at": item.get("published_at") or "",
                 "role": role,
+                "lane": "related",
                 "description": f"相关度 {score:.2f}；匹配：{', '.join(shared) or '同领域'}",
                 "score": round(score, 4),
             })
@@ -280,6 +330,7 @@ class GraphAgent:
                 "target": related_id,
                 "type": relation,
                 "label": label,
+                "tier": "primary" if score >= 0.35 else "secondary",
                 "weight": round(score, 4),
                 "evidence": shared,
             })
@@ -287,10 +338,7 @@ class GraphAgent:
         focus = "、".join(item["label"] for item in concept_items[:3]) or "相关核心概念"
         limitations_note = "；存在待人工复核的局限性" if limitations else ""
         narrative = (
-            f"围绕《{title}》，图谱聚焦 {focus}，包含 {len(nodes)} 个节点和 {len(edges)} 条关系。"
-            f"关联论文按标题、摘要、分类和解析实体的重合度排序，并非真实引用关系{limitations_note}。"
+            f"当前论文围绕「{focus}」展开；图谱仅保留高相关关联论文（相关度≥{RELATED_SCORE_THRESHOLD}）"
+            f"{limitations_note}。"
         )
         return PaperGraph(nodes=nodes, edges=edges, lineage=lineage, narrative=narrative)
-
-
-__all__ = ["GraphAgent", "PaperGraph"]

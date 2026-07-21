@@ -2,7 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.model import ParseTask, Paper, User
+from app.model import ParseTask, Paper, User, UserAction, UserProfile
 
 
 def admin_overview(session: Session, settings: Settings) -> dict:
@@ -78,6 +78,24 @@ def update_user_status(session: Session, user_id: int, is_active: bool) -> dict:
         "created_at": user.created_at,
         "last_login_at": user.last_login_at,
     }
+
+
+def delete_user(session: Session, user_id: int) -> dict:
+    user = session.get(User, user_id)
+    if user is None:
+        raise ValueError("USER_NOT_FOUND")
+    if user.role == "admin":
+        raise ValueError("ADMIN_CANNOT_DELETE")
+    email = user.email
+    uid = str(user.id)
+    for action in session.scalars(select(UserAction).where(UserAction.user_id == uid)).all():
+        session.delete(action)
+    profile = session.get(UserProfile, uid)
+    if profile is not None:
+        session.delete(profile)
+    session.delete(user)
+    session.commit()
+    return {"deleted": True, "id": user_id, "email": email}
 
 
 def admin_quality(session: Session, limit: int = 50) -> dict:

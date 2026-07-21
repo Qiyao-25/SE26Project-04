@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, Select, Empty, Spin, Alert, message } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, Select, Empty, Spin, Alert, message, Button, Popconfirm, Pagination, Space } from 'antd';
 import { READING_HISTORY, PERSONAS, MODE_DESC, PAPERS } from '../../data/papers';
 import { useApp } from '../../context/AppContext';
 import { getPaperDetail } from '../../services/paperService';
-import { getConceptDictionary, getLearningProfile, listActions, updateLearningProfile } from '../../services/learningService';
+import { getConceptDictionary, getLearningProfile, listActions, updateLearningProfile, deleteAction, deleteActionsByType } from '../../services/learningService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { formatDateKey, parseApiDate } from '../../utils/datetime';
 import PaperCard from '../../components/paper/PaperCard';
 import { PROFILE_TOPIC_OPTIONS } from '../../data/arxivCategories';
 
 const { Text, Paragraph } = Typography;
+const DICT_PAGE_SIZE = 9;
 
 const TOPIC_OPTIONS = PROFILE_TOPIC_OPTIONS;
 
@@ -18,6 +20,7 @@ function emptyLibrary() {
 }
 
 export default function LearningPage() {
+  const navigate = useNavigate();
   const { userId, persona, setPersona, topics, setTopics } = useApp();
   const [historyKey, setHistoryKey] = useState('today');
   const [library, setLibrary] = useState(emptyLibrary);
@@ -26,6 +29,11 @@ export default function LearningPage() {
   const [error, setError] = useState('');
   const [profile, setProfile] = useState(null);
   const [dictionary, setDictionary] = useState([]);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [notesSearch, setNotesSearch] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+  const [dictSearch, setDictSearch] = useState('');
+  const [dictPage, setDictPage] = useState(1);
 
   useEffect(() => {
     if (USE_MOCK) return undefined;
@@ -106,7 +114,63 @@ export default function LearningPage() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, reloadToken]);
+
+  const refreshDictionary = async () => {
+    const nextDictionary = await getConceptDictionary(userId);
+    setDictionary(nextDictionary || []);
+  };
+
+  const handleDeleteNote = async (actionId) => {
+    try {
+      await deleteAction(actionId);
+      message.success('已删除笔记');
+      setReloadToken((token) => token + 1);
+    } catch (requestError) {
+      message.error(requestError.message || '删除失败');
+    }
+  };
+
+  const handleDeleteHistory = async (actionId) => {
+    try {
+      await deleteAction(actionId);
+      message.success('已删除阅读记录');
+      setReloadToken((token) => token + 1);
+    } catch (requestError) {
+      message.error(requestError.message || '删除失败');
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await deleteActionsByType(userId, 'reading_history');
+      message.success('已清空阅读历史');
+      setReloadToken((token) => token + 1);
+    } catch (requestError) {
+      message.error(requestError.message || '清空失败');
+    }
+  };
+
+  const hideDictionaryTerms = async (terms) => {
+    const uniqueTerms = [...new Set((terms || []).map((term) => String(term || '').trim()).filter(Boolean))];
+    if (!uniqueTerms.length) return;
+    const hidden = [
+      ...new Set([
+        ...(profile?.preferences?.hidden_dictionary_terms || []),
+        ...uniqueTerms
+      ])
+    ];
+    try {
+      const nextProfile = await updateLearningProfile(userId, {
+        preferences: { ...(profile?.preferences || {}), hidden_dictionary_terms: hidden }
+      });
+      setProfile(nextProfile);
+      await refreshDictionary();
+      message.success(uniqueTerms.length > 1 ? '已清空词典词条' : '已删除词条');
+    } catch (requestError) {
+      message.error(requestError.message || '操作失败');
+    }
+  };
 
   const mockHistory = READING_HISTORY[historyKey];
   const apiHistory = useMemo(() => {
@@ -124,6 +188,7 @@ export default function LearningPage() {
         ? occurred.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false })
         : (item.occurred_at?.slice(11, 16) || '');
       return {
+        id: item.id,
         paper: String(item.paper_id),
         time: item.payload_json?.time || hhmm,
         section: item.payload_json?.section || '论文主体',
@@ -136,16 +201,59 @@ export default function LearningPage() {
   const favorites = USE_MOCK ? ['attention', 'bert', 'lora'].map((id) => ({ paper: PAPERS[id], paperId: id })) : library.favorites.map((item) => ({ paper: paperMap[String(item.paper_id)], paperId: item.paper_id }));
   const notes = USE_MOCK
     ? [
-      { paperId: 'attention', paper: PAPERS.attention, text: '核心创新在于完全用注意力替代 RNN', date: '2026-07-01' },
-      { paperId: 'bert', paper: PAPERS.bert, text: '预训练-微调范式的里程碑', date: '2026-06-18' }
+      { id: 'mock-note-1', paperId: 'attention', paper: PAPERS.attention, text: '核心创新在于完全用注意力替代 RNN', date: '2026-07-01' },
+      { id: 'mock-note-2', paperId: 'bert', paper: PAPERS.bert, text: '预训练-微调范式的里程碑', date: '2026-06-18' }
     ]
     : library.notes.map((item) => ({
+      id: item.id,
       paperId: item.paper_id,
       paper: paperMap[String(item.paper_id)],
       text: item.payload_json?.text || '',
       date: item.occurred_at?.slice(0, 10) || ''
     }));
   const history = USE_MOCK ? mockHistory : apiHistory;
+
+  const filteredNotes = useMemo(() => {
+    const q = notesSearch.trim().toLowerCase();
+    return notes.filter((item) => {
+      if (!item.paper) return false;
+      if (!q) return true;
+      const title = String(item.paper.title || '').toLowerCase();
+      const text = String(item.text || '').toLowerCase();
+      return title.includes(q) || text.includes(q);
+    });
+  }, [notes, notesSearch]);
+
+  const filteredHistoryItems = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    const items = history.items || [];
+    if (!q) return items;
+    return items.filter((item) => {
+      const paper = USE_MOCK ? PAPERS[item.paper] : paperMap[item.paper];
+      const title = String(paper?.title || '').toLowerCase();
+      const section = String(item.section || '').toLowerCase();
+      return title.includes(q) || section.includes(q);
+    });
+  }, [history.items, historySearch, paperMap]);
+
+  const filteredDictionary = useMemo(() => {
+    const q = dictSearch.trim().toLowerCase();
+    if (!q) return dictionary;
+    return dictionary.filter((item) => {
+      const term = String(item.term || '').toLowerCase();
+      const description = String(item.description || '').toLowerCase();
+      return term.includes(q) || description.includes(q);
+    });
+  }, [dictionary, dictSearch]);
+
+  const pagedDictionary = useMemo(() => {
+    const start = (dictPage - 1) * DICT_PAGE_SIZE;
+    return filteredDictionary.slice(start, start + DICT_PAGE_SIZE);
+  }, [filteredDictionary, dictPage]);
+
+  useEffect(() => {
+    setDictPage(1);
+  }, [dictSearch]);
 
   const tabItems = [
     {
@@ -162,39 +270,81 @@ export default function LearningPage() {
     {
       key: 'notes',
       label: '笔记/评论',
-      children: notes.length ? (
-        <List
-          dataSource={notes.filter((item) => item.paper)}
-          locale={{ emptyText: '暂无笔记或评论' }}
-          renderItem={(item) => (
-            <List.Item>
-              <List.Item.Meta
-                title={item.paper.title}
-                description={<>{item.text} · <Text type="secondary">{item.date}</Text></>}
-              />
-            </List.Item>
-          )}
-        />
-      ) : <Empty description="暂无笔记或评论" />
+      children: (
+        <>
+          <Input
+            allowClear
+            placeholder="搜索笔记标题或内容"
+            value={notesSearch}
+            onChange={(event) => setNotesSearch(event.target.value)}
+            style={{ marginBottom: 16, maxWidth: 360 }}
+          />
+          {filteredNotes.length ? (
+            <List
+              dataSource={filteredNotes}
+              locale={{ emptyText: '暂无笔记或评论' }}
+              renderItem={(item) => (
+                <List.Item
+                  actions={!USE_MOCK ? [
+                    <Popconfirm key="delete" title="确定删除这条笔记？" onConfirm={() => handleDeleteNote(item.id)}>
+                      <Button type="link" danger size="small">删除</Button>
+                    </Popconfirm>
+                  ] : undefined}
+                >
+                  <List.Item.Meta
+                    title={(
+                      <a onClick={() => navigate(`/paper/${item.paperId}`)} style={{ cursor: 'pointer' }}>
+                        {item.paper.title}
+                      </a>
+                    )}
+                    description={<>{item.text} · <Text type="secondary">{item.date}</Text></>}
+                  />
+                </List.Item>
+              )}
+            />
+          ) : <Empty description="暂无笔记或评论" />}
+        </>
+      )
     },
     {
       key: 'history',
       label: '阅读历史',
       children: (
         <>
-          <Segmented
-            options={[{ value: 'today', label: '今天' }, { value: 'yesterday', label: '昨天' }, { value: 'earlier', label: '更早' }]}
-            value={historyKey}
-            onChange={setHistoryKey}
-            style={{ marginBottom: 16 }}
-          />
+          <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+            <Space wrap>
+              <Segmented
+                options={[{ value: 'today', label: '今天' }, { value: 'yesterday', label: '昨天' }, { value: 'earlier', label: '更早' }]}
+                value={historyKey}
+                onChange={setHistoryKey}
+              />
+              <Input
+                allowClear
+                placeholder="搜索阅读历史"
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+                style={{ width: 220 }}
+              />
+            </Space>
+            {!USE_MOCK && (
+              <Popconfirm title="确定清空全部阅读历史？" onConfirm={handleClearHistory}>
+                <Button danger size="small">清空历史</Button>
+              </Popconfirm>
+            )}
+          </Space>
           <Text strong>{history.label}</Text>
-          {history.items.length ? (
+          {filteredHistoryItems.length ? (
             <List
               style={{ marginTop: 12 }}
-              dataSource={history.items}
+              dataSource={filteredHistoryItems}
               renderItem={(item) => (
-                <List.Item>
+                <List.Item
+                  actions={!USE_MOCK && item.id ? [
+                    <Popconfirm key="delete" title="确定删除这条阅读记录？" onConfirm={() => handleDeleteHistory(item.id)}>
+                      <Button type="link" danger size="small">删除</Button>
+                    </Popconfirm>
+                  ] : undefined}
+                >
                   <PaperCard paper={USE_MOCK ? PAPERS[item.paper] : paperMap[item.paper]} compact />
                   <Text type="secondary" style={{ fontSize: 12 }}>{item.time} · {item.section} · {item.duration}</Text>
                 </List.Item>
@@ -209,9 +359,58 @@ export default function LearningPage() {
       label: '概念词典',
       children: USE_MOCK
         ? <Row gutter={[16, 16]}>{['Self-Attention', 'Pre-training', 'LoRA'].map((name) => <Col xs={24} sm={8} key={name}><Card hoverable size="small"><Text strong>{name}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>Wiki 词条</Text></Card></Col>)}</Row>
-        : dictionary.length
-          ? <Row gutter={[16, 16]}>{dictionary.map((item) => <Col xs={24} sm={12} lg={8} key={item.term}><Card hoverable size="small"><Text strong>{item.term}</Text><Paragraph type="secondary" style={{ margin: '6px 0 0' }}>{item.description}</Paragraph><Text type="secondary" style={{ fontSize: 12 }}>来自 {item.paper_titles?.length || 0} 篇论文</Text></Card></Col>)}</Row>
-          : <Empty description="解析论文后会自动生成概念词典" />
+        : (
+          <>
+            <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+              <Input
+                allowClear
+                placeholder="搜索概念词条"
+                value={dictSearch}
+                onChange={(event) => setDictSearch(event.target.value)}
+                style={{ width: 260 }}
+              />
+              <Popconfirm
+                title="确定清空当前可见词条？"
+                onConfirm={() => hideDictionaryTerms(filteredDictionary.map((item) => item.term))}
+                disabled={!filteredDictionary.length}
+              >
+                <Button danger size="small" disabled={!filteredDictionary.length}>清空词典</Button>
+              </Popconfirm>
+            </Space>
+            {filteredDictionary.length ? (
+              <>
+                <Row gutter={[16, 16]}>
+                  {pagedDictionary.map((item) => (
+                    <Col xs={24} sm={12} lg={8} key={item.term}>
+                      <Card
+                        hoverable
+                        size="small"
+                        extra={(
+                          <Popconfirm title="确定隐藏该词条？" onConfirm={() => hideDictionaryTerms([item.term])}>
+                            <Button type="link" danger size="small">删除</Button>
+                          </Popconfirm>
+                        )}
+                      >
+                        <Text strong>{item.term}</Text>
+                        <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>{item.description}</Paragraph>
+                        <Text type="secondary" style={{ fontSize: 12 }}>来自 {item.paper_titles?.length || 0} 篇论文</Text>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+                <div style={{ marginTop: 16, textAlign: 'right' }}>
+                  <Pagination
+                    current={dictPage}
+                    pageSize={DICT_PAGE_SIZE}
+                    total={filteredDictionary.length}
+                    onChange={setDictPage}
+                    showSizeChanger={false}
+                  />
+                </div>
+              </>
+            ) : <Empty description="解析论文后会自动生成概念词典" />}
+          </>
+        )
     },
     {
       key: 'profile',

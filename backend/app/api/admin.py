@@ -7,7 +7,7 @@ from app.core.auth import require_admin
 from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
-from app.service.admin import admin_audit, admin_overview, admin_quality, admin_tasks, admin_users, update_user_status
+from app.service.admin import admin_audit, admin_overview, admin_quality, admin_tasks, admin_users, delete_user, update_user_status
 
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -58,6 +58,36 @@ def user_status(user_id: int, payload: UserStatusUpdate, request: Request, _admi
                 content=ApiResponse[dict](
                     code="ADMIN_CANNOT_DISABLE",
                     message="管理员账户不可禁用",
+                    data={},
+                    request_id=request.state.request_id,
+                ).model_dump(),
+            )
+        raise
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.delete("/users/{user_id}", response_model=ApiResponse[dict], summary="删除用户")
+def user_delete(user_id: int, request: Request, _admin: AuthUser = Depends(require_admin), db: Session = Depends(db_session)):
+    try:
+        data = delete_user(db, user_id)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "USER_NOT_FOUND":
+            return JSONResponse(
+                status_code=404,
+                content=ApiResponse[dict](
+                    code="USER_NOT_FOUND",
+                    message="用户不存在",
+                    data={},
+                    request_id=request.state.request_id,
+                ).model_dump(),
+            )
+        if code == "ADMIN_CANNOT_DELETE":
+            return JSONResponse(
+                status_code=400,
+                content=ApiResponse[dict](
+                    code="ADMIN_CANNOT_DELETE",
+                    message="管理员账户不可删除",
                     data={},
                     request_id=request.state.request_id,
                 ).model_dump(),

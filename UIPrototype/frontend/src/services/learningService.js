@@ -36,6 +36,13 @@ export async function deleteAction(actionId) {
   return apiClient.delete(`/learning/actions/${actionId}`);
 }
 
+export async function deleteActionsByType(userId, actionType) {
+  if (USE_MOCK) return { deleted: 0 };
+  return apiClient.delete('/learning/actions/bulk', {
+    params: { user_id: userId, action_type: actionType }
+  });
+}
+
 export async function setFavorite({ userId, paperId, favorite }) {
   const actions = await listActions({ userId, paperId, actionType: 'favorite' });
   const current = actions[0];

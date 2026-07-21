@@ -109,3 +109,15 @@ def delete_action(session: Session, action_id: int, user_id: str | None = None) 
         raise ValueError("ACTION_FORBIDDEN")
     session.delete(action)
     session.commit()
+
+
+def delete_actions_by_type(session: Session, user_id: str, action_type: str) -> int:
+    if action_type not in ACTION_TYPES:
+        raise ValueError("VALIDATION_ERROR")
+    rows = session.scalars(
+        select(UserAction).where(UserAction.user_id == user_id, UserAction.action_type == action_type)
+    ).all()
+    for row in rows:
+        session.delete(row)
+    session.commit()
+    return len(rows)

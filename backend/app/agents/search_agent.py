@@ -97,7 +97,7 @@ class SearchAgent:
             ],
             timeout_s=getattr(self.settings, "search_agent_timeout_s", 45.0),
             json_mode=True,
-            temperature=0.1,
+            temperature=0.0,
         )
         data = _parse_json(raw)
         keywords = _as_str_list(data.get("keywords"))
@@ -148,7 +148,7 @@ class SearchAgent:
             ],
             timeout_s=getattr(self.settings, "search_agent_timeout_s", 45.0),
             json_mode=True,
-            temperature=0.3,
+            temperature=0.0,
         )
         data = _parse_json(raw)
         answer = str(data.get("answer") or "").strip()
