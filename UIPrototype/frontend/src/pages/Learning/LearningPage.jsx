@@ -239,6 +239,9 @@ export default function LearningPage() {
           </Col>
           <Col xs={24} md={12}>
             <Card title="偏好设置" size="small">
+              <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                会参与「基于画像推荐」打分：开启「偏好有代码」时更倾向摘要中提到开源/代码的论文；关注作者/机构按逗号分隔，匹配作者名或摘要时加权。
+              </Paragraph>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>偏好有代码</span>
                 <Switch
@@ -252,6 +255,7 @@ export default function LearningPage() {
               <div style={{ marginTop: 8 }}>
                 <Text type="secondary">关注作者/机构</Text>
                 <Input
+                  placeholder="例如 Vaswani, Google, Stanford"
                   defaultValue={profile?.preferences?.authors || ''}
                   onBlur={(event) => updateLearningProfile(userId, {
                     preferences: { ...(profile?.preferences || {}), authors: event.target.value }

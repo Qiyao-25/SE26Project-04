@@ -105,7 +105,14 @@ def _concept_names(session: Session, paper_id: int) -> list[str]:
     return names[:8]
 
 
-def _score_paper(paper: Paper, wanted_topics: list[str], concept_names: list[str] | None = None) -> tuple[float, list[str]]:
+def _score_paper(
+    paper: Paper,
+    wanted_topics: list[str],
+    concept_names: list[str] | None = None,
+    *,
+    prefer_code: bool | None = None,
+    author_hints: list[str] | None = None,
+) -> tuple[float, list[str]]:
     blob = " ".join([paper.title or "", paper.abstract or "", paper.primary_category or ""]).casefold()
     matched: list[str] = []
     score = 0.0
@@ -125,7 +132,41 @@ def _score_paper(paper: Paper, wanted_topics: list[str], concept_names: list[str
     score += _recency_boost(paper)
     if paper.ingest_status == "qa_ready":
         score += 0.5
+
+    code_signals = ("github.com", "gitlab.com", "code available", "source code", "open-source", "opensource", "implementation available")
+    has_code_signal = any(signal in blob for signal in code_signals)
+    if prefer_code is True and has_code_signal:
+        matched.append("有代码")
+        score += 1.8
+    elif prefer_code is False and has_code_signal:
+        score -= 0.8
+
+    author_names = []
+    for link in paper.authors or []:
+        author = getattr(link, "author", None)
+        if author is None:
+            continue
+        for value in (getattr(author, "display_name", None), getattr(author, "normalized_name", None)):
+            if value:
+                author_names.append(str(value).casefold())
+    for hint in author_hints or []:
+        key = hint.casefold().strip()
+        if not key:
+            continue
+        if any(key in name or name in key for name in author_names) or key in blob:
+            matched.append(hint)
+            score += 2.5
+
     return score, list(dict.fromkeys(matched))
+
+
+def _preference_boosts(prefs: dict) -> tuple[bool | None, list[str]]:
+    prefer_code = prefs.get("code")
+    if prefer_code is not None:
+        prefer_code = bool(prefer_code)
+    raw_authors = str(prefs.get("authors") or "")
+    author_hints = [part.strip() for part in raw_authors.replace("；", ",").replace(";", ",").split(",") if part.strip()]
+    return prefer_code, author_hints
 
 
 def _weighted_sample_preserve_order(
@@ -168,6 +209,9 @@ def profile_recommendations(
         if topic not in wanted_topics:
             wanted_topics.append(topic)
 
+    prefs = dict(profile.preferences or {})
+    prefer_code, author_hints = _preference_boosts(prefs)
+
     excluded = set(exclude_ids or [])
     excluded.update(
         session.scalars(
@@ -208,7 +252,13 @@ def profile_recommendations(
         if paper.id in excluded:
             continue
         concepts = _concept_names(session, paper.id) if wanted_topics else []
-        score, matched = _score_paper(paper, wanted_topics, concepts)
+        score, matched = _score_paper(
+            paper,
+            wanted_topics,
+            concepts,
+            prefer_code=prefer_code,
+            author_hints=author_hints,
+        )
         if matched:
             reason = f"匹配兴趣：{', '.join(matched[:3])} · {persona_label}模式"
         elif wanted_topics:

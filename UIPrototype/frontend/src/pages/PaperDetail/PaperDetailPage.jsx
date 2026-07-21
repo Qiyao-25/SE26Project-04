@@ -22,9 +22,7 @@ import {
   getPaperDetail,
   getPaperSummary,
   getPaperGraph,
-  rebuildPaperGraph,
-  createParseTask,
-  getParseTask
+  rebuildPaperGraph
 } from '../../services/paperService';
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
@@ -60,8 +58,6 @@ export default function PaperDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
-  const [parseTask, setParseTask] = useState(null);
-  const [parseLoading, setParseLoading] = useState(false);
   const [graphRefreshing, setGraphRefreshing] = useState(false);
   const [mainTab, setMainTab] = useState('content');
   const historyRecordedFor = useRef(null);
@@ -123,50 +119,6 @@ export default function PaperDetailPage() {
   }, [paperId, reloadToken]);
 
   useEffect(() => {
-    const taskId = parseTask?.task_id || parseTask?.taskId;
-    const status = parseTask?.status;
-    if (!taskId || !['queued', 'running'].includes(status)) return undefined;
-
-    let cancelled = false;
-    let timer;
-    let timeout;
-    const poll = async () => {
-      try {
-        const next = await getParseTask(taskId);
-        if (cancelled) return;
-        setParseTask(next);
-        if (['succeeded', 'failed', 'timed_out'].includes(next.status)) {
-          window.clearTimeout(timeout);
-          window.clearInterval(timer);
-          setParseLoading(false);
-          if (next.status === 'succeeded') {
-            message.success('论文解析完成，正在刷新结构化结果');
-            setReloadToken((value) => value + 1);
-          } else {
-            message.error(next.error_code || '论文解析失败');
-          }
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setParseLoading(false);
-          message.error(error.message || '解析任务查询失败');
-        }
-      }
-    };
-    timer = window.setInterval(poll, 1200);
-    timeout = window.setTimeout(() => {
-      window.clearInterval(timer);
-      setParseLoading(false);
-      message.warning('解析仍在进行中（Agent 生成可能较慢），请稍后刷新页面查看智能总结');
-    }, 300000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      window.clearTimeout(timeout);
-    };
-  }, [parseTask]);
-
-  useEffect(() => {
     if (!paper || !isPersistedPaperId(paperId) || historyRecordedFor.current === paperId) return;
     historyRecordedFor.current = paperId;
     createAction({
@@ -182,33 +134,6 @@ export default function PaperDetailPage() {
   const handleExitPaper = () => {
     exitLockedPaper();
     navigate('/workspace');
-  };
-
-  const handleParse = async () => {
-    if (parseLoading) return;
-    if (!isPersistedPaperId(paperId)) {
-      message.warning('当前论文尚未入库，无法启动解析');
-      return;
-    }
-    setParseLoading(true);
-    setLoadError('');
-    setMainTab('summary');
-    try {
-      // queued/running 也可能是重启后遗留的僵死任务，允许强制新建
-      const force = ['completed', 'qa_ready', 'failed', 'queued', 'running', 'pending'].includes(paper.parseStatus);
-      const task = await createParseTask(paperId, { force });
-      setParseTask(task);
-      if (task.status === 'succeeded') {
-        setParseLoading(false);
-        setReloadToken((value) => value + 1);
-        message.success('论文解析已完成');
-      } else {
-        message.info('已启动 Summarize Agent，正在生成智能总结…');
-      }
-    } catch (error) {
-      setParseLoading(false);
-      message.error(error.message || '解析任务创建失败');
-    }
   };
 
   const handleGraphRefresh = async () => {
@@ -283,9 +208,6 @@ export default function PaperDetailPage() {
             <Tag color={['completed', 'qa_ready'].includes(paper.parseStatus) ? 'success' : 'warning'}>
               解析状态：{getParseStatusLabel(paper.parseStatus)}
             </Tag>
-            <Button size="small" loading={parseLoading} onClick={handleParse}>
-              {['completed', 'qa_ready'].includes(paper.parseStatus) ? '重新解析' : '开始解析'}
-            </Button>
           </Space>
 
           <Paragraph type="secondary">
@@ -362,7 +284,9 @@ export default function PaperDetailPage() {
             >
               解析状态：{getParseStatusLabel(summaryData?.parseStatus)}
             </Tag>
-            {parseTask && <Text type="secondary">解析任务：{parseTask.task_id || parseTask.taskId} · {getParseStatusLabel(parseTask.status)}</Text>}
+            {!structuredSummaryReady ? (
+              <Text type="secondary">未解析论文由后台自动解析（优先新入库），完成后刷新即可查看</Text>
+            ) : null}
           </Space>
 
           {structuredSummaryReady ? (

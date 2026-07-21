@@ -22,23 +22,27 @@ from app.core.config import Settings, get_settings, validate_production_settings
 from app.core.database import create_engine_for
 from app.schema.common import ApiResponse
 from app.service.crawl_scheduler import run_crawl_scheduler
+from app.service.parse_scheduler import run_parse_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     stop_event = asyncio.Event()
-    task = asyncio.create_task(run_crawl_scheduler(app, stop_event))
+    crawl_task = asyncio.create_task(run_crawl_scheduler(app, stop_event))
+    parse_task = asyncio.create_task(run_parse_scheduler(app, stop_event))
     app.state.crawl_stop_event = stop_event
-    app.state.crawl_task = task
+    app.state.crawl_task = crawl_task
+    app.state.parse_task = parse_task
     try:
         yield
     finally:
         stop_event.set()
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+        for task in (crawl_task, parse_task):
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

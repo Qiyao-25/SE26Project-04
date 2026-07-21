@@ -29,6 +29,10 @@ const WELCOME_MESSAGE = {
   citations: []
 };
 
+function paperIds(papers = []) {
+  return papers.map((paper) => paper.paperId).filter((id) => id !== undefined && id !== null);
+}
+
 export default function WorkspacePage() {
   const {
     workspaceSearched,
@@ -50,10 +54,18 @@ export default function WorkspacePage() {
   const [dailyPapers, setDailyPapers] = useState([]);
   const [profilePapers, setProfilePapers] = useState([]);
   const [subscriptionPapers, setSubscriptionPapers] = useState([]);
-  const [recommendStatus, setRecommendStatus] = useState('idle');
-  const [recommendError, setRecommendError] = useState('');
-  const [recommendTick, setRecommendTick] = useState(0);
-  const shownIdsRef = useRef([]);
+  const [bootStatus, setBootStatus] = useState('idle');
+  const [bootError, setBootError] = useState('');
+  const [dailyLoading, setDailyLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const dailyRef = useRef([]);
+  const profileRef = useRef([]);
+  const subscriptionRef = useRef([]);
+
+  useEffect(() => { dailyRef.current = dailyPapers; }, [dailyPapers]);
+  useEffect(() => { profileRef.current = profilePapers; }, [profilePapers]);
+  useEffect(() => { subscriptionRef.current = subscriptionPapers; }, [subscriptionPapers]);
 
   useEffect(() => {
     if (skipRestoreRef.current) {
@@ -80,55 +92,86 @@ export default function WorkspacePage() {
     return () => { cancelled = true; };
   }, [workspaceSearched, lastSearchQuery]);
 
-  const loadRecommendations = useCallback(async (signal = { cancelled: false }) => {
-    setRecommendStatus('loading');
-    setRecommendError('');
+  const refreshDaily = useCallback(async ({ excludeCurrent = true } = {}) => {
+    setDailyLoading(true);
     try {
-      const avoidIds = shownIdsRef.current || [];
-      const daily = await fetchDailyArxivPicks({ limit: 3, excludeIds: avoidIds });
-      if (signal.cancelled) return;
+      const excludeIds = [
+        ...paperIds(profileRef.current),
+        ...paperIds(subscriptionRef.current),
+        ...(excludeCurrent ? paperIds(dailyRef.current) : [])
+      ];
+      const daily = await fetchDailyArxivPicks({ limit: 3, excludeIds });
       setDailyPapers(daily);
+      return daily;
+    } finally {
+      setDailyLoading(false);
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async ({ excludeCurrent = true } = {}) => {
+    setProfileLoading(true);
+    try {
+      const excludeIds = [
+        ...paperIds(dailyRef.current),
+        ...paperIds(subscriptionRef.current),
+        ...(excludeCurrent ? paperIds(profileRef.current) : [])
+      ];
       const recommended = await fetchProfileRecommendations({
         userId,
         persona,
         topics,
         limit: 3,
-        excludeIds: [...avoidIds, ...daily.map((paper) => paper.paperId)]
+        excludeIds
       });
-      if (signal.cancelled) return;
       setProfilePapers(recommended);
-      const subscribed = await fetchSubscriptionRecommendations({
-        userId,
-        limit: 6,
-        excludeIds: [...avoidIds, ...daily.map((paper) => paper.paperId), ...recommended.map((paper) => paper.paperId)]
-      });
-      if (signal.cancelled) return;
-      setSubscriptionPapers(subscribed);
-      shownIdsRef.current = [...daily, ...recommended, ...subscribed]
-        .map((paper) => paper.paperId)
-        .filter((id) => id !== undefined && id !== null);
-      setRecommendStatus(daily.length || recommended.length || subscribed.length ? 'success' : 'empty');
-    } catch (error) {
-      if (signal.cancelled) return;
-      setDailyPapers([]);
-      setProfilePapers([]);
-      setSubscriptionPapers([]);
-      setRecommendStatus('failed');
-      setRecommendError(error.message || '推荐加载失败');
+      return recommended;
+    } finally {
+      setProfileLoading(false);
     }
   }, [userId, persona, topics]);
 
+  const refreshSubscriptions = useCallback(async ({ excludeCurrent = true } = {}) => {
+    setSubscriptionLoading(true);
+    try {
+      const excludeIds = [
+        ...paperIds(dailyRef.current),
+        ...paperIds(profileRef.current),
+        ...(excludeCurrent ? paperIds(subscriptionRef.current) : [])
+      ];
+      const subscribed = await fetchSubscriptionRecommendations({
+        userId,
+        limit: 6,
+        excludeIds
+      });
+      setSubscriptionPapers(subscribed);
+      return subscribed;
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => {
     if (workspaceSearched || lockedPaperId) return undefined;
-    const signal = { cancelled: false };
-    loadRecommendations(signal);
-    return () => { signal.cancelled = true; };
-  }, [workspaceSearched, lockedPaperId, loadRecommendations, recommendTick]);
-
-  const handleRefreshRecommendations = () => {
-    setRecommendTick((value) => value + 1);
-    message.success('正在刷新推荐论文');
-  };
+    let cancelled = false;
+    setBootStatus('loading');
+    setBootError('');
+    (async () => {
+      try {
+        await refreshDaily({ excludeCurrent: false });
+        if (cancelled) return;
+        await refreshProfile({ excludeCurrent: false });
+        if (cancelled) return;
+        await refreshSubscriptions({ excludeCurrent: false });
+        if (cancelled) return;
+        setBootStatus('success');
+      } catch (error) {
+        if (cancelled) return;
+        setBootStatus('failed');
+        setBootError(error.message || '推荐加载失败');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceSearched, lockedPaperId, refreshDaily, refreshProfile, refreshSubscriptions]);
 
   const handleSearch = async (text) => {
     setMessages((current) => [...current, {
@@ -191,12 +234,19 @@ export default function WorkspacePage() {
     </Row>
   );
 
-  const refreshExtra = (
+  const sectionRefresh = (label, loading, onClick) => (
     <Button
       size="small"
       icon={<ReloadOutlined />}
-      loading={recommendStatus === 'loading'}
-      onClick={handleRefreshRecommendations}
+      loading={loading}
+      onClick={async () => {
+        try {
+          await onClick();
+          message.success(`已刷新${label}`);
+        } catch (error) {
+          message.error(error.message || `${label}刷新失败`);
+        }
+      }}
     >
       刷新
     </Button>
@@ -212,22 +262,58 @@ export default function WorkspacePage() {
       </Card>
       {!workspaceSearched ? (
         <>
-          {recommendStatus === 'loading' && <Card className="section-card"><div style={{ textAlign: 'center', padding: 40 }}><Spin tip="正在从数据库加载推荐论文..." /></div></Card>}
-          {recommendStatus === 'failed' && (
+          {bootStatus === 'loading' && !dailyPapers.length && !profilePapers.length && !subscriptionPapers.length && (
+            <Card className="section-card"><div style={{ textAlign: 'center', padding: 40 }}><Spin tip="正在从数据库加载推荐论文..." /></div></Card>
+          )}
+          {bootStatus === 'failed' && (
             <Alert
               type="error"
               showIcon
               message="推荐加载失败"
-              description={recommendError}
+              description={bootError}
               style={{ marginBottom: 16 }}
-              action={<Button size="small" onClick={handleRefreshRecommendations}>重试</Button>}
+              action={(
+                <Button
+                  size="small"
+                  onClick={async () => {
+                    setBootStatus('loading');
+                    try {
+                      await refreshDaily({ excludeCurrent: false });
+                      await refreshProfile({ excludeCurrent: false });
+                      await refreshSubscriptions({ excludeCurrent: false });
+                      setBootStatus('success');
+                    } catch (error) {
+                      setBootStatus('failed');
+                      setBootError(error.message || '推荐加载失败');
+                    }
+                  }}
+                >
+                  重试
+                </Button>
+              )}
             />
           )}
-          {recommendStatus !== 'loading' && <>
-            <Card title="每日 ArXiv 精选" className="section-card" extra={refreshExtra}>{dailyPapers.length ? renderPaperGrid(dailyPapers) : <Empty description="暂无可用论文，请先导入种子数据或入库论文" />}</Card>
-            <Card title="基于画像推荐的论文" className="section-card" extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>兴趣主题 + 阅读历史</Text>{refreshExtra}</Space>}>{profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文，请先在学习页设置兴趣主题" />}</Card>
-            <Card title="订阅更新" className="section-card" extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>来自设置页订阅 · 可立即同步 arXiv</Text>{refreshExtra}</Space>}>{subscriptionPapers.length ? renderPaperGrid(subscriptionPapers) : <Empty description="暂无订阅更新，请到设置页添加订阅并点击「立即同步」" />}</Card>
-          </>}
+          {(bootStatus !== 'loading' || dailyPapers.length || profilePapers.length || subscriptionPapers.length) && (
+            <>
+              <Card title="每日 ArXiv 精选" className="section-card" extra={sectionRefresh('每日精选', dailyLoading, () => refreshDaily({ excludeCurrent: true }))}>
+                {dailyLoading && !dailyPapers.length ? <Spin /> : (dailyPapers.length ? renderPaperGrid(dailyPapers) : <Empty description="暂无可用论文，请先导入种子数据或入库论文" />)}
+              </Card>
+              <Card
+                title="基于画像推荐的论文"
+                className="section-card"
+                extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>兴趣主题 + 阅读历史</Text>{sectionRefresh('画像推荐', profileLoading, () => refreshProfile({ excludeCurrent: true }))}</Space>}
+              >
+                {profileLoading && !profilePapers.length ? <Spin /> : (profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文，请先在学习页设置兴趣主题" />)}
+              </Card>
+              <Card
+                title="订阅更新"
+                className="section-card"
+                extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>来自设置页订阅 · 可立即同步 arXiv</Text>{sectionRefresh('订阅更新', subscriptionLoading, () => refreshSubscriptions({ excludeCurrent: true }))}</Space>}
+              >
+                {subscriptionLoading && !subscriptionPapers.length ? <Spin /> : (subscriptionPapers.length ? renderPaperGrid(subscriptionPapers) : <Empty description="暂无订阅更新，请到设置页添加订阅并点击「立即同步」" />)}
+              </Card>
+            </>
+          )}
         </>
       ) : (
         <Card title={`检索结果${lastSearchQuery ? ` · 「${lastSearchQuery}」` : ''} · 共 ${resultTotal} 篇`} extra={<Button icon={<HomeOutlined />} onClick={handleBackHome}>返回首页</Button>} className="section-card">

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Card, Tabs, Row, Col, Statistic, List, Tag, Table, Progress, Select, Button,
-  Input, Typography, message
+  Input, Typography, message, Space
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { TASK_STATUS_LABELS } from '../../data/admin';
-import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus } from '../../services/adminService';
+import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus, retryAdminParseTask, enqueuePendingParseTasks, forceParsePaper } from '../../services/adminService';
 import { formatDateTime } from '../../utils/datetime';
 
 const { Text } = Typography;
@@ -145,28 +145,111 @@ function TasksTab({ tasks = [] }) {
   );
 }
 
-function QualityTab({ quality }) {
+function QualityTab({ quality, onRefresh }) {
   const navigate = useNavigate();
   const exceptions = quality?.exceptions || [];
   const rates = quality?.rates || {};
+  const queue = quality?.queue || {};
+  const [busyKey, setBusyKey] = useState('');
+
+  const runAction = async (key, action, successText) => {
+    setBusyKey(key);
+    try {
+      await action();
+      message.success(successText);
+      await onRefresh?.();
+    } catch (error) {
+      message.error(error.message || '操作失败');
+    } finally {
+      setBusyKey('');
+    }
+  };
+
   return (
     <Row gutter={16}>
       <Col xs={24} lg={14}>
-        <Card title="异常论文工作台" size="small">
+        <Card
+          title="异常论文工作台"
+          size="small"
+          extra={(
+            <Space>
+              <Button
+                size="small"
+                loading={busyKey === 'enqueue'}
+                onClick={() => runAction('enqueue', () => enqueuePendingParseTasks(20), '已将待解析论文加入队列')}
+              >
+                入队待解析
+              </Button>
+              <Button size="small" onClick={() => onRefresh?.()}>刷新</Button>
+            </Space>
+          )}
+        >
+          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+            汇总解析失败 / 超时任务。可重试失败任务、强制重新解析，或打开论文详情人工修正。
+          </Text>
           <List dataSource={exceptions} locale={{ emptyText: '暂无质量异常' }} renderItem={(e) => (
             <List.Item actions={[
-              <Button size="small" key="fix" onClick={() => navigate(`/paper/${e.paper}`)}>人工修正</Button>
-            ]}>
-              <List.Item.Meta title={e.title} description={<>{e.detail}<br /><Text type="secondary">{e.type} · {formatDateTime(e.time)}</Text></>} />
+              e.retryable ? (
+                <Button
+                  size="small"
+                  key="retry"
+                  loading={busyKey === `retry-${e.task_id}`}
+                  onClick={() => runAction(`retry-${e.task_id}`, () => retryAdminParseTask(e.task_id), '已重试解析任务')}
+                >
+                  重试
+                </Button>
+              ) : null,
+              <Button
+                size="small"
+                key="force"
+                loading={busyKey === `force-${e.paper}`}
+                onClick={() => runAction(`force-${e.paper}`, () => forceParsePaper(e.paper), '已强制重新解析')}
+              >
+                强制解析
+              </Button>,
+              <Button size="small" key="view" onClick={() => navigate(`/paper/${e.paper}`)}>打开论文</Button>
+            ].filter(Boolean)}
+            >
+              <List.Item.Meta
+                title={e.title}
+                description={(
+                  <>
+                    {e.detail}
+                    <br />
+                    <Text type="secondary">
+                      {e.type} · {e.status} · 第 {e.attempt || 1} 次 · {formatDateTime(e.time)}
+                    </Text>
+                  </>
+                )}
+              />
             </List.Item>
           )} />
         </Card>
       </Col>
       <Col xs={24} lg={10}>
-        <Card title="质量统计" size="small">
-          <Text type="secondary">各 Agent 错误率（近7日）</Text>
+        <Card title="队列与质量统计" size="small">
+          <List
+            size="small"
+            dataSource={[
+              ['待解析论文', queue.pending_papers ?? 0],
+              ['排队中任务', queue.queued_tasks ?? 0],
+              ['运行中任务', queue.running_tasks ?? 0],
+              ['失败任务', queue.failed_tasks ?? 0],
+            ]}
+            renderItem={([label, value]) => (
+              <List.Item>
+                <Text type="secondary">{label}</Text>
+                <Text strong>{value}</Text>
+              </List.Item>
+            )}
+          />
+          <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>各阶段失败占比</Text>
           {Object.entries(rates).map(([label, value]) => (
-            <div key={label} style={{ marginTop: 8 }}><Text style={{ width: 48, display: 'inline-block' }}>{label}</Text><Progress percent={value} size="small" showInfo={false} /><Text style={{ marginLeft: 8 }}>{value}%</Text></div>
+            <div key={label} style={{ marginTop: 8 }}>
+              <Text style={{ width: 64, display: 'inline-block' }}>{label}</Text>
+              <Progress percent={value} size="small" showInfo={false} />
+              <Text style={{ marginLeft: 8 }}>{value}%</Text>
+            </div>
           ))}
         </Card>
       </Col>
@@ -234,31 +317,34 @@ export default function AdminPage() {
     }
   };
 
+  const refreshAdminData = async () => {
+    const [nextOverview, nextTasks, nextQuality, nextUsers, nextAudit] = await Promise.all([
+      getAdminOverview(), getAdminTasks(), getAdminQuality(), getAdminUsers(), getAdminAudit()
+    ]);
+    setOverview(nextOverview);
+    setTasks((nextTasks || []).map((task) => ({
+      id: task.id,
+      title: task.title,
+      agent: '解析 Agent',
+      status: task.status === 'queued' ? 'pending' : task.status === 'running' ? 'processing' : task.status === 'succeeded' ? 'done' : 'failed',
+      progress: task.progress,
+      start: formatDateTime(task.started_at),
+      duration: task.finished_at && task.started_at ? '已完成' : '—'
+    })));
+    setQuality(nextQuality);
+    setUsers(nextUsers || []);
+    setAudit(nextAudit || []);
+  };
+
   useEffect(() => {
-    Promise.all([getAdminOverview(), getAdminTasks(), getAdminQuality(), getAdminUsers(), getAdminAudit()])
-      .then(([nextOverview, nextTasks, nextQuality, nextUsers, nextAudit]) => {
-        setOverview(nextOverview);
-        setTasks((nextTasks || []).map((task) => ({
-          id: task.id,
-          title: task.title,
-          agent: '解析 Agent',
-          status: task.status === 'queued' ? 'pending' : task.status === 'running' ? 'processing' : task.status === 'succeeded' ? 'done' : 'failed',
-          progress: task.progress,
-          start: formatDateTime(task.started_at),
-          duration: task.finished_at && task.started_at ? '已完成' : '—'
-        })));
-        setQuality(nextQuality);
-        setUsers(nextUsers || []);
-        setAudit(nextAudit || []);
-      })
-      .catch((requestError) => setError(requestError.message || '管理员数据加载失败'));
+    refreshAdminData().catch((requestError) => setError(requestError.message || '管理员数据加载失败'));
   }, []);
 
   const items = [
     { key: 'overview', label: '系统概览', children: <OverviewTab onGo={setTab} overview={overview} activities={audit} /> },
     { key: 'fleet', label: 'Agent舰队', children: <FleetTab agents={(overview?.agents || []).map((agent) => ({ ...agent, health: agent.ready ? 'ok' : 'warn', task: agent.status, latency: '—', cpu: '—' }))} /> },
     { key: 'tasks', label: '任务队列', children: <TasksTab tasks={tasks || []} /> },
-    { key: 'quality', label: '质量异常', children: <QualityTab quality={quality} /> },
+    { key: 'quality', label: '质量异常', children: <QualityTab quality={quality} onRefresh={refreshAdminData} /> },
     { key: 'users', label: '用户管理', children: <UsersTab users={users} onStatusChange={handleUserStatusChange} /> },
     { key: 'audit', label: '审计日志', children: <AuditTab logs={audit} /> }
   ];

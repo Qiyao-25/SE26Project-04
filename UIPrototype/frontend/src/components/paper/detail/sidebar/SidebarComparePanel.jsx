@@ -8,14 +8,12 @@ import {
   Tabs,
   Tag,
   Typography,
-  Row,
-  Col,
   message
 } from 'antd';
-import { SearchOutlined, StarOutlined, ApartmentOutlined, SwapOutlined } from '@ant-design/icons';
+import { SearchOutlined, StarOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../../context/AppContext';
-import { PAPER_LIST, PAPERS, shortPaperTitle } from '../../../../data/papers';
+import { PAPER_LIST, PAPERS } from '../../../../data/papers';
 import {
   getPaperDetail,
   getPaperGraph,
@@ -56,12 +54,6 @@ function normalizePickerItem(paper) {
   };
 }
 
-function slotLabel(paper, fallback = '未选择') {
-  if (!paper?.title || paper.title === EMPTY_PAPER.title) return fallback;
-  const title = paper.title;
-  return title.length > 36 ? `${title.slice(0, 36)}…` : title;
-}
-
 function displayField(paper, key) {
   if (key === 'authors') {
     if (Array.isArray(paper.authors)) return paper.authors.join(', ');
@@ -72,7 +64,7 @@ function displayField(paper, key) {
 
 export default function SidebarComparePanel({ paperId, paper }) {
   const navigate = useNavigate();
-  const { userId, comparePaperA, comparePaperB, compareActiveSlot, setCompareActiveSlot, setComparePaperA, setComparePaperB } = useApp();
+  const { userId, comparePaperB, setComparePaperB } = useApp();
 
   const [remotePapers, setRemotePapers] = useState({});
   const remoteCacheRef = useRef({});
@@ -145,7 +137,6 @@ export default function SidebarComparePanel({ paperId, paper }) {
 
       const related = [];
       const seen = new Set([currentId]);
-
       const [graphResult, historyActions] = await Promise.allSettled([
         getPaperGraph(paperId),
         listActions({ userId, actionType: 'reading_history' })
@@ -189,94 +180,46 @@ export default function SidebarComparePanel({ paperId, paper }) {
 
   useEffect(() => {
     let cancelled = false;
-    const ids = [comparePaperA, comparePaperB]
-      .map((id) => String(id))
-      .filter((id) => id && id !== currentId && (/^\d+$/.test(id) || PAPERS[id]));
-    if (!ids.length) return undefined;
-    Promise.all(ids.map((id) => ensureRemotePaper(id)))
-      .then((items) => {
-        if (cancelled) return;
-        const next = {};
-        items.forEach((item) => {
-          if (item) next[item.paperId] = item;
-        });
-        if (Object.keys(next).length) {
-          setRemotePapers((current) => ({ ...current, ...next }));
-        }
+    const otherId = String(comparePaperB || '');
+    if (!otherId || otherId === currentId) return undefined;
+    ensureRemotePaper(otherId)
+      .then((item) => {
+        if (cancelled || !item) return;
+        setRemotePapers((current) => ({ ...current, [item.paperId]: item }));
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [comparePaperA, comparePaperB, currentId, ensureRemotePaper]);
+  }, [comparePaperB, currentId, ensureRemotePaper]);
 
   useEffect(() => {
     if (pickerTab === 'favorites') loadFavorites();
     if (pickerTab === 'related') loadRelated();
   }, [loadFavorites, loadRelated, pickerTab]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function suggestDefaultCompareTarget() {
-      const slotA = String(comparePaperA);
-      const slotB = String(comparePaperB);
-      // B may equal the paper currently being read — that is valid when reading B.
-      const missingB = !slotB || (USE_MOCK ? !PAPERS[slotB] : !/^\d+$/.test(slotB));
-      const sameAsA = Boolean(slotB) && slotB === slotA;
-      if (!missingB && !sameAsA) return;
+  const currentPaper = useMemo(() => {
+    if (!paper) return EMPTY_PAPER;
+    return {
+      ...paper,
+      tag: paper.tag || paper.primaryCategory,
+      direction: paper.direction || paper.researchDirection,
+      authorsText: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors
+    };
+  }, [paper]);
 
-      const exclude = new Set([slotA, currentId].filter(Boolean));
-
-      if (USE_MOCK) {
-        const candidate = PAPER_LIST.map((item) => item.id).find((id) => !exclude.has(String(id)));
-        if (candidate && !cancelled) setComparePaperB(candidate);
-        return;
-      }
-
-      try {
-        const favoriteActions = await listActions({ userId, actionType: 'favorite' });
-        const favoriteId = favoriteActions
-          .map((action) => String(action.paper_id))
-          .find((id) => id && !exclude.has(id));
-        if (favoriteId) {
-          if (!cancelled) setComparePaperB(favoriteId);
-          return;
-        }
-
-        const graph = await getPaperGraph(paperId);
-        const lineageId = (graph?.lineage || [])
-          .map((item) => String(item.paperId ?? item.paper_id ?? ''))
-          .find((id) => id && !exclude.has(id));
-        if (lineageId && !cancelled) setComparePaperB(lineageId);
-      } catch {
-        // Keep empty slot B until user picks manually.
-      }
-    }
-    suggestDefaultCompareTarget();
-    return () => { cancelled = true; };
-  }, [comparePaperA, comparePaperB, currentId, paperId, setComparePaperB, userId]);
-
-  const resolvePaper = useCallback((id) => {
-    if (String(id) === currentId) {
-      return paper
-        ? {
-            ...paper,
-            tag: paper.tag || paper.primaryCategory,
-            direction: paper.direction || paper.researchDirection,
-            authorsText: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors
-          }
-        : EMPTY_PAPER;
-    }
-    const cached = PAPERS[id] || remotePapers[String(id)];
-    if (!cached) return EMPTY_PAPER;
+  const otherPaper = useMemo(() => {
+    const id = String(comparePaperB || '');
+    if (!id || id === currentId) return EMPTY_PAPER;
+    const cached = PAPERS[id] || remotePapers[id];
+    if (!cached) return { ...EMPTY_PAPER, title: '正在加载对比论文…' };
     return {
       ...cached,
       tag: cached.tag || cached.primaryCategory,
       direction: cached.direction || cached.researchDirection,
       authorsText: Array.isArray(cached.authors) ? cached.authors.join(', ') : cached.authors
     };
-  }, [currentId, paper, remotePapers]);
+  }, [comparePaperB, currentId, remotePapers]);
 
-  const paperA = resolvePaper(comparePaperA);
-  const paperB = resolvePaper(comparePaperB);
+  const hasOther = Boolean(comparePaperB) && String(comparePaperB) !== currentId && otherPaper.title !== EMPTY_PAPER.title;
 
   const handleSearch = async (value) => {
     const query = (value ?? searchQuery).trim();
@@ -303,39 +246,24 @@ export default function SidebarComparePanel({ paperId, paper }) {
     }
   };
 
-  const setSlotPaper = (slot, id) => {
+  const selectOtherPaper = (id) => {
     const nextId = String(id);
-    if (nextId === String(comparePaperA) && slot === 'a') return;
-    if (nextId === String(comparePaperB) && slot === 'b') return;
-    if (slot === 'a') {
-      setComparePaperA(nextId);
-      // Do not reshuffle B when A is set to what was B — keep B, user can change later
-      if (String(comparePaperB) === nextId) {
-        message.warning('论文 B 已是该篇，请另选一篇作为 B，或先互换');
-      }
-    } else {
-      setComparePaperB(nextId);
-      if (String(comparePaperA) === nextId) {
-        message.warning('论文 A 已是该篇，请另选一篇作为 A，或先互换');
-      }
+    if (nextId === currentId) {
+      message.warning('不能与当前论文自身对比');
+      return;
     }
-    message.success(`已设为论文 ${slot.toUpperCase()}`);
-  };
-
-  const swap = () => {
-    setComparePaperA(comparePaperB);
-    setComparePaperB(comparePaperA);
-    message.success('已互换对比论文');
+    setComparePaperB(nextId);
+    ensureRemotePaper(nextId);
+    message.success('已选定对比论文，下方自动生成对比');
   };
 
   const renderPickerItem = (item) => (
     <List.Item
       key={item.paperId}
       className="compare-picker-item"
-      onClick={() => setSlotPaper(compareActiveSlot, item.paperId)}
+      onClick={() => selectOtherPaper(item.paperId)}
       actions={[
-        String(item.paperId) === String(comparePaperA) ? <Tag key="slot-a" color="blue">A</Tag> : null,
-        String(item.paperId) === String(comparePaperB) ? <Tag key="slot-b">B</Tag> : null
+        String(item.paperId) === String(comparePaperB) ? <Tag key="selected" color="blue">已选</Tag> : null
       ].filter(Boolean)}
     >
       <List.Item.Meta
@@ -397,16 +325,14 @@ export default function SidebarComparePanel({ paperId, paper }) {
       ) : (
         <List
           size="small"
-          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无相关论文，可先阅读或解析当前论文" /> }}
+          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无相关论文" /> }}
           dataSource={relatedPapers}
           renderItem={renderPickerItem}
         />
       )
     }
   ], [
-    comparePaperA,
     comparePaperB,
-    compareActiveSlot,
     favorites,
     favoritesLoading,
     relatedLoading,
@@ -419,53 +345,51 @@ export default function SidebarComparePanel({ paperId, paper }) {
 
   return (
     <div className="sidebar-scroll">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text strong>对比阅读</Text>
-        <Button size="small" icon={<SwapOutlined />} onClick={swap}>互换</Button>
-      </div>
-      <Text type="secondary" style={{ fontSize: 12 }}>
-        先选 A/B 栏，再通过搜索或收藏选择对比论文
+      <Text strong>对比阅读</Text>
+      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+        当前论文固定为对比基准；请搜索或从收藏选择另一篇，选定后下方自动生成对比。
       </Text>
 
-      <Row gutter={8} style={{ marginTop: 12 }}>
-        <Col span={12}>
-          <div className={`compare-slot ${compareActiveSlot === 'a' ? 'active' : ''}`} onClick={() => setCompareActiveSlot('a')}>
-            <Text className="block-label">论文 A</Text>
-            <Text ellipsis style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
-              {slotLabel(paperA, USE_MOCK ? shortPaperTitle(comparePaperA) : '未选择')}
-            </Text>
-          </div>
-        </Col>
-        <Col span={12}>
-          <div className={`compare-slot ${compareActiveSlot === 'b' ? 'active' : ''}`} onClick={() => setCompareActiveSlot('b')}>
-            <Text className="block-label">论文 B</Text>
-            <Text ellipsis style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
-              {slotLabel(paperB, USE_MOCK ? shortPaperTitle(comparePaperB) : '未选择')}
-            </Text>
-          </div>
-        </Col>
-      </Row>
+      <div className="compare-slot" style={{ marginTop: 12 }}>
+        <Text className="block-label">当前论文</Text>
+        <Text ellipsis style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
+          {currentPaper.title || '—'}
+        </Text>
+      </div>
+      <div className={`compare-slot ${hasOther ? 'active' : ''}`} style={{ marginTop: 8 }}>
+        <Text className="block-label">对比论文</Text>
+        <Text ellipsis style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
+          {hasOther ? otherPaper.title : '尚未选择'}
+        </Text>
+      </div>
 
       <div className="compare-picker" style={{ marginTop: 12 }}>
         <Tabs size="small" activeKey={pickerTab} onChange={setPickerTab} items={pickerTabs} />
       </div>
 
       <div className="compare-body" style={{ marginTop: 12 }}>
-        {ROWS.map((row) => {
-          const va = row.fmt ? row.fmt(paperA) : displayField(paperA, row.key);
-          const vb = row.fmt ? row.fmt(paperB) : displayField(paperB, row.key);
-          return (
-            <div key={row.key} className="compare-row">
-              <Text type="secondary" style={{ fontSize: 11, fontWeight: 600 }}>{row.label}</Text>
-              <div className={`compare-col ${va !== vb ? 'diff' : ''}`}><Tag>A</Tag>{va || '—'}</div>
-              <div className={`compare-col ${va !== vb ? 'diff' : ''}`}><Tag>B</Tag>{vb || '—'}</div>
-            </div>
-          );
-        })}
+        {!hasOther ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选定对比论文后自动生成对比内容" />
+        ) : (
+          ROWS.map((row) => {
+            const va = row.fmt ? row.fmt(currentPaper) : displayField(currentPaper, row.key);
+            const vb = row.fmt ? row.fmt(otherPaper) : displayField(otherPaper, row.key);
+            return (
+              <div key={row.key} className="compare-row">
+                <Text type="secondary" style={{ fontSize: 11, fontWeight: 600 }}>{row.label}</Text>
+                <div className={`compare-col ${va !== vb ? 'diff' : ''}`}><Tag color="blue">当前</Tag>{va || '—'}</div>
+                <div className={`compare-col ${va !== vb ? 'diff' : ''}`}><Tag>对比</Tag>{vb || '—'}</div>
+              </div>
+            );
+          })
+        )}
       </div>
 
-      <Button block style={{ marginTop: 12 }} onClick={() => navigate(`/paper/${comparePaperA}`)}>阅读论文 A</Button>
-      <Button block style={{ marginTop: 8 }} onClick={() => navigate(`/paper/${comparePaperB}`)}>阅读论文 B</Button>
+      {hasOther ? (
+        <Button block style={{ marginTop: 12 }} onClick={() => navigate(`/paper/${comparePaperB}`)}>
+          打开对比论文
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -89,18 +89,51 @@ def admin_quality(session: Session, limit: int = 50) -> dict:
         paper = session.get(Paper, task.paper_id)
         exceptions.append({
             "paper": task.paper_id,
+            "task_id": task.id,
             "title": paper.title if paper else f"paper-{task.paper_id}",
             "detail": task.error_code or "解析任务失败",
             "type": task.stage or "parse",
+            "status": task.status,
+            "attempt": task.attempt,
+            "retryable": task.status in {"failed", "timed_out"} and task.attempt < 3,
             "time": task.finished_at or task.requested_at,
         })
     total = session.scalar(select(func.count(ParseTask.id))) or 0
+    failed_total = session.scalar(
+        select(func.count(ParseTask.id)).where(ParseTask.status.in_(("failed", "timed_out")))
+    ) or 0
+    pending = session.scalar(
+        select(func.count(Paper.id)).where(
+            Paper.deleted_at.is_(None),
+            Paper.ingest_status.in_(("metadata_only", "downloaded")),
+        )
+    ) or 0
+    queued = session.scalar(select(func.count(ParseTask.id)).where(ParseTask.status == "queued")) or 0
+    running = session.scalar(select(func.count(ParseTask.id)).where(ParseTask.status == "running")) or 0
+    fetch_failed = session.scalar(
+        select(func.count(ParseTask.id)).where(
+            ParseTask.status.in_(("failed", "timed_out")),
+            ParseTask.stage == "fetch",
+        )
+    ) or 0
+    summarize_failed = session.scalar(
+        select(func.count(ParseTask.id)).where(
+            ParseTask.status.in_(("failed", "timed_out")),
+            ParseTask.stage.in_(("summarize", "parse", "persist")),
+        )
+    ) or 0
     return {
         "exceptions": exceptions,
         "rates": {
-            "抓取": round((len([item for item in failed if item.stage == "fetch"]) / total) * 100, 2) if total else 0,
-            "摘要": round((len([item for item in failed if item.stage == "summarize"]) / total) * 100, 2) if total else 0,
-            "问答": 0,
+            "抓取": round((fetch_failed / total) * 100, 2) if total else 0,
+            "摘要": round((summarize_failed / total) * 100, 2) if total else 0,
+            "失败占比": round((failed_total / total) * 100, 2) if total else 0,
+        },
+        "queue": {
+            "pending_papers": pending,
+            "queued_tasks": queued,
+            "running_tasks": running,
+            "failed_tasks": failed_total,
         },
     }
 

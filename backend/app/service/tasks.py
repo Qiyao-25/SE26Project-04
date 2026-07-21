@@ -305,10 +305,11 @@ def recover_stale_tasks(session: Session, stale_after_seconds: int = 900) -> lis
 
 
 def enqueue_pending_tasks(session: Session, limit: int = 20) -> list[TaskResponse]:
+    # Newest ingested papers first.
     papers = session.scalars(
         select(Paper)
         .where(Paper.deleted_at.is_(None), Paper.ingest_status.in_(("metadata_only", "downloaded")))
-        .order_by(Paper.id.asc())
+        .order_by(Paper.created_at.desc().nullslast(), Paper.id.desc())
         .limit(limit)
     ).all()
     queued: list[TaskResponse] = []
