@@ -48,15 +48,15 @@ def test_batch_upsert_deduplicates_by_arxiv_id() -> None:
         assert session.scalar(select(Paper).where(Paper.title == "Updated title")) is not None
 
 
-def test_batch_upsert_merges_same_title_different_arxiv_id() -> None:
-    """Business rule: normalized title collision reuses the existing paper row."""
+def test_batch_upsert_keeps_same_title_different_arxiv_id() -> None:
+    """Distinct arXiv records must not be merged just because titles collide."""
     with make_session() as session:
         first = batch_upsert_papers(session, [paper_payload("1706.03762", "Same Title Paper")])
         second = batch_upsert_papers(session, [paper_payload("9999.99999", "Same Title Paper")])
         assert first.created == 1
-        assert second.created == 0
-        assert second.updated == 1
-        assert session.scalar(select(func.count()).select_from(Paper).where(Paper.deleted_at.is_(None))) == 1
+        assert second.created == 1
+        assert second.updated == 0
+        assert session.scalar(select(func.count()).select_from(Paper).where(Paper.deleted_at.is_(None))) == 2
 
 
 def test_paper_detail_and_wiki_return_contract() -> None:

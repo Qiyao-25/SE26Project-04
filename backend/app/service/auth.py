@@ -54,7 +54,7 @@ def _token(user: User, settings: Settings) -> str:
         "exp": int(time.time()) + TOKEN_TTL_SECONDS,
     }
     raw = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
-    signature = hmac.new((settings.auth_secret or "papermate-dev-secret").encode(), raw.encode(), hashlib.sha256).hexdigest()
+    signature = hmac.new(settings.auth_secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
     return f"{raw}.{signature}"
 
 
@@ -86,7 +86,7 @@ def login(session: Session, payload: LoginRequest, settings: Settings) -> AuthRe
 def user_from_token(session: Session, token: str, settings: Settings) -> AuthUser:
     try:
         raw, signature = token.split(".", 1)
-        expected = hmac.new((settings.auth_secret or "papermate-dev-secret").encode(), raw.encode(), hashlib.sha256).hexdigest()
+        expected = hmac.new(settings.auth_secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
             raise ValueError
         padded = raw + "=" * (-len(raw) % 4)
