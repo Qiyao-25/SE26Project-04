@@ -14,6 +14,7 @@ export const CRAWL_DEBUG_UI_ENABLED =
 async function runCrawlDebugTick(maxPerSubscription = 3) {
   return apiClient.post('/debug/crawl/run', {}, {
     params: { max_per_subscription: maxPerSubscription },
+    timeout: 180000,
   });
 }
 
@@ -34,9 +35,16 @@ export default function CrawlSchedulerDebugCard() {
     try {
       const data = await runCrawlDebugTick(3);
       const stats = data?.stats || {};
-      const text = `users=${stats.users ?? '-'} fetched=${stats.fetched ?? '-'} created=${stats.created ?? '-'} updated=${stats.updated ?? '-'}`;
+      const errHint = stats.errors
+        ? ` errors=${stats.errors}${stats.error_samples?.length ? ` (${stats.error_samples[0]})` : ''}`
+        : '';
+      const text = `users=${stats.users ?? '-'} fetched=${stats.fetched ?? '-'} created=${stats.created ?? '-'}${errHint}`;
       setLastResult(text);
-      message.success(`调试抓取完成：${text}`);
+      if (stats.errors > 0 && !(stats.created > 0)) {
+        message.warning(`抓取结束但 arXiv 请求失败：${text}`);
+      } else {
+        message.success(`调试抓取完成：${text}`);
+      }
     } catch (error) {
       message.error(error.message || '调试抓取失败');
     } finally {
@@ -60,7 +68,7 @@ export default function CrawlSchedulerDebugCard() {
         showIcon
         style={{ marginBottom: 12 }}
         message="临时调试入口（便于删除）"
-        description="调用与后台调度器相同的 sync_all_users。删除 frontend/src/debug/ 并关闭 VITE_ENABLE_CRAWL_DEBUG 即可移除。"
+        description="调用与后台调度器相同的 sync_all_users（需管理员登录）。删除 frontend/src/debug/ 并关闭 VITE_ENABLE_CRAWL_DEBUG 即可移除。"
       />
       <Button type="dashed" danger loading={loading} onClick={onRun}>
         立即执行一轮全站订阅抓取

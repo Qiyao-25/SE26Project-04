@@ -40,8 +40,29 @@ def users(request: Request, limit: int = Query(default=100, ge=1, le=200), _admi
 def user_status(user_id: int, payload: UserStatusUpdate, request: Request, _admin: AuthUser = Depends(require_admin), db: Session = Depends(db_session)):
     try:
         data = update_user_status(db, user_id, payload.is_active)
-    except ValueError:
-        return JSONResponse(status_code=404, content=ApiResponse[dict](code="USER_NOT_FOUND", message="用户不存在", data={}, request_id=request.state.request_id).model_dump())
+    except ValueError as exc:
+        code = str(exc)
+        if code == "USER_NOT_FOUND":
+            return JSONResponse(
+                status_code=404,
+                content=ApiResponse[dict](
+                    code="USER_NOT_FOUND",
+                    message="用户不存在",
+                    data={},
+                    request_id=request.state.request_id,
+                ).model_dump(),
+            )
+        if code == "ADMIN_CANNOT_DISABLE":
+            return JSONResponse(
+                status_code=400,
+                content=ApiResponse[dict](
+                    code="ADMIN_CANNOT_DISABLE",
+                    message="管理员账户不可禁用",
+                    data={},
+                    request_id=request.state.request_id,
+                ).model_dump(),
+            )
+        raise
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

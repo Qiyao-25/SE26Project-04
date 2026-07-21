@@ -3,13 +3,14 @@ from types import SimpleNamespace
 
 from fastapi import BackgroundTasks
 from starlette.requests import Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.papers import parse
 from app.core.config import Settings
 from app.core.database import create_engine_for
 from app.model import Base, Paper
+from app.schema.auth import AuthUser
 from app.schema.papers import AuthorInput, PaperUpsert, ParseRequest
 from app.service.papers import batch_upsert_papers, get_paper_detail, get_paper_graph, get_wiki
 
@@ -32,12 +33,30 @@ def paper_payload(arxiv_id: str = "1706.03762", title: str = "Attention Is All Y
 
 def test_batch_upsert_deduplicates_by_arxiv_id() -> None:
     with make_session() as session:
-        result = batch_upsert_papers(session, [paper_payload(), paper_payload("1810.04805")])
+        # Different titles so title-normalize merge does not collapse distinct arXiv IDs.
+        result = batch_upsert_papers(
+            session,
+            [
+                paper_payload("1706.03762", "Attention Is All You Need"),
+                paper_payload("1810.04805", "BERT: Pre-training of Deep Bidirectional Transformers"),
+            ],
+        )
         assert result.created == 2
         result = batch_upsert_papers(session, [paper_payload(title="Updated title")])
         assert result.created == 0
         assert result.updated == 1
         assert session.scalar(select(Paper).where(Paper.title == "Updated title")) is not None
+
+
+def test_batch_upsert_merges_same_title_different_arxiv_id() -> None:
+    """Business rule: normalized title collision reuses the existing paper row."""
+    with make_session() as session:
+        first = batch_upsert_papers(session, [paper_payload("1706.03762", "Same Title Paper")])
+        second = batch_upsert_papers(session, [paper_payload("9999.99999", "Same Title Paper")])
+        assert first.created == 1
+        assert second.created == 0
+        assert second.updated == 1
+        assert session.scalar(select(func.count()).select_from(Paper).where(Paper.deleted_at.is_(None))) == 1
 
 
 def test_paper_detail_and_wiki_return_contract() -> None:
@@ -91,6 +110,7 @@ def test_parse_endpoint_schedules_background_job() -> None:
             background_tasks,
             "parse-test-key",
             session,
+            AuthUser(user_id="1", email="u@example.com", role="user"),
         )
 
     assert result.data.paper_id == paper_id

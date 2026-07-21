@@ -4,8 +4,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.auth import require_admin, require_current_user, db_session
 from app.agents.llm_client import LlmError
+from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
 from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
@@ -17,10 +18,6 @@ from app.service.qa import ask_paper
 from app.service.tasks import create_task
 
 router = APIRouter(prefix="/api/papers", tags=["papers"])
-
-
-def db_session(request: Request):
-    yield from get_db(request.app.state.engine)
 
 
 def _not_found(request: Request, paper_id: str):
@@ -38,6 +35,7 @@ def _qa_payload(result, history_count: int) -> dict:
         "messageId": result.message_id,
         "paperId": str(result.paper_id),
         "answer": result.answer,
+        "answerMode": getattr(result, "answer_mode", None) or "agent",
         "createdAt": result.created_at.isoformat(),
         "citations": [
             {**citation, "paperId": str(citation.get("paperId", result.paper_id))}
@@ -77,7 +75,12 @@ def smart_search(payload: SmartSearchRequest, request: Request, db: Session = De
 
 
 @router.post("/batch", response_model=ApiResponse[BatchUpsertResponse], summary="批量去重写入论文元数据")
-def batch_papers(request: Request, payload: list[PaperUpsert] | BatchPaperRequest, db: Session = Depends(db_session)):
+def batch_papers(
+    request: Request,
+    payload: list[PaperUpsert] | BatchPaperRequest,
+    db: Session = Depends(db_session),
+    _admin: AuthUser = Depends(require_admin),
+):
     try:
         items = payload if isinstance(payload, list) else payload.papers
         data = batch_upsert_papers(db, items)
@@ -94,6 +97,7 @@ def parse(
     background_tasks: BackgroundTasks,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
 ):
     if not idempotency_key or not idempotency_key.strip():
         return _db_error(request, PaperServiceError("VALIDATION_ERROR", "必须提供 Idempotency-Key", 400))
@@ -112,7 +116,13 @@ def parse(
 
 
 @router.post("/{paper_id}/chunks", response_model=ApiResponse[dict], summary="批量写入论文文本块")
-def chunks(paper_id: int, payload: TextChunkBatch, request: Request, db: Session = Depends(db_session)):
+def chunks(
+    paper_id: int,
+    payload: TextChunkBatch,
+    request: Request,
+    db: Session = Depends(db_session),
+    _admin: AuthUser = Depends(require_admin),
+):
     from app.repository.chunks import upsert_chunks
 
     try:

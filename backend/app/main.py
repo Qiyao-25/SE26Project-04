@@ -20,7 +20,7 @@ from app.api.subscriptions import router as subscriptions_router
 from app.api.tasks import router as tasks_router
 # DEBUG crawl: remove import + include_router block below to drop the feature
 from app.api.debug_crawl import router as debug_crawl_router
-from app.core.config import Settings, get_settings
+from app.core.config import Settings, get_settings, validate_production_settings
 from app.core.database import create_engine_for
 from app.schema.common import ApiResponse
 from app.service.crawl_scheduler import run_crawl_scheduler
@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    validate_production_settings(settings)
     docs_enabled = bool(settings.enable_docs)
     app = FastAPI(
         title="PaperMate Backend API",

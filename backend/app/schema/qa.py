@@ -30,3 +30,4 @@ class AskPaperResult(BaseModel):
     createdAt: str
     citations: list[CitationItem]
     historyCount: int = 0
+    answerMode: str = "agent"

@@ -22,7 +22,15 @@ import {
   DeleteOutlined,
   PlusOutlined,
   TagsOutlined,
-} from "@ant-design/icons";
+} from '@ant-design/icons';
+import { useApp } from '../../context/AppContext';
+import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
+import { syncSubscriptions } from '../../services/recommendationService';
+import { updateAccount } from '../../services/authService';
+import { USE_MOCK } from '../../services/runtimeConfig';
+// DEBUG crawl: remove this import + <CrawlSchedulerDebugCard /> below to drop UI
+import CrawlSchedulerDebugCard from '../../debug/CrawlSchedulerDebugCard';
+
 
 const ARXIV_CATEGORIES = [
   {
@@ -383,6 +391,8 @@ export default function SettingsPage() {
                   保存配置
                 </Button>
               </Form>
+              {/* DEBUG crawl: remove next line + src/debug/ folder to drop */}
+              <CrawlSchedulerDebugCard />
             </Card>
           </Col>
         </Row>

@@ -465,6 +465,7 @@ def answer_question(
     if agent is None:
         answer, citation_ids = _extractive_answer(question, evidence)
         selected_ids = citation_ids[:3]
+        answer_mode = "extractive_fallback"
     else:
         try:
             generated = agent.run(
@@ -477,6 +478,7 @@ def answer_question(
             logger.warning("qa_agent_fallback paper_id=%s err=%s", paper_id, exc)
             answer, citation_ids = _extractive_answer(question, evidence)
             selected_ids = citation_ids[:3]
+            answer_mode = "extractive_fallback"
         else:
             if generated.refuse:
                 raise PaperServiceError("NO_EVIDENCE", generated.answer or "依据不足，无法核验该问题", 422)
@@ -490,6 +492,7 @@ def answer_question(
                 min_overlap=0.06,
                 max_citations=3,
             )
+            answer_mode = "agent"
 
     citations = []
     for chunk_id in selected_ids:
@@ -521,6 +524,7 @@ def answer_question(
         answer=answer,
         created_at=datetime.now(timezone.utc),
         citations=citations,
+        answer_mode=answer_mode,
     )
 
 

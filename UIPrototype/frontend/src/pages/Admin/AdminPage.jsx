@@ -180,7 +180,11 @@ function UsersTab({ users = [], onStatusChange }) {
         { title: '用户', dataIndex: 'email' },
         { title: '角色', dataIndex: 'role' },
         { title: '状态', dataIndex: 'status' },
-        { title: '操作', render: (_, user) => <Button size="small" onClick={() => onStatusChange(user)}>{user.status === '启用' ? '禁用' : '启用'}</Button> }
+        { title: '操作', render: (_, user) => (
+          user.role === 'admin'
+            ? <Text type="secondary">不可禁用</Text>
+            : <Button size="small" onClick={() => onStatusChange(user)}>{user.status === '启用' ? '禁用' : '启用'}</Button>
+        ) }
       ]} />
     </Card>
   );
