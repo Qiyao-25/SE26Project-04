@@ -93,19 +93,6 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-
-        <div className="auth-floating-panel">
-          <div className="auth-flow-title">使用流程</div>
-          <div className="auth-flow">
-            <span>登录/注册</span>
-            <span>→</span>
-            <span>首次引导</span>
-            <span>→</span>
-            <span>工作空间</span>
-            <span>→</span>
-            <span>论文详情</span>
-          </div>
-        </div>
       </section>
 
       <section className="auth-panel-wrap">
@@ -196,13 +183,8 @@ export default function LoginPage() {
                       <Input.Password size="large" placeholder="再次输入密码" prefix={<NodeIndexOutlined />} />
                     </Form.Item>
                     <Button type="primary" htmlType="submit" size="large" block>
-                      注册并开始引导
+                      注册 PaperMate
                     </Button>
-                    <div className="auth-note">
-                      <Text type="secondary">
-                        注册后会弹出首次引导，用于选择研究方向和阅读模式。
-                      </Text>
-                    </div>
                   </Form>
                 )
               }
