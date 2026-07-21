@@ -6,6 +6,7 @@ import logging
 import re
 import tempfile
 import urllib.request
+from html.parser import HTMLParser
 from pathlib import Path
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -191,6 +192,7 @@ def _fail(session: Session, task_id: int, error_code: str) -> None:
 
 
 def _extract_paper_text(paper: Paper, settings: Settings) -> tuple[str, int, str]:
+    """Prefer PDF text; fall back to ar5iv/HTML; finally abstract."""
     pdf_url = (paper.pdf_url or "").strip()
     if not pdf_url and paper.arxiv_id:
         pdf_url = f"https://arxiv.org/pdf/{paper.arxiv_id}.pdf"
@@ -198,10 +200,27 @@ def _extract_paper_text(paper: Paper, settings: Settings) -> tuple[str, int, str
     if pdf_url:
         try:
             text, pages = _download_and_extract_pdf(pdf_url, max_pages=settings.parse_agent_max_pages)
-            if text.strip():
+            if len(text.strip()) >= 400:
                 return text, pages, "pdf"
+            if text.strip():
+                logger.info("pdf_text_short arxiv_id=%s chars=%s; try_html", paper.arxiv_id, len(text.strip()))
         except Exception as exc:  # noqa: BLE001
             logger.warning("pdf_extract_failed arxiv_id=%s err=%s", paper.arxiv_id, exc)
+
+    html_url = ""
+    if paper.arxiv_id:
+        html_url = f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}"
+    source_url = (paper.source_url or "").strip()
+    if source_url and "html" in source_url.casefold():
+        html_url = source_url
+
+    if html_url:
+        try:
+            text, sections = _download_and_extract_html(html_url, max_chars=120_000)
+            if len(text.strip()) >= 200:
+                return text, max(sections, 1), "html"
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("html_extract_failed arxiv_id=%s err=%s", paper.arxiv_id, exc)
 
     abstract = (paper.abstract or "").strip()
     return abstract, 0, "abstract_fallback"
@@ -241,6 +260,75 @@ def _download_and_extract_pdf(url: str, *, max_pages: int) -> tuple[str, int]:
             pass
 
 
+class _Ar5ivHtmlParser(HTMLParser):
+    """Lightweight ar5iv/HTML body extractor (stdlib only)."""
+
+    _BLOCK = {"article", "div", "li", "p", "section", "td", "th"}
+    _HEADING = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    _SKIP = {"script", "style", "svg", "noscript", "nav", "footer", "header"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.section = "body"
+        self._skip_depth = 0
+        self._buffer: list[str] = []
+        self.paragraphs: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:  # noqa: ANN001
+        tag = tag.lower()
+        if tag in self._SKIP:
+            self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+        if tag in self._HEADING or tag in self._BLOCK:
+            self._flush()
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in self._SKIP and self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+        if tag in self._HEADING:
+            text = re.sub(r"\s+", " ", " ".join(self._buffer)).strip()
+            self._buffer.clear()
+            if text:
+                self.section = re.sub(r"^\d+(?:\.\d+)*\.?\s*", "", text).strip()[:64] or "body"
+        elif tag in self._BLOCK:
+            self._flush()
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth and data.strip():
+            self._buffer.append(data)
+
+    def _flush(self) -> None:
+        text = re.sub(r"\s+", " ", " ".join(self._buffer)).strip()
+        self._buffer.clear()
+        if len(text) >= 40:
+            self.paragraphs.append((self.section, text[:2000]))
+
+
+def _download_and_extract_html(url: str, *, max_chars: int = 120_000) -> tuple[str, int]:
+    request = urllib.request.Request(url, headers={"User-Agent": "PaperMate-ParseAgent/0.1"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        raw = response.read()
+    html = raw.decode("utf-8", errors="replace")
+    parser = _Ar5ivHtmlParser()
+    parser.feed(html)
+    parser.close()
+    parts: list[str] = []
+    total = 0
+    for section, body in parser.paragraphs:
+        piece = f"[section: {section}] {body}"
+        if total + len(piece) > max_chars:
+            break
+        parts.append(piece)
+        total += len(piece) + 2
+    return "\n\n".join(parts), len(parts)
+
+
 def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
     cleaned = re.sub(r"\s+", " ", text or "").strip()
     if not cleaned:
@@ -261,6 +349,25 @@ def _text_to_chunks(text: str, *, max_chunks: int = 80) -> list[dict]:
                         "chunk_id": f"p{page_no}-{len(chunks) + 1}",
                         "page_no": int(page_no),
                         "section": _guess_section(piece),
+                        "content": piece,
+                    }
+                )
+        return chunks
+
+    # HTML section markers from ar5iv extract
+    section_blocks = re.split(r"\[section:\s*([^\]]+)\]\s*", cleaned)
+    if len(section_blocks) > 1:
+        it = iter(section_blocks[1:])
+        for section_name, body in zip(it, it):
+            section = (section_name or "body").strip()[:64] or "body"
+            for piece in _split_pieces(body, size=700):
+                if len(chunks) >= max_chunks:
+                    return chunks
+                chunks.append(
+                    {
+                        "chunk_id": f"s-{len(chunks) + 1}",
+                        "page_no": 1,
+                        "section": section,
                         "content": piece,
                     }
                 )
