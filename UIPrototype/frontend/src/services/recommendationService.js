@@ -44,12 +44,20 @@ function normalizeRecommendations(items) {
 }
 
 /** 每日 ArXiv 精选：数据库随机论文 */
-export async function fetchDailyArxivPicks({ limit = 3 } = {}) {
+export async function fetchDailyArxivPicks({ limit = 3, excludeIds = [] } = {}) {
   if (USE_MOCK) {
-    const data = await searchPapers({ page: 1, pageSize: 12, sortBy: 'date' });
-    return shuffle(data.items || []).slice(0, limit);
+    const data = await searchPapers({ page: 1, pageSize: 24, sortBy: 'date' });
+    const excluded = new Set((excludeIds || []).map(String));
+    const pool = shuffle((data.items || []).filter((item) => !excluded.has(String(item.paperId))));
+    return (pool.length ? pool : shuffle(data.items || [])).slice(0, limit);
   }
-  const data = await apiClient.get('/recommendations/daily', { params: { limit } });
+  const data = await apiClient.get('/recommendations/daily', {
+    params: {
+      limit,
+      exclude_ids: (excludeIds || []).join(',') || undefined,
+      _t: Date.now()
+    }
+  });
   return normalizeRecommendations(data);
 }
 
@@ -88,7 +96,8 @@ export async function fetchProfileRecommendations({
       persona,
       topics: profileContext.topics.join(','),
       limit,
-      exclude_ids: excludeIds.join(',')
+      exclude_ids: excludeIds.join(','),
+      _t: Date.now()
     }
   });
   return normalizeRecommendations(data);
@@ -108,7 +117,8 @@ export async function fetchSubscriptionRecommendations({
     params: {
       user_id: userId,
       limit,
-      exclude_ids: excludeIds.join(',')
+      exclude_ids: excludeIds.join(','),
+      _t: Date.now()
     }
   });
   return normalizeRecommendations(data);

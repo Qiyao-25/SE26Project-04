@@ -53,6 +53,7 @@ export default function WorkspacePage() {
   const [recommendStatus, setRecommendStatus] = useState('idle');
   const [recommendError, setRecommendError] = useState('');
   const [recommendTick, setRecommendTick] = useState(0);
+  const shownIdsRef = useRef([]);
 
   useEffect(() => {
     if (skipRestoreRef.current) {
@@ -83,7 +84,8 @@ export default function WorkspacePage() {
     setRecommendStatus('loading');
     setRecommendError('');
     try {
-      const daily = await fetchDailyArxivPicks({ limit: 3 });
+      const avoidIds = shownIdsRef.current || [];
+      const daily = await fetchDailyArxivPicks({ limit: 3, excludeIds: avoidIds });
       if (signal.cancelled) return;
       setDailyPapers(daily);
       const recommended = await fetchProfileRecommendations({
@@ -91,17 +93,20 @@ export default function WorkspacePage() {
         persona,
         topics,
         limit: 3,
-        excludeIds: daily.map((paper) => paper.paperId)
+        excludeIds: [...avoidIds, ...daily.map((paper) => paper.paperId)]
       });
       if (signal.cancelled) return;
       setProfilePapers(recommended);
       const subscribed = await fetchSubscriptionRecommendations({
         userId,
         limit: 6,
-        excludeIds: [...daily, ...recommended].map((paper) => paper.paperId)
+        excludeIds: [...avoidIds, ...daily.map((paper) => paper.paperId), ...recommended.map((paper) => paper.paperId)]
       });
       if (signal.cancelled) return;
       setSubscriptionPapers(subscribed);
+      shownIdsRef.current = [...daily, ...recommended, ...subscribed]
+        .map((paper) => paper.paperId)
+        .filter((id) => id !== undefined && id !== null);
       setRecommendStatus(daily.length || recommended.length || subscribed.length ? 'success' : 'empty');
     } catch (error) {
       if (signal.cancelled) return;

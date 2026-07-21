@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -15,7 +16,15 @@ from app.service.profile import get_profile
 from app.service.subscriptions import normalize_subscriptions
 
 
-def daily_picks(session: Session, limit: int = 3) -> list[PaperItem]:
+def daily_picks(
+    session: Session,
+    limit: int = 3,
+    *,
+    exclude_ids: list[int] | None = None,
+) -> list[PaperItem]:
+    """Random sample from a recent paper pool so refresh yields new picks."""
+    excluded = set(exclude_ids or [])
+    pool_size = min(max(limit * 12, 30), 80)
     papers, _ = list_papers(
         session,
         keyword=None,
@@ -25,16 +34,21 @@ def daily_picks(session: Session, limit: int = 3) -> list[PaperItem]:
         published_from=None,
         published_to=None,
         page=1,
-        page_size=min(max(limit * 3, limit), 50),
+        page_size=pool_size,
     )
-    scored = []
-    for paper in papers:
+    candidates = [paper for paper in papers if paper.id not in excluded]
+    if not candidates:
+        candidates = papers
+    if not candidates:
+        return []
+    picked = random.sample(candidates, k=min(limit, len(candidates)))
+    items: list[PaperItem] = []
+    for paper in picked:
         item = to_item(paper)
-        item.reason = "每日精选 · 库内最新论文"
+        item.reason = "每日精选 · 库内随机论文"
         item.recommend_source = "daily"
-        scored.append((_recency_boost(paper), item))
-    scored.sort(key=lambda row: row[0], reverse=True)
-    return [item for _, item in scored[:limit]]
+        items.append(item)
+    return items
 
 
 def _annotate(item: PaperItem, *, reason: str, source: str) -> PaperItem:
@@ -114,6 +128,30 @@ def _score_paper(paper: Paper, wanted_topics: list[str], concept_names: list[str
     return score, list(dict.fromkeys(matched))
 
 
+def _weighted_sample_preserve_order(
+    ranked: list[tuple[float, PaperItem]],
+    limit: int,
+) -> list[PaperItem]:
+    """Sample with preference for higher scores, then return in recommendation order."""
+    if limit <= 0:
+        return []
+    if len(ranked) <= limit:
+        return [item for _, item in ranked]
+    pool = ranked[: max(limit * 10, 24)]
+    remaining = list(pool)
+    chosen: list[tuple[float, PaperItem]] = []
+    while remaining and len(chosen) < limit:
+        # Rank bias: earlier (higher score) items are more likely.
+        weights = [
+            max(score, 0.05) * (1.0 / (index + 1)) * 4.0 + 0.2
+            for index, (score, _) in enumerate(remaining)
+        ]
+        pick_index = random.choices(range(len(remaining)), weights=weights, k=1)[0]
+        chosen.append(remaining.pop(pick_index))
+    chosen.sort(key=lambda row: row[0], reverse=True)
+    return [item for _, item in chosen]
+
+
 def profile_recommendations(
     session: Session,
     *,
@@ -179,7 +217,7 @@ def profile_recommendations(
             reason = f"热门补充 · {persona_label}模式"
         ranked.append((score, _annotate(to_item(paper), reason=reason, source="profile")))
     ranked.sort(key=lambda row: row[0], reverse=True)
-    return [item for _, item in ranked[:limit]]
+    return _weighted_sample_preserve_order(ranked, limit)
 
 
 def subscription_recommendations(
@@ -221,7 +259,7 @@ def subscription_recommendations(
                 )
             )
         scored.sort(key=lambda row: row[0], reverse=True)
-        items = [item for _, item in scored[:limit]]
+        items = _weighted_sample_preserve_order(scored, limit)
         if len(items) >= limit:
             return items
 
@@ -250,7 +288,7 @@ def subscription_recommendations(
             (score, _annotate(to_item(paper), reason=f"匹配订阅「{label}」", source="subscription"))
         )
     ranked.sort(key=lambda row: row[0], reverse=True)
-    for _, item in ranked:
+    for item in _weighted_sample_preserve_order(ranked, max(0, limit - len(items))):
         items.append(item)
         if len(items) >= limit:
             break
