@@ -18,12 +18,12 @@ function markMockParsed(paperId) {
   } catch { /* local demo state is optional */ }
 }
 
-function normalizeAuthors(authors) {
+export function normalizeAuthors(authors) {
   if (Array.isArray(authors)) return authors.map((author) => (typeof author === 'string' ? author : author?.name)).filter(Boolean);
   return String(authors || '').split(',').map((author) => author.trim()).filter(Boolean);
 }
 
-function toPaperListItem(paper) {
+export function toPaperListItem(paper) {
   return {
     paperId: paper.paperId || paper.paper_id || paper.id,
     title: paper.title,
@@ -42,7 +42,7 @@ function toPaperListItem(paper) {
   };
 }
 
-function createCompatibleDetail(paper, { forcePending = false } = {}) {
+export function createCompatibleDetail(paper, { forcePending = false } = {}) {
   const normalized = toPaperListItem(forcePending ? { ...paper, parseStatus: 'pending', chunkCount: 0, qaReady: false } : paper);
   return {
     ...paper,
