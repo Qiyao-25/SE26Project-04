@@ -132,7 +132,37 @@ def _arxiv_id_from_text(value: str) -> str:
     if "/pdf/" in text:
         text = text.rsplit("/pdf/", 1)[-1]
     text = text.replace(".pdf", "")
+    # RSS / OAI identifiers: oai:arXiv.org:2401.01234
+    if "arXiv.org:" in text:
+        text = text.rsplit("arXiv.org:", 1)[-1]
+    elif text.lower().startswith("oai:"):
+        text = text.rsplit(":", 1)[-1]
     return re.sub(r"v\d+$", "", text.strip())
+
+
+def _split_author_names(raw_authors: list[str]) -> list[str]:
+    """RSS often packs every author into one dc:creator string."""
+    names: list[str] = []
+    for raw in raw_authors or []:
+        text = " ".join(str(raw or "").split()).strip()
+        if not text:
+            continue
+        # Multi-author blob: "Alice, Bob, Carol"
+        if "," in text and len(text) > 80:
+            parts = [part.strip() for part in text.split(",")]
+        elif " and " in text.casefold() and len(text) > 80:
+            parts = [part.strip() for part in re.split(r"\s+and\s+", text, flags=re.I)]
+        else:
+            parts = [text]
+        for part in parts:
+            name = part.strip(" ;")
+            if not name:
+                continue
+            if len(name) > 255:
+                name = name[:255].rstrip()
+            if name and name not in names:
+                names.append(name)
+    return names[:40]
 
 
 def _parse_atom_feed(xml_bytes: bytes) -> list[ArxivPaperMeta]:
@@ -225,7 +255,7 @@ def _parse_rss_or_atom(xml_bytes: bytes) -> list[ArxivPaperMeta]:
             ArxivPaperMeta(
                 arxiv_id=arxiv_id,
                 title=title or arxiv_id,
-                authors=creators,
+                authors=_split_author_names(creators),
                 abstract=description,
                 categories=categories,
                 pdf_url=f"https://arxiv.org/pdf/{arxiv_id}.pdf",

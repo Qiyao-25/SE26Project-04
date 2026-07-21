@@ -68,6 +68,23 @@ def _build_query(item: dict) -> str:
     return f'all:"{item["value"]}"'
 
 
+def _author_inputs(raw_authors: list[str] | None) -> list[AuthorInput]:
+    authors: list[AuthorInput] = []
+    for raw in raw_authors or []:
+        name = " ".join(str(raw or "").split()).strip()
+        if not name:
+            continue
+        if len(name) > 255:
+            name = name[:255].rstrip()
+        try:
+            authors.append(AuthorInput(name=name))
+        except Exception:  # noqa: BLE001
+            continue
+        if len(authors) >= 20:
+            break
+    return authors
+
+
 def _parse_published(value: str) -> datetime | None:
     if not value:
         return None
@@ -259,7 +276,7 @@ def sync_subscriptions(
                 PaperUpsert(
                     arxiv_id=meta.arxiv_id,
                     title=meta.title or meta.arxiv_id,
-                    authors=[AuthorInput(name=name) for name in meta.authors[:20]],
+                    authors=_author_inputs(meta.authors),
                     abstract=meta.abstract,
                     published_at=_parse_published(meta.published),
                     primary_category=(meta.categories[0] if meta.categories else None),

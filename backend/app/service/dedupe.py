@@ -12,6 +12,10 @@ _PUNCT = re.compile(r"[^\w\u4e00-\u9fff]+", re.UNICODE)
 def normalize_arxiv_id(arxiv_id: str) -> str:
     aid = (arxiv_id or "").strip()
     aid = aid.rsplit("/", 1)[-1]
+    if "arXiv.org:" in aid:
+        aid = aid.rsplit("arXiv.org:", 1)[-1]
+    elif aid.lower().startswith("oai:"):
+        aid = aid.rsplit(":", 1)[-1]
     return _VERSION.sub("", aid)
 
 
