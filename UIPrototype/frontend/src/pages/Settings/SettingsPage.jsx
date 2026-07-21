@@ -26,7 +26,6 @@ import {
 import { useApp } from '../../context/AppContext';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
 import { syncSubscriptions } from '../../services/recommendationService';
-import { updateAccount } from '../../services/authService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 // DEBUG crawl: remove this import + <CrawlSchedulerDebugCard /> below to drop UI
 import CrawlSchedulerDebugCard from '../../debug/CrawlSchedulerDebugCard';
@@ -136,11 +135,17 @@ const SUBSCRIPTION_SEGMENTED_STYLES = `
 `;
 
 export default function SettingsPage() {
+  const { userId } = useApp();
+  const [crawlForm] = Form.useForm();
   const [subscriptions, setSubscriptions] = useState(loadSessionSubscriptions);
 
   const [subscriptionType, setSubscriptionType] = useState("keyword");
   const [keywordInput, setKeywordInput] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(undefined);
+  const [profileReady, setProfileReady] = useState(USE_MOCK);
+  const [savedPreferences, setSavedPreferences] = useState({});
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncMessage, setLastSyncMessage] = useState("");
 
   useEffect(() => {
     try {
@@ -152,6 +157,69 @@ export default function SettingsPage() {
       console.error("保存订阅设置失败：", error);
     }
   }, [subscriptions]);
+
+  useEffect(() => {
+    if (USE_MOCK) return undefined;
+    getLearningProfile(userId)
+      .then((profile) => {
+        const preferences = profile.preferences || {};
+        setSavedPreferences(preferences);
+        if (Array.isArray(preferences.subscriptions)) {
+          setSubscriptions(preferences.subscriptions);
+        }
+        if (preferences.crawl) crawlForm.setFieldsValue(preferences.crawl);
+        if (preferences.last_subscription_sync_stats) {
+          const stats = preferences.last_subscription_sync_stats;
+          setLastSyncMessage(
+            `上次同步：抓取 ${stats.fetched ?? 0}，新建 ${stats.created ?? 0}`,
+          );
+        }
+        setProfileReady(true);
+      })
+      .catch(() => setProfileReady(true));
+    return undefined;
+  }, [crawlForm, userId]);
+
+  useEffect(() => {
+    if (!profileReady || USE_MOCK) return;
+    const preferences = { ...savedPreferences, subscriptions };
+    if (JSON.stringify(preferences) === JSON.stringify(savedPreferences)) return;
+    setSavedPreferences(preferences);
+    updateLearningProfile(userId, { preferences }).catch(() => {});
+  }, [profileReady, savedPreferences, subscriptions, userId]);
+
+  const savePreferences = async (patch, successMessage) => {
+    const preferences = { ...savedPreferences, ...patch, subscriptions };
+    try {
+      const profile = await updateLearningProfile(userId, { preferences });
+      setSavedPreferences(profile.preferences || preferences);
+      message.success(successMessage);
+    } catch (error) {
+      message.error(error.message || "设置保存失败");
+    }
+  };
+
+  const handleSyncNow = async () => {
+    if (USE_MOCK) {
+      message.info("Mock 模式无法同步 arXiv");
+      return;
+    }
+    setSyncing(true);
+    try {
+      await updateLearningProfile(userId, {
+        preferences: { ...savedPreferences, subscriptions },
+      });
+      const result = await syncSubscriptions(userId, { maxPerSubscription: 5 });
+      setLastSyncMessage(result.message || "同步完成");
+      message.success(result.message || "订阅同步完成");
+      const profile = await getLearningProfile(userId);
+      setSavedPreferences(profile.preferences || {});
+    } catch (error) {
+      message.error(error.message || "同步失败");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const addSubscription = () => {
     if (subscriptionType === "keyword") {
@@ -179,6 +247,7 @@ export default function SettingsPage() {
           key: `keyword-${Date.now()}`,
           type: "keyword",
           value,
+          enabled: true,
         },
       ]);
 
@@ -207,6 +276,7 @@ export default function SettingsPage() {
         key: `category-${Date.now()}`,
         type: "category",
         value: selectedCategory,
+        enabled: true,
       },
     ]);
 
@@ -348,13 +418,16 @@ export default function SettingsPage() {
           <Col xs={24} md={10}>
             <Card title="抓取资源配置" size="small">
               <Form
+                form={crawlForm}
                 layout="vertical"
                 initialValues={{
                   frequency: "每日",
                   codeOnly: false,
                   engineeringOnly: false,
                 }}
-                onFinish={() => message.success("抓取资源配置已保存")}
+                onFinish={(values) =>
+                  savePreferences({ crawl: values }, "抓取资源配置已保存")
+                }
               >
                 <Form.Item name="frequency" label="抓取频率">
                   <Select
@@ -387,9 +460,22 @@ export default function SettingsPage() {
                   <Switch />
                 </Form.Item>
 
-                <Button type="primary" htmlType="submit">
-                  保存配置
-                </Button>
+                <Space>
+                  <Button type="primary" htmlType="submit">
+                    保存配置
+                  </Button>
+                  <Button loading={syncing} onClick={handleSyncNow}>
+                    立即同步 arXiv
+                  </Button>
+                </Space>
+                {lastSyncMessage ? (
+                  <Typography.Paragraph
+                    type="secondary"
+                    style={{ marginTop: 12, marginBottom: 0 }}
+                  >
+                    {lastSyncMessage}
+                  </Typography.Paragraph>
+                ) : null}
               </Form>
               {/* DEBUG crawl: remove next line + src/debug/ folder to drop */}
               <CrawlSchedulerDebugCard />
