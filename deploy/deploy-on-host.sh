@@ -8,6 +8,9 @@
 
 set -euo pipefail
 
+# 若从即将被替换的 /opt/papermate/backend 目录启动，mv 后 getcwd 会失败
+cd / || true
+
 PKG_DIR="${PKG_DIR:-/tmp/papermate}"
 BACKEND_ROOT="${BACKEND_ROOT:-/opt/papermate/backend}"
 WEB_ROOT="${WEB_ROOT:-/var/www/papermate}"
@@ -74,7 +77,8 @@ if [[ -f "${PRESERVE_DIR}/.env" ]]; then
 fi
 if [[ -d "${PRESERVE_DIR}/data" ]]; then
   mkdir -p "${BACKEND_ROOT}/data"
-  rsync -a "${PRESERVE_DIR}/data/" "${BACKEND_ROOT}/data/"
+  # 不用 rsync：在失效 cwd 下 rsync 可能报 getcwd 错误
+  cp -a "${PRESERVE_DIR}/data/." "${BACKEND_ROOT}/data/"
   echo "==> restored existing data/"
 fi
 rm -rf "${PRESERVE_DIR}"
