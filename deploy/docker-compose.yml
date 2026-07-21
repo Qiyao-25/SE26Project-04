@@ -25,7 +25,7 @@ services:
       PAPERMATE_ENV: prod
       PAPERMATE_DATABASE_URL: postgresql+psycopg://papermate:papermate@db:5432/papermate
       PAPERMATE_CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
-      PAPERMATE_ENABLE_DOCS: "true"
+      PAPERMATE_ENABLE_DOCS: "false"
     depends_on:
       db:
         condition: service_healthy

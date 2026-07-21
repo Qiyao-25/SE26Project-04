@@ -49,5 +49,10 @@ def sync_now(
     db: Session = Depends(db_session),
 ):
     ensure_same_user(user_id, current_user)
-    result = sync_subscriptions(db, user_id, max_per_subscription=max_per_subscription)
+    result = sync_subscriptions(
+        db,
+        user_id,
+        max_per_subscription=max_per_subscription,
+        settings=request.app.state.settings,
+    )
     return ApiResponse(data=result, request_id=request.state.request_id)

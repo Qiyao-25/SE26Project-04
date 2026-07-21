@@ -83,6 +83,7 @@ def sync_subscriptions(
     *,
     max_per_subscription: int = 5,
     client: ArxivClient | None = None,
+    settings=None,
 ) -> SubscriptionSyncResult:
     profile = get_profile(session, user_id)
     prefs = dict(profile.preferences or {})
@@ -99,7 +100,18 @@ def sync_subscriptions(
             synced_at=datetime.now(timezone.utc),
         )
 
-    client = client or ArxivClient(min_interval_s=3.0)
+    if client is None:
+        if settings is not None:
+            client = ArxivClient(
+                api_base=getattr(settings, "arxiv_api_base", "https://export.arxiv.org/api/query"),
+                rss_base=getattr(settings, "arxiv_rss_base", "https://rss.arxiv.org/rss"),
+                timeout_s=float(getattr(settings, "arxiv_timeout_s", 60.0)),
+                min_interval_s=float(getattr(settings, "arxiv_min_interval_s", 5.0)),
+                max_retries=int(getattr(settings, "arxiv_max_retries", 4)),
+                rate_limit_wait_s=float(getattr(settings, "arxiv_rate_limit_wait_s", 45.0)),
+            )
+        else:
+            client = ArxivClient()
     payloads: list[PaperUpsert] = []
     seen_ids: set[str] = set()
     seen_titles: set[str] = set()
@@ -121,7 +133,26 @@ def sync_subscriptions(
     for item in enabled:
         query = _build_query(item)
         try:
-            metas = client.search(search_query=query, max_results=max_per_subscription)
+            if item["type"] == "category":
+                # RSS is more reliable when export.arxiv.org API returns 429.
+                try:
+                    metas = client.fetch_category_rss(item["value"], max_results=max_per_subscription)
+                    logger.info(
+                        "subscription_fetch_rss user=%s cat=%s n=%s",
+                        user_id,
+                        item["value"],
+                        len(metas),
+                    )
+                except Exception as rss_exc:  # noqa: BLE001
+                    logger.warning(
+                        "subscription_rss_failed user=%s cat=%s err=%s; fallback_api",
+                        user_id,
+                        item["value"],
+                        rss_exc,
+                    )
+                    metas = client.search(search_query=query, max_results=max_per_subscription)
+            else:
+                metas = client.search(search_query=query, max_results=max_per_subscription)
         except Exception as exc:  # noqa: BLE001
             logger.warning("subscription_fetch_failed user=%s query=%s err=%s", user_id, query, exc)
             errors.append(f"{item['type']}:{item['value']} -> {exc}")
@@ -202,21 +233,38 @@ def sync_subscriptions(
     )
 
 
-def sync_all_users(session: Session, *, max_per_subscription: int = 3) -> dict:
+def sync_all_users(session: Session, *, max_per_subscription: int = 3, settings=None) -> dict:
     from app.model import UserProfile
 
     profiles = session.query(UserProfile).all()
-    total_fetched = total_created = 0
+    total_fetched = total_created = total_errors = 0
     users = 0
+    error_samples: list[str] = []
     for profile in profiles:
         subs = normalize_subscriptions((profile.preferences or {}).get("subscriptions"))
         if not any(item.get("enabled", True) for item in subs):
             continue
         users += 1
-        result = sync_subscriptions(session, profile.user_id, max_per_subscription=max_per_subscription)
+        result = sync_subscriptions(
+            session,
+            profile.user_id,
+            max_per_subscription=max_per_subscription,
+            settings=settings,
+        )
         total_fetched += result.fetched
         total_created += result.created
-    return {"users": users, "fetched": total_fetched, "created": total_created}
+        errs = list(result.errors or [])
+        total_errors += len(errs)
+        for item in errs:
+            if len(error_samples) < 5:
+                error_samples.append(item)
+    return {
+        "users": users,
+        "fetched": total_fetched,
+        "created": total_created,
+        "errors": total_errors,
+        "error_samples": error_samples,
+    }
 
 
 __all__ = [

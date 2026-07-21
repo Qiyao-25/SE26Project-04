@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger("papermate.crawl_scheduler")
 
 
-def _run_sync(engine) -> dict:
+def _run_sync(engine, settings) -> dict:
     from app.service.subscriptions import sync_all_users
 
     with Session(engine) as session:
-        return sync_all_users(session, max_per_subscription=3)
+        return sync_all_users(session, max_per_subscription=3, settings=settings)
 
 
 async def run_crawl_scheduler(app, stop_event: asyncio.Event) -> None:
@@ -36,7 +36,7 @@ async def run_crawl_scheduler(app, stop_event: asyncio.Event) -> None:
 
     while not stop_event.is_set():
         try:
-            stats = await asyncio.to_thread(_run_sync, app.state.engine)
+            stats = await asyncio.to_thread(_run_sync, app.state.engine, settings)
             logger.info("crawl_scheduler_tick %s", stats)
         except Exception:  # noqa: BLE001
             logger.exception("crawl_scheduler_failed")

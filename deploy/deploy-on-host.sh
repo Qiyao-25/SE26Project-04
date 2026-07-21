@@ -8,6 +8,9 @@
 
 set -euo pipefail
 
+# 若从即将被替换的 /opt/papermate/backend 目录启动，mv 后 getcwd 会失败
+cd / || true
+
 PKG_DIR="${PKG_DIR:-/tmp/papermate}"
 BACKEND_ROOT="${BACKEND_ROOT:-/opt/papermate/backend}"
 WEB_ROOT="${WEB_ROOT:-/var/www/papermate}"
@@ -74,7 +77,8 @@ if [[ -f "${PRESERVE_DIR}/.env" ]]; then
 fi
 if [[ -d "${PRESERVE_DIR}/data" ]]; then
   mkdir -p "${BACKEND_ROOT}/data"
-  rsync -a "${PRESERVE_DIR}/data/" "${BACKEND_ROOT}/data/"
+  # 不用 rsync：在失效 cwd 下 rsync 可能报 getcwd 错误
+  cp -a "${PRESERVE_DIR}/data/." "${BACKEND_ROOT}/data/"
   echo "==> restored existing data/"
 fi
 rm -rf "${PRESERVE_DIR}"
@@ -96,7 +100,8 @@ PAPERMATE_ENV=prod
 PAPERMATE_DATABASE_URL=sqlite:////opt/papermate/backend/data/prod.db
 PAPERMATE_AUTH_SECRET=CHANGE_ME_AFTER_INSTALL
 PAPERMATE_CORS_ORIGINS=http://127.0.0.1
-PAPERMATE_ENABLE_DOCS=true
+PAPERMATE_ENABLE_DOCS=false
+PAPERMATE_WORKER_TOKEN=CHANGE_ME_WORKER_TOKEN
 PAPERMATE_LLM_API_KEY=
 PAPERMATE_LLM_MODEL=deepseek-v4-flash
 PAPERMATE_LLM_API_BASE=https://api.deepseek.com
@@ -111,9 +116,10 @@ EOF
   if [[ -n "${PAPERMATE_PUBLIC_ORIGINS:-}" ]]; then
     sed -i "s|^PAPERMATE_CORS_ORIGINS=.*|PAPERMATE_CORS_ORIGINS=${PAPERMATE_PUBLIC_ORIGINS}|" .env
   fi
-  sed -i 's|^PAPERMATE_ENABLE_DOCS=.*|PAPERMATE_ENABLE_DOCS=true|' .env
+  sed -i 's|^PAPERMATE_ENABLE_DOCS=.*|PAPERMATE_ENABLE_DOCS=false|' .env
+  grep -q '^PAPERMATE_WORKER_TOKEN=' .env || echo 'PAPERMATE_WORKER_TOKEN=CHANGE_ME_WORKER_TOKEN' >> .env
   chmod 600 .env
-  echo "==> 已生成 ${BACKEND_ROOT}/.env ，请编辑 AUTH_SECRET 与 LLM_API_KEY"
+  echo "==> 已生成 ${BACKEND_ROOT}/.env ，请编辑 AUTH_SECRET、WORKER_TOKEN 与 LLM_API_KEY（生产勿用占位符）"
 fi
 
 python -m alembic upgrade head
@@ -150,7 +156,8 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
     }
     location /health {
         proxy_pass http://papermate_api/health;

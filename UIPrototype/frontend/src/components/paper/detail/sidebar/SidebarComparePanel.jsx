@@ -334,8 +334,8 @@ export default function SidebarComparePanel({ paperId, paper }) {
       className="compare-picker-item"
       onClick={() => setSlotPaper(compareActiveSlot, item.paperId)}
       actions={[
-        String(item.paperId) === String(comparePaperA) ? <Tag color="blue">A</Tag> : null,
-        String(item.paperId) === String(comparePaperB) ? <Tag>B</Tag> : null
+        String(item.paperId) === String(comparePaperA) ? <Tag key="slot-a" color="blue">A</Tag> : null,
+        String(item.paperId) === String(comparePaperB) ? <Tag key="slot-b">B</Tag> : null
       ].filter(Boolean)}
     >
       <List.Item.Meta

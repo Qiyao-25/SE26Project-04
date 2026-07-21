@@ -4,15 +4,24 @@ import { ChatBox } from '../../../common/ChatBox';
 const { Text } = Typography;
 
 export default function SidebarQaPanel({ messages, onSend, qaStatus }) {
+  const hasFallback = messages.some((item) => item.answerMode === 'extractive_fallback');
   return (
     <div>
       <Alert
         type="info"
         showIcon
         message="当前为单论文智能问答"
-        description="回答由 QA Agent 基于已解析原文块生成，并展示引用章节与页码。请先完成解析（可问答）后再提问。"
+        description="默认由 QA Agent 基于已解析原文块生成并附出处。若 LLM 不可用，会降级为「原文摘录」并单独标记，请勿将其视为 Agent 总结。"
         style={{ marginBottom: 12 }}
       />
+      {hasFallback ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="本会话含降级摘录回答"
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
 
       <ChatBox
         messages={messages}

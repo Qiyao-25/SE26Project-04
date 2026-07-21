@@ -65,6 +65,8 @@ def update_user_status(session: Session, user_id: int, is_active: bool) -> dict:
     user = session.get(User, user_id)
     if user is None:
         raise ValueError("USER_NOT_FOUND")
+    if user.role == "admin" and not is_active:
+        raise ValueError("ADMIN_CANNOT_DISABLE")
     user.is_active = is_active
     session.commit()
     session.refresh(user)

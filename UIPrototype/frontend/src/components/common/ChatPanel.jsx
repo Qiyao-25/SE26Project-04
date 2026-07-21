@@ -1,4 +1,4 @@
-import { Typography } from 'antd';
+import { Tag, Typography } from 'antd';
 
 const { Text } = Typography;
 
@@ -13,12 +13,18 @@ export default function ChatPanel({ messages, minHeight = 120 }) {
         const content = messageItem.content ?? messageItem.text ?? '';
         const bubbleRole = getBubbleRole(messageItem.role);
         const citations = messageItem.citations || [];
+        const isFallback = messageItem.answerMode === 'extractive_fallback';
 
         return (
           <div
             key={messageItem.messageId || `${bubbleRole}-${index}`}
             className={`chat-bubble ${bubbleRole}`}
           >
+            {isFallback ? (
+              <Tag color="orange" style={{ marginBottom: 6 }}>
+                降级摘录（非 Agent 总结）
+              </Tag>
+            ) : null}
             <Text style={{ fontSize: 13 }}>{content}</Text>
 
             {citations.map((citation, citationIndex) => (

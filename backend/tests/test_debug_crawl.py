@@ -15,9 +15,9 @@ def test_debug_crawl_hidden_when_disabled(tmp_path):
         enable_crawl_debug=False,
         enable_docs=False,
     )
-    client = TestClient(create_app(settings))
-    resp = client.post("/api/debug/crawl/run")
-    assert resp.status_code == 404
+    with TestClient(create_app(settings)) as client:
+        resp = client.post("/api/debug/crawl/run")
+        assert resp.status_code == 404
 
 
 def test_debug_crawl_requires_auth_when_enabled(tmp_path):
@@ -29,6 +29,6 @@ def test_debug_crawl_requires_auth_when_enabled(tmp_path):
         enable_crawl_debug=True,
         enable_docs=False,
     )
-    client = TestClient(create_app(settings))
-    resp = client.post("/api/debug/crawl/run")
-    assert resp.status_code == 401
+    with TestClient(create_app(settings)) as client:
+        resp = client.post("/api/debug/crawl/run")
+        assert resp.status_code == 401

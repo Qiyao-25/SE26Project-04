@@ -21,10 +21,16 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new Event('papermate:auth-expired'));
     }
     if (error.code === 'ECONNABORTED') {
-      return Promise.reject(new Error('请求超时，请确认后端服务已启动后重试'));
+      const url = String(error.config?.url || '');
+      if (url.includes('/subscriptions/sync') || url.includes('/debug/crawl')) {
+        return Promise.reject(
+          new Error('同步超时：arXiv 响应较慢或被限流。请改用「分类」订阅重试，或稍后再试')
+        );
+      }
+      return Promise.reject(new Error('请求超时，请稍后重试（若刚重启后端可再等几秒）'));
     }
     if (!error.response) {
-      return Promise.reject(new Error('无法连接后端服务，请检查 FastAPI 是否运行在 8000 端口'));
+      return Promise.reject(new Error('无法连接后端服务，请检查网络或稍后重试'));
     }
     const payload = error.response.data;
     const message = payload?.message || payload?.detail || `请求失败（HTTP ${error.response.status}）`;

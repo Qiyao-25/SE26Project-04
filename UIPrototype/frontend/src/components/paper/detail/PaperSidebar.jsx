@@ -92,7 +92,8 @@ export default function PaperSidebar({ paperId, paper }) {
           content: data.answer,
           status: 'success',
           createdAt: data.createdAt,
-          citations: data.citations || []
+          citations: data.citations || [],
+          answerMode: data.answerMode || 'agent'
         }
       ]);
       setQaStatus('success');

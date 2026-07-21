@@ -11,6 +11,7 @@ function normalizeQaResult(data, paperId, historyCount = 0) {
     messageId: data.messageId || data.message_id || `assistant-${Date.now()}`,
     paperId: String(data.paperId || data.paper_id || paperId),
     answer: data.answer || '',
+    answerMode: data.answerMode || data.answer_mode || 'agent',
     createdAt: data.createdAt || data.created_at || new Date().toISOString(),
     citations: (data.citations || []).map((citation, index) => ({
       citationId: citation.citationId || citation.citation_id || `citation-${paperId}-${index + 1}`,
