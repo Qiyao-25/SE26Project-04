@@ -27,6 +27,25 @@ def test_learning_crud_and_favorite_idempotency() -> None:
         assert list_actions(session, "user-1", None, None) == []
 
 
+def test_reading_history_upserts_latest_per_paper() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="history-paper", title="History Paper")]).items[0].paper_id
+        first, created = create_action(
+            session,
+            UserActionInput(user_id="user-1", paper_id=paper_id, action_type="reading_history", payload_json={"section": "intro"}),
+        )
+        assert created is True
+        second, created_again = create_action(
+            session,
+            UserActionInput(user_id="user-1", paper_id=paper_id, action_type="reading_history", payload_json={"section": "method"}),
+        )
+        assert created_again is False
+        assert second.id == first.id
+        assert second.payload_json["section"] == "method"
+        rows = list_actions(session, "user-1", None, "reading_history")
+        assert len(rows) == 1
+
+
 def test_learning_validation_and_not_found() -> None:
     with make_session() as session:
         try:

@@ -12,7 +12,7 @@ from app.core.database import create_engine_for
 from app.model import Base, Paper
 from app.schema.auth import AuthUser
 from app.schema.papers import AuthorInput, PaperUpsert, ParseRequest
-from app.service.papers import batch_upsert_papers, get_paper_detail, get_paper_graph, get_wiki
+from app.service.papers import PaperServiceError, batch_upsert_papers, delete_paper, get_paper_detail, get_paper_graph, get_wiki
 
 
 def make_session() -> Session:
@@ -145,3 +145,16 @@ def test_paper_graph_refresh_persists_and_reuses_related_papers() -> None:
     assert any(node.paper_id and node.paper_id != current_id for node in refreshed.nodes)
     assert any(edge.type == "precedes" for edge in refreshed.edges)
     assert reused.model_dump() == refreshed.model_dump()
+
+
+def test_soft_delete_paper_hides_from_detail() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [paper_payload("delete-me", "Delete Me")]).items[0].paper_id
+        deleted = delete_paper(session, paper_id)
+        assert deleted.paper_id == paper_id
+        try:
+            get_paper_detail(session, paper_id)
+        except PaperServiceError as exc:
+            assert exc.code == "PAPER_NOT_FOUND"
+        else:
+            raise AssertionError("expected PAPER_NOT_FOUND after soft delete")

@@ -85,7 +85,17 @@ export default function LearningPage() {
         setLibrary({
           favorites: actions.filter((action) => action.action_type === 'favorite' && action.payload_json?.favorite !== false),
           notes: actions.filter((action) => action.action_type === 'note'),
-          history: actions.filter((action) => action.action_type === 'reading_history')
+          history: (() => {
+            const seen = new Set();
+            const rows = [];
+            for (const action of actions.filter((item) => item.action_type === 'reading_history')) {
+              const key = String(action.paper_id);
+              if (seen.has(key)) continue;
+              seen.add(key);
+              rows.push(action);
+            }
+            return rows;
+          })()
         });
       })
       .catch((requestError) => {

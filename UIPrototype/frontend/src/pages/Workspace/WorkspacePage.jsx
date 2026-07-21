@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { HomeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Navigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -6,12 +8,11 @@ import {
   Col,
   Empty,
   Row,
+  Space,
   Spin,
   Typography,
   message
 } from 'antd';
-import { HomeOutlined } from '@ant-design/icons';
-import { Navigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { smartSearchPapers } from '../../services/paperService';
 import { fetchDailyArxivPicks, fetchProfileRecommendations, fetchSubscriptionRecommendations } from '../../services/recommendationService';
@@ -51,6 +52,7 @@ export default function WorkspacePage() {
   const [subscriptionPapers, setSubscriptionPapers] = useState([]);
   const [recommendStatus, setRecommendStatus] = useState('idle');
   const [recommendError, setRecommendError] = useState('');
+  const [recommendTick, setRecommendTick] = useState(0);
 
   useEffect(() => {
     if (skipRestoreRef.current) {
@@ -77,44 +79,51 @@ export default function WorkspacePage() {
     return () => { cancelled = true; };
   }, [workspaceSearched, lastSearchQuery]);
 
-  useEffect(() => {
-    if (workspaceSearched || lockedPaperId) return undefined;
-    let cancelled = false;
+  const loadRecommendations = useCallback(async (signal = { cancelled: false }) => {
     setRecommendStatus('loading');
     setRecommendError('');
-    (async () => {
-      try {
-        const daily = await fetchDailyArxivPicks({ limit: 3 });
-        if (cancelled) return;
-        setDailyPapers(daily);
-        const recommended = await fetchProfileRecommendations({
-          userId,
-          persona,
-          topics,
-          limit: 3,
-          excludeIds: daily.map((paper) => paper.paperId)
-        });
-        if (cancelled) return;
-        setProfilePapers(recommended);
-        const subscribed = await fetchSubscriptionRecommendations({
-          userId,
-          limit: 6,
-          excludeIds: [...daily, ...recommended].map((paper) => paper.paperId)
-        });
-        if (cancelled) return;
-        setSubscriptionPapers(subscribed);
-        setRecommendStatus(daily.length || recommended.length || subscribed.length ? 'success' : 'empty');
-      } catch (error) {
-        if (cancelled) return;
-        setDailyPapers([]);
-        setProfilePapers([]);
-        setSubscriptionPapers([]);
-        setRecommendStatus('failed');
-        setRecommendError(error.message || '推荐加载失败');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [workspaceSearched, persona, topics, lockedPaperId, userId]);
+    try {
+      const daily = await fetchDailyArxivPicks({ limit: 3 });
+      if (signal.cancelled) return;
+      setDailyPapers(daily);
+      const recommended = await fetchProfileRecommendations({
+        userId,
+        persona,
+        topics,
+        limit: 3,
+        excludeIds: daily.map((paper) => paper.paperId)
+      });
+      if (signal.cancelled) return;
+      setProfilePapers(recommended);
+      const subscribed = await fetchSubscriptionRecommendations({
+        userId,
+        limit: 6,
+        excludeIds: [...daily, ...recommended].map((paper) => paper.paperId)
+      });
+      if (signal.cancelled) return;
+      setSubscriptionPapers(subscribed);
+      setRecommendStatus(daily.length || recommended.length || subscribed.length ? 'success' : 'empty');
+    } catch (error) {
+      if (signal.cancelled) return;
+      setDailyPapers([]);
+      setProfilePapers([]);
+      setSubscriptionPapers([]);
+      setRecommendStatus('failed');
+      setRecommendError(error.message || '推荐加载失败');
+    }
+  }, [userId, persona, topics]);
+
+  useEffect(() => {
+    if (workspaceSearched || lockedPaperId) return undefined;
+    const signal = { cancelled: false };
+    loadRecommendations(signal);
+    return () => { signal.cancelled = true; };
+  }, [workspaceSearched, lockedPaperId, loadRecommendations, recommendTick]);
+
+  const handleRefreshRecommendations = () => {
+    setRecommendTick((value) => value + 1);
+    message.success('正在刷新推荐论文');
+  };
 
   const handleSearch = async (text) => {
     setMessages((current) => [...current, {
@@ -177,6 +186,17 @@ export default function WorkspacePage() {
     </Row>
   );
 
+  const refreshExtra = (
+    <Button
+      size="small"
+      icon={<ReloadOutlined />}
+      loading={recommendStatus === 'loading'}
+      onClick={handleRefreshRecommendations}
+    >
+      刷新
+    </Button>
+  );
+
   if (lockedPaperId) return <Navigate to={`/paper/${lockedPaperId}`} replace />;
 
   return (
@@ -188,11 +208,20 @@ export default function WorkspacePage() {
       {!workspaceSearched ? (
         <>
           {recommendStatus === 'loading' && <Card className="section-card"><div style={{ textAlign: 'center', padding: 40 }}><Spin tip="正在从数据库加载推荐论文..." /></div></Card>}
-          {recommendStatus === 'failed' && <Alert type="error" showIcon message="推荐加载失败" description={recommendError} style={{ marginBottom: 16 }} />}
+          {recommendStatus === 'failed' && (
+            <Alert
+              type="error"
+              showIcon
+              message="推荐加载失败"
+              description={recommendError}
+              style={{ marginBottom: 16 }}
+              action={<Button size="small" onClick={handleRefreshRecommendations}>重试</Button>}
+            />
+          )}
           {recommendStatus !== 'loading' && <>
-            <Card title="每日 ArXiv 精选" className="section-card">{dailyPapers.length ? renderPaperGrid(dailyPapers) : <Empty description="暂无可用论文，请先导入种子数据或入库论文" />}</Card>
-            <Card title="基于画像推荐的论文" className="section-card" extra={<Text type="secondary" style={{ fontSize: 12 }}>兴趣主题 + 阅读历史</Text>}>{profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文，请先在学习页设置兴趣主题" />}</Card>
-            <Card title="订阅更新" className="section-card" extra={<Text type="secondary" style={{ fontSize: 12 }}>来自设置页订阅 · 可立即同步 arXiv</Text>}>{subscriptionPapers.length ? renderPaperGrid(subscriptionPapers) : <Empty description="暂无订阅更新，请到设置页添加订阅并点击「立即同步」" />}</Card>
+            <Card title="每日 ArXiv 精选" className="section-card" extra={refreshExtra}>{dailyPapers.length ? renderPaperGrid(dailyPapers) : <Empty description="暂无可用论文，请先导入种子数据或入库论文" />}</Card>
+            <Card title="基于画像推荐的论文" className="section-card" extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>兴趣主题 + 阅读历史</Text>{refreshExtra}</Space>}>{profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文，请先在学习页设置兴趣主题" />}</Card>
+            <Card title="订阅更新" className="section-card" extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>来自设置页订阅 · 可立即同步 arXiv</Text>{refreshExtra}</Space>}>{subscriptionPapers.length ? renderPaperGrid(subscriptionPapers) : <Empty description="暂无订阅更新，请到设置页添加订阅并点击「立即同步」" />}</Card>
           </>}
         </>
       ) : (

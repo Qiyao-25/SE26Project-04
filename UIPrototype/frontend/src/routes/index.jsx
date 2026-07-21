@@ -12,6 +12,7 @@ import LearningPage from '../pages/Learning/LearningPage';
 import AdminPage from '../pages/Admin/AdminPage';
 import AdminRoute from './AdminRoute';
 import SettingsPage from '../pages/Settings/SettingsPage';
+import PaperLibraryPage from '../pages/PaperLibrary/PaperLibraryPage';
 
 
 const getAntdTheme = (mode) => {
@@ -252,6 +253,7 @@ export default function AppRoutes() {
                   <Route path="/learning" element={<LearningPage />} />
                   <Route element={<AdminRoute />}>
                     <Route path="/admin" element={<AdminPage />} />
+                    <Route path="/papers" element={<PaperLibraryPage />} />
                   </Route>
                   <Route path="/settings" element={<SettingsPage />} />
                 </Route>

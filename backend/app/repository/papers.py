@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -135,3 +135,14 @@ def get_paper(session: Session, paper_id: int) -> Paper | None:
         .where(Paper.id == paper_id, Paper.deleted_at.is_(None))
     )
     return session.scalars(stmt).unique().first()
+
+
+def soft_delete_paper(session: Session, paper_id: int) -> Paper | None:
+    paper = get_paper(session, paper_id)
+    if paper is None:
+        return None
+    paper.deleted_at = datetime.now(timezone.utc)
+    session.add(paper)
+    session.commit()
+    session.refresh(paper)
+    return paper

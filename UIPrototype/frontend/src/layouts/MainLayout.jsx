@@ -13,6 +13,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   DashboardOutlined,
+  DatabaseOutlined,
   MoonOutlined,
   SunOutlined,
 } from '@ant-design/icons';
@@ -40,6 +41,10 @@ const PAGE_TITLES = {
   '/admin': {
     title: '管理员后台',
     sub: '系统管理端',
+  },
+  '/papers': {
+    title: '论文库',
+    sub: '管理员 · 论文元数据与管理',
   },
   '/settings': {
     title: '设置',
@@ -96,6 +101,11 @@ export default function MainLayout({
     },
     ...(showAdminNav
       ? [
+          {
+            key: '/papers',
+            icon: <DatabaseOutlined />,
+            label: '论文库',
+          },
           {
             key: '/admin',
             icon: <DashboardOutlined />,

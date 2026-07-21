@@ -12,7 +12,7 @@ from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequ
 from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
-from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
+from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, delete_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
@@ -256,6 +256,20 @@ def qa(paper_id: str, payload: AskPaperRequest, request: Request, _user: AuthUse
             status_code=status_code,
             content=ApiResponse[dict](code=code, message=message, data={}, request_id=request.state.request_id).model_dump(),
         )
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.delete("/{paper_id}", response_model=ApiResponse[PaperItem], summary="软删除论文（管理员）")
+def remove_paper(
+    paper_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    _admin: AuthUser = Depends(require_admin),
+):
+    try:
+        data = delete_paper(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
