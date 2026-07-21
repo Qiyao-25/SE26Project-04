@@ -181,7 +181,7 @@ export default function WorkspacePage() {
 
   return (
     <div className="page-workspace">
-      <Card title="智能论文检索" className="section-card">
+      <Card title="智能论文检索" className="section-card smart-search-card">
         <ChatBox messages={messages} onSend={handleSearch} placeholder="试试：有哪些关于注意力机制或 Transformer 的论文？" minHeight={140} loading={searchStatus === 'loading'} />
         <Text type="secondary" style={{ fontSize: 12 }}>支持自然语言；系统会改写关键词并匹配数据库论文，再给出检索说明。</Text>
       </Card>

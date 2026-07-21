@@ -259,7 +259,7 @@ export default function AdminPage() {
   ];
 
   return (
-    <div>
+    <div className="page-admin">
       {error && <Card className="section-card"><Text type="danger">{error}</Text></Card>}
       <Card className="section-card"><Tabs activeKey={tab} onChange={setTab} items={items} /></Card>
     </div>
