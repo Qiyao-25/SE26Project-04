@@ -127,12 +127,25 @@ export default function MainLayout({
     navigate(key);
   };
 
+  const handleLogout = () => {
+    // 清理只属于当前登录会话的数据，再由全局上下文清理登录态
+    sessionStorage.removeItem('papermate-session-subscriptions');
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <Layout className="main-layout">
       <Sider
         width={248}
         theme={themeMode === 'dark' ? 'dark' : 'light'}
         className="main-sider"
+        style={{
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          alignSelf: 'flex-start',
+        }}
       >
         <div className="logo-area">
           <div className="logo-row">
@@ -163,16 +176,24 @@ export default function MainLayout({
           selectedKeys={[pathKey]}
           items={menuItems}
           onClick={handleMenuClick}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+          }}
         />
 
-        <div className="sider-footer">
+        <div
+          className="sider-footer"
+          style={{
+            marginTop: 'auto',
+            flexShrink: 0,
+          }}
+        >
           <Button
             block
             icon={<LogoutOutlined />}
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
+            onClick={handleLogout}
           >
             退出登录
           </Button>
