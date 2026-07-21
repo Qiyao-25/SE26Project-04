@@ -48,7 +48,7 @@ const PAGE_TITLES = {
   },
   '/settings': {
     title: '设置',
-    sub: '抓取订阅 / 账户 / 网页',
+    sub: '订阅同步 / 账户 / 界面',
   },
 };
 
