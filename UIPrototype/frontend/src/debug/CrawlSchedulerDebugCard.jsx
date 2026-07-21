@@ -34,9 +34,16 @@ export default function CrawlSchedulerDebugCard() {
     try {
       const data = await runCrawlDebugTick(3);
       const stats = data?.stats || {};
-      const text = `users=${stats.users ?? '-'} fetched=${stats.fetched ?? '-'} created=${stats.created ?? '-'} updated=${stats.updated ?? '-'}`;
+      const errHint = stats.errors
+        ? ` errors=${stats.errors}${stats.error_samples?.length ? ` (${stats.error_samples[0]})` : ''}`
+        : '';
+      const text = `users=${stats.users ?? '-'} fetched=${stats.fetched ?? '-'} created=${stats.created ?? '-'}${errHint}`;
       setLastResult(text);
-      message.success(`调试抓取完成：${text}`);
+      if (stats.errors > 0 && !(stats.created > 0)) {
+        message.warning(`抓取结束但 arXiv 请求失败：${text}`);
+      } else {
+        message.success(`调试抓取完成：${text}`);
+      }
     } catch (error) {
       message.error(error.message || '调试抓取失败');
     } finally {

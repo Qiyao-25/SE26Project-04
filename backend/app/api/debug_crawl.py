@@ -33,7 +33,7 @@ def run_crawl_tick(
     if not getattr(settings, "enable_crawl_debug", False):
         raise HTTPException(status_code=404, detail="调试接口未启用")
 
-    stats = sync_all_users(db, max_per_subscription=max_per_subscription)
+    stats = sync_all_users(db, max_per_subscription=max_per_subscription, settings=settings)
     logger.info("debug_crawl_run user=%s stats=%s", _user.user_id, stats)
     return ApiResponse(
         data={

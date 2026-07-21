@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # Scheduled arXiv subscription crawl (Demo)
     crawl_enabled: bool = True
     crawl_interval_s: int = 21600  # 6 hours
+    # arXiv API (campus networks often need longer timeout)
+    arxiv_api_base: str = "https://export.arxiv.org/api/query"
+    arxiv_timeout_s: float = 60.0
+    arxiv_min_interval_s: float = 3.0
+    arxiv_max_retries: int = 2
     # DEBUG: manual crawl trigger API; set false / remove debug_crawl.py to drop
     enable_crawl_debug: bool = False
     # Production: set false to hide /docs /redoc /openapi.json

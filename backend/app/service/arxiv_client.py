@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 logger = logging.getLogger("papermate.arxiv")
 
-ARXIV_API = "http://export.arxiv.org/api/query"
+DEFAULT_ARXIV_API = "https://export.arxiv.org/api/query"
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 
 
@@ -30,7 +30,15 @@ class ArxivPaperMeta:
 
 
 class ArxivClient:
-    def __init__(self, *, timeout_s: float = 20.0, min_interval_s: float = 3.0, max_retries: int = 3) -> None:
+    def __init__(
+        self,
+        *,
+        api_base: str = DEFAULT_ARXIV_API,
+        timeout_s: float = 60.0,
+        min_interval_s: float = 3.0,
+        max_retries: int = 2,
+    ) -> None:
+        self.api_base = (api_base or DEFAULT_ARXIV_API).rstrip("?")
         self.timeout_s = timeout_s
         self.min_interval_s = min_interval_s
         self.max_retries = max_retries
@@ -45,7 +53,7 @@ class ArxivClient:
         self._throttle()
         req = urllib.request.Request(url, headers={"User-Agent": "PaperMate-Backend/0.2 (course demo)"})
         attempt = 0
-        backoff = 1.0
+        backoff = 1.5
         while True:
             attempt += 1
             try:
@@ -53,7 +61,7 @@ class ArxivClient:
                 with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                     return resp.read()
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
-                logger.warning("arxiv_http_error attempt=%s err=%s", attempt, exc)
+                logger.warning("arxiv_http_error attempt=%s/%s err=%s", attempt, self.max_retries, exc)
                 if attempt >= self.max_retries:
                     raise
                 time.sleep(backoff)
@@ -69,7 +77,7 @@ class ArxivClient:
                 "sortOrder": "descending",
             }
         )
-        return _parse_feed(self._http_get(f"{ARXIV_API}?{params}"))
+        return _parse_feed(self._http_get(f"{self.api_base}?{params}"))
 
 
 def _parse_feed(xml_bytes: bytes) -> list[ArxivPaperMeta]:

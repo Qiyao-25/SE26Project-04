@@ -83,6 +83,7 @@ def sync_subscriptions(
     *,
     max_per_subscription: int = 5,
     client: ArxivClient | None = None,
+    settings=None,
 ) -> SubscriptionSyncResult:
     profile = get_profile(session, user_id)
     prefs = dict(profile.preferences or {})
@@ -99,7 +100,16 @@ def sync_subscriptions(
             synced_at=datetime.now(timezone.utc),
         )
 
-    client = client or ArxivClient(min_interval_s=3.0)
+    if client is None:
+        if settings is not None:
+            client = ArxivClient(
+                api_base=getattr(settings, "arxiv_api_base", "https://export.arxiv.org/api/query"),
+                timeout_s=float(getattr(settings, "arxiv_timeout_s", 60.0)),
+                min_interval_s=float(getattr(settings, "arxiv_min_interval_s", 3.0)),
+                max_retries=int(getattr(settings, "arxiv_max_retries", 2)),
+            )
+        else:
+            client = ArxivClient()
     payloads: list[PaperUpsert] = []
     seen_ids: set[str] = set()
     seen_titles: set[str] = set()
@@ -202,21 +212,38 @@ def sync_subscriptions(
     )
 
 
-def sync_all_users(session: Session, *, max_per_subscription: int = 3) -> dict:
+def sync_all_users(session: Session, *, max_per_subscription: int = 3, settings=None) -> dict:
     from app.model import UserProfile
 
     profiles = session.query(UserProfile).all()
-    total_fetched = total_created = 0
+    total_fetched = total_created = total_errors = 0
     users = 0
+    error_samples: list[str] = []
     for profile in profiles:
         subs = normalize_subscriptions((profile.preferences or {}).get("subscriptions"))
         if not any(item.get("enabled", True) for item in subs):
             continue
         users += 1
-        result = sync_subscriptions(session, profile.user_id, max_per_subscription=max_per_subscription)
+        result = sync_subscriptions(
+            session,
+            profile.user_id,
+            max_per_subscription=max_per_subscription,
+            settings=settings,
+        )
         total_fetched += result.fetched
         total_created += result.created
-    return {"users": users, "fetched": total_fetched, "created": total_created}
+        errs = list(result.errors or [])
+        total_errors += len(errs)
+        for item in errs:
+            if len(error_samples) < 5:
+                error_samples.append(item)
+    return {
+        "users": users,
+        "fetched": total_fetched,
+        "created": total_created,
+        "errors": total_errors,
+        "error_samples": error_samples,
+    }
 
 
 __all__ = [
