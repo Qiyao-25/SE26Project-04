@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # Scheduled arXiv subscription crawl (Demo)
     crawl_enabled: bool = True
     crawl_interval_s: int = 21600  # 6 hours
+    # DEBUG: manual crawl trigger API; set false / remove debug_crawl.py to drop
+    enable_crawl_debug: bool = False
     # Production: set false to hide /docs /redoc /openapi.json
     enable_docs: bool | None = None
 

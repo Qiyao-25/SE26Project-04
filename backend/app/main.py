@@ -18,6 +18,8 @@ from app.api.recommendations import router as recommendations_router
 from app.api.search import router as search_router
 from app.api.subscriptions import router as subscriptions_router
 from app.api.tasks import router as tasks_router
+# DEBUG crawl: remove import + include_router block below to drop the feature
+from app.api.debug_crawl import router as debug_crawl_router
 from app.core.config import Settings, get_settings
 from app.core.database import create_engine_for
 from app.schema.common import ApiResponse
@@ -91,6 +93,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(subscriptions_router)
     app.include_router(search_router)
     app.include_router(tasks_router)
+    # DEBUG crawl: delete this block + app/api/debug_crawl.py when no longer needed
+    if getattr(settings, "enable_crawl_debug", False):
+        app.include_router(debug_crawl_router)
     return app
 
 
