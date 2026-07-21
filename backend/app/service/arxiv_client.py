@@ -92,11 +92,18 @@ class ArxivClient:
                 time.sleep(backoff)
                 backoff *= 2
 
-    def search(self, *, search_query: str, max_results: int = 5, sort_by: str = "submittedDate") -> list[ArxivPaperMeta]:
+    def search(
+        self,
+        *,
+        search_query: str,
+        max_results: int = 5,
+        start: int = 0,
+        sort_by: str = "submittedDate",
+    ) -> list[ArxivPaperMeta]:
         params = urllib.parse.urlencode(
             {
                 "search_query": search_query,
-                "start": 0,
+                "start": max(0, int(start)),
                 "max_results": max_results,
                 "sortBy": sort_by,
                 "sortOrder": "descending",

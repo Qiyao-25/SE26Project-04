@@ -77,6 +77,88 @@ def _parse_published(value: str) -> datetime | None:
         return None
 
 
+def _collect_new_metas(
+    client: ArxivClient,
+    item: dict,
+    *,
+    want: int,
+    existing_ids: set[str],
+    batch_seen_ids: set[str],
+    page_size: int = 25,
+    max_pages: int = 5,
+) -> tuple[list, int]:
+    """Fetch newest-first and keep only papers not already in DB / this sync batch.
+
+    Returns (new_metas, skipped_known_count).
+    """
+    from app.service.dedupe import normalize_arxiv_id
+
+    if want <= 0:
+        return [], 0
+
+    collected: list = []
+    skipped = 0
+    query = _build_query(item)
+
+    def _accept(meta) -> bool:
+        nonlocal skipped
+        aid = normalize_arxiv_id(meta.arxiv_id)
+        if not aid:
+            return False
+        if aid in existing_ids or aid in batch_seen_ids:
+            skipped += 1
+            return False
+        batch_seen_ids.add(aid)
+        meta.arxiv_id = aid
+        collected.append(meta)
+        return True
+
+    # Category: try a wider RSS window first (often works when API is rate-limited).
+    if item["type"] == "category":
+        try:
+            rss_n = min(100, max(page_size, want * 8))
+            for meta in client.fetch_category_rss(item["value"], max_results=rss_n):
+                _accept(meta)
+                if len(collected) >= want:
+                    return collected[:want], skipped
+            logger.info(
+                "subscription_rss_new cat=%s new=%s skipped=%s",
+                item["value"],
+                len(collected),
+                skipped,
+            )
+        except Exception as rss_exc:  # noqa: BLE001
+            logger.warning(
+                "subscription_rss_failed cat=%s err=%s; fallback_api",
+                item["value"],
+                rss_exc,
+            )
+
+    # API pagination: walk past already-known papers until we fill `want` new ones.
+    for page in range(max_pages):
+        if len(collected) >= want:
+            break
+        start = page * page_size
+        try:
+            page_metas = client.search(
+                search_query=query,
+                max_results=page_size,
+                start=start,
+            )
+        except Exception:
+            raise
+        if not page_metas:
+            break
+        for meta in page_metas:
+            _accept(meta)
+            if len(collected) >= want:
+                break
+        if len(page_metas) < page_size:
+            break
+
+    return collected[:want], skipped
+
+
 def sync_subscriptions(
     session: Session,
     user_id: str,
@@ -118,49 +200,49 @@ def sync_subscriptions(
     errors: list[str] = []
     skipped_dupes = 0
 
-    from app.service.dedupe import normalize_title
+    from app.service.dedupe import normalize_arxiv_id, normalize_title
     from app.model import Paper
     from sqlalchemy import select
 
+    existing_ids: set[str] = set()
     existing_by_title: dict[str, int] = {}
     for paper in session.scalars(select(Paper).where(Paper.deleted_at.is_(None))).all():
+        aid = normalize_arxiv_id(paper.arxiv_id or "")
+        if aid:
+            existing_ids.add(aid)
         key = normalize_title(paper.title or "")
         if key and key not in existing_by_title:
             existing_by_title[key] = paper.id
 
     reused_ids: list[int] = []
+    page_size = max(10, min(50, max_per_subscription * 5))
+    max_pages = 6
 
     for item in enabled:
-        query = _build_query(item)
         try:
-            if item["type"] == "category":
-                # RSS is more reliable when export.arxiv.org API returns 429.
-                try:
-                    metas = client.fetch_category_rss(item["value"], max_results=max_per_subscription)
-                    logger.info(
-                        "subscription_fetch_rss user=%s cat=%s n=%s",
-                        user_id,
-                        item["value"],
-                        len(metas),
-                    )
-                except Exception as rss_exc:  # noqa: BLE001
-                    logger.warning(
-                        "subscription_rss_failed user=%s cat=%s err=%s; fallback_api",
-                        user_id,
-                        item["value"],
-                        rss_exc,
-                    )
-                    metas = client.search(search_query=query, max_results=max_per_subscription)
-            else:
-                metas = client.search(search_query=query, max_results=max_per_subscription)
+            metas, skipped = _collect_new_metas(
+                client,
+                item,
+                want=max_per_subscription,
+                existing_ids=existing_ids,
+                batch_seen_ids=seen_ids,
+                page_size=page_size,
+                max_pages=max_pages,
+            )
+            skipped_dupes += skipped
+            logger.info(
+                "subscription_fetch_new user=%s type=%s value=%s new=%s skipped=%s",
+                user_id,
+                item["type"],
+                item["value"],
+                len(metas),
+                skipped,
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("subscription_fetch_failed user=%s query=%s err=%s", user_id, query, exc)
+            logger.warning("subscription_fetch_failed user=%s item=%s err=%s", user_id, item, exc)
             errors.append(f"{item['type']}:{item['value']} -> {exc}")
             continue
         for meta in metas:
-            if meta.arxiv_id in seen_ids:
-                skipped_dupes += 1
-                continue
             title_key = normalize_title(meta.title or "")
             if title_key and title_key in seen_titles:
                 skipped_dupes += 1
@@ -170,9 +252,9 @@ def sync_subscriptions(
                 reused_ids.append(existing_by_title[title_key])
                 seen_titles.add(title_key)
                 continue
-            seen_ids.add(meta.arxiv_id)
             if title_key:
                 seen_titles.add(title_key)
+            existing_ids.add(normalize_arxiv_id(meta.arxiv_id))
             payloads.append(
                 PaperUpsert(
                     arxiv_id=meta.arxiv_id,
@@ -233,7 +315,7 @@ def sync_subscriptions(
     )
 
 
-def sync_all_users(session: Session, *, max_per_subscription: int = 3, settings=None) -> dict:
+def sync_all_users(session: Session, *, max_per_subscription: int = 5, settings=None) -> dict:
     from app.model import UserProfile
 
     profiles = session.query(UserProfile).all()

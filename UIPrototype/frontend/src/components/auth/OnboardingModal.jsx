@@ -4,10 +4,11 @@ import { useApp } from '../../context/AppContext';
 import { PERSONAS } from '../../data/papers';
 import { updateLearningProfile } from '../../services/learningService';
 import { USE_MOCK } from '../../services/runtimeConfig';
+import { ARXIV_CATEGORIES } from '../../data/arxivCategories';
 
 const { Text } = Typography;
 
-const TOPICS = ['cs.CL', 'cs.LG', 'cs.CV', 'cs.AI'];
+const TOPICS = ARXIV_CATEGORIES.slice(0, 18).map((item) => item.value);
 
 export default function OnboardingModal({ open, onDone }) {
   const { userId, setTopics, setPersona } = useApp();

@@ -14,7 +14,7 @@ def _run_sync(engine, settings) -> dict:
     from app.service.subscriptions import sync_all_users
 
     with Session(engine) as session:
-        return sync_all_users(session, max_per_subscription=3, settings=settings)
+        return sync_all_users(session, max_per_subscription=5, settings=settings)
 
 
 async def run_crawl_scheduler(app, stop_event: asyncio.Event) -> None:

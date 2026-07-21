@@ -7,10 +7,11 @@ import { getConceptDictionary, getLearningProfile, listActions, updateLearningPr
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { formatDateKey, parseApiDate } from '../../utils/datetime';
 import PaperCard from '../../components/paper/PaperCard';
+import { PROFILE_TOPIC_OPTIONS } from '../../data/arxivCategories';
 
 const { Text, Paragraph } = Typography;
 
-const TOPIC_OPTIONS = ['cs.AI', 'cs.CL', 'cs.CV', 'cs.LG', 'cs.IR', 'cs.SE', 'Transformer', 'RAG', 'LLM', 'Diffusion'];
+const TOPIC_OPTIONS = PROFILE_TOPIC_OPTIONS;
 
 function emptyLibrary() {
   return { favorites: [], notes: [], history: [] };

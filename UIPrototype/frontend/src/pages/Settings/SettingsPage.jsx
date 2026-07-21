@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -27,42 +27,8 @@ import { useApp } from '../../context/AppContext';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
 import { syncSubscriptions } from '../../services/recommendationService';
 import { USE_MOCK } from '../../services/runtimeConfig';
+import { ARXIV_CATEGORIES, ARXIV_CATEGORY_LABEL_MAP } from '../../data/arxivCategories';
 
-
-const ARXIV_CATEGORIES = [
-  {
-    value: "cs.AI",
-    label: "cs.AI · 人工智能",
-  },
-  {
-    value: "cs.CL",
-    label: "cs.CL · 计算与语言",
-  },
-  {
-    value: "cs.CV",
-    label: "cs.CV · 计算机视觉",
-  },
-  {
-    value: "cs.LG",
-    label: "cs.LG · 机器学习",
-  },
-  {
-    value: "cs.IR",
-    label: "cs.IR · 信息检索",
-  },
-  {
-    value: "cs.SE",
-    label: "cs.SE · 软件工程",
-  },
-  {
-    value: "cs.RO",
-    label: "cs.RO · 机器人学",
-  },
-  {
-    value: "stat.ML",
-    label: "stat.ML · 统计机器学习",
-  },
-];
 
 const SUBSCRIPTIONS_STORAGE_KEY = "papermate-session-subscriptions";
 
@@ -105,9 +71,7 @@ const loadSessionSubscriptions = () => {
   }
 };
 
-const CATEGORY_LABEL_MAP = Object.fromEntries(
-  ARXIV_CATEGORIES.map((item) => [item.value, item.label]),
-);
+const CATEGORY_LABEL_MAP = ARXIV_CATEGORY_LABEL_MAP;
 
 const SUBSCRIPTION_SEGMENTED_STYLES = `
   html[data-theme='dark'] .subscription-type-segmented.ant-segmented {
@@ -140,6 +104,7 @@ export default function SettingsPage() {
   const [subscriptionType, setSubscriptionType] = useState("keyword");
   const [keywordInput, setKeywordInput] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(undefined);
+  const [categorySearch, setCategorySearch] = useState("");
   const [profileReady, setProfileReady] = useState(USE_MOCK);
   const [savedPreferences, setSavedPreferences] = useState({});
   const [syncing, setSyncing] = useState(false);
@@ -219,6 +184,24 @@ export default function SettingsPage() {
     }
   };
 
+  const categoryOptions = useMemo(() => {
+    const typed = categorySearch.trim();
+    if (
+      typed &&
+      !ARXIV_CATEGORIES.some((item) => item.value.toLowerCase() === typed.toLowerCase())
+    ) {
+      return [{ value: typed, label: `${typed} · 自定义学科（回车或点选添加）` }, ...ARXIV_CATEGORIES];
+    }
+    return ARXIV_CATEGORIES;
+  }, [categorySearch]);
+
+  const normalizeCategoryCode = (raw) => {
+    const value = String(raw || "").trim();
+    if (!value) return "";
+    // Allow "cs.NE · 说明" paste → take left token
+    return value.split(/[·\s]/)[0].trim();
+  };
+
   const addSubscription = () => {
     if (subscriptionType === "keyword") {
       const value = keywordInput.trim();
@@ -254,13 +237,15 @@ export default function SettingsPage() {
       return;
     }
 
-    if (!selectedCategory) {
-      message.warning("请选择一个学科分类");
+    const categoryValue = normalizeCategoryCode(selectedCategory || categorySearch);
+
+    if (!categoryValue) {
+      message.warning("请选择或输入一个学科分类（如 cs.NE、math.OC）");
       return;
     }
 
     const alreadyExists = subscriptions.some(
-      (item) => item.type === "category" && item.value === selectedCategory,
+      (item) => item.type === "category" && item.value.toLowerCase() === categoryValue.toLowerCase(),
     );
 
     if (alreadyExists) {
@@ -273,18 +258,19 @@ export default function SettingsPage() {
       {
         key: `category-${Date.now()}`,
         type: "category",
-        value: selectedCategory,
+        value: categoryValue,
         enabled: true,
       },
     ]);
 
     message.success(
       `已添加学科订阅：${
-        CATEGORY_LABEL_MAP[selectedCategory] || selectedCategory
+        CATEGORY_LABEL_MAP[categoryValue] || categoryValue
       }`,
     );
 
     setSelectedCategory(undefined);
+    setCategorySearch("");
   };
 
   const removeSubscription = (key) => {
@@ -343,7 +329,7 @@ export default function SettingsPage() {
             <Card title="订阅设置" size="small">
               <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <Typography.Text type="secondary">
-                  请先选择要添加的是普通关键词还是 arXiv 学科分类。
+                  可订阅关键词或 arXiv 学科；学科支持从列表选择，也可直接输入任意分类代码（如 cs.NE、q-bio.NC）。
                 </Typography.Text>
 
                 <Segmented
@@ -354,6 +340,7 @@ export default function SettingsPage() {
                     setSubscriptionType(value);
                     setKeywordInput("");
                     setSelectedCategory(undefined);
+                    setCategorySearch("");
                   }}
                   options={[
                     {
@@ -382,11 +369,33 @@ export default function SettingsPage() {
                       showSearch
                       allowClear
                       value={selectedCategory}
-                      placeholder="选择学科分类，例如：cs.CL"
-                      options={ARXIV_CATEGORIES}
+                      placeholder="选择或输入学科，例如：cs.CL、math.OC、physics.comp-ph"
+                      options={categoryOptions}
                       optionFilterProp="label"
+                      filterOption={(input, option) => {
+                        const q = input.toLowerCase();
+                        return (
+                          String(option?.label || "").toLowerCase().includes(q) ||
+                          String(option?.value || "").toLowerCase().includes(q)
+                        );
+                      }}
                       style={{ width: "100%" }}
-                      onChange={setSelectedCategory}
+                      onSearch={setCategorySearch}
+                      onChange={(value) => {
+                        setSelectedCategory(value);
+                        setCategorySearch(value || "");
+                      }}
+                      onInputKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addSubscription();
+                        }
+                      }}
+                      notFoundContent={
+                        categorySearch.trim()
+                          ? `未在列表中：将添加自定义「${categorySearch.trim()}」`
+                          : "输入学科代码或从列表选择"
+                      }
                     />
                   )}
 
