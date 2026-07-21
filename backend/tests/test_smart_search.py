@@ -32,7 +32,12 @@ def test_smart_search_uses_database_papers_without_llm() -> None:
             query="attention transformer",
             page=1,
             page_size=12,
-            settings=Settings(environment="test", database_url="sqlite:///:memory:"),
+            settings=Settings(
+                environment="test",
+                database_url="sqlite:///:memory:",
+                search_agent_enabled=False,
+                llm_api_key="",
+            ),
         )
 
     assert result.total == 1
