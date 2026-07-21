@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     environment: str = "dev"
     version: str = "0.1.0"
     database_url: str = "sqlite:///./data/dev.db"
+    paper_storage_dir: str = "data/pdfs"
     echo_sql: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     agent_enabled: bool | None = None
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     agent_base_url: str = "https://api.openai.com/v1"
     agent_timeout_s: float = 30.0
     worker_token: str = ""
+    # Development-only default. Production startup rejects this value.
     auth_secret: str = "papermate-dev-secret"
 
     # Unified OpenAI-compatible LLM configuration.
@@ -112,6 +114,10 @@ class Settings(BaseSettings):
             self.enable_docs = self.environment not in {"prod", "production"}
         return self
 
+    def validate_runtime(self) -> None:
+        """Backward-compatible entry point for production configuration checks."""
+        validate_production_settings(self)
+
     @property
     def parse_agent_ready(self) -> bool:
         return bool(self.parse_agent_enabled and self.llm_api_key.strip() and self.llm_model.strip())
@@ -146,19 +152,24 @@ class Settings(BaseSettings):
 
 
 def validate_production_settings(settings: Settings) -> None:
-    """Refuse to boot production with placeholder secrets or empty CORS."""
+    """Refuse to boot production with insecure or incomplete configuration."""
     if not settings.is_prod:
         return
+    problems: list[str] = []
     if _is_weak_secret(settings.auth_secret):
-        raise RuntimeError(
-            "PAPERMATE_AUTH_SECRET must be a strong non-placeholder value when PAPERMATE_ENV=prod"
-        )
+        problems.append("PAPERMATE_AUTH_SECRET must be a strong non-placeholder value")
     if _is_weak_secret(settings.worker_token):
-        raise RuntimeError(
-            "PAPERMATE_WORKER_TOKEN must be a strong non-placeholder value when PAPERMATE_ENV=prod"
-        )
+        problems.append("PAPERMATE_WORKER_TOKEN must be a strong non-placeholder value")
     if not settings.cors_origin_list:
-        raise RuntimeError("PAPERMATE_CORS_ORIGINS must be non-empty when PAPERMATE_ENV=prod")
+        problems.append("PAPERMATE_CORS_ORIGINS must be non-empty")
+    if settings.enable_docs:
+        problems.append("PAPERMATE_ENABLE_DOCS must be false")
+    if settings.enable_crawl_debug:
+        problems.append("PAPERMATE_ENABLE_CRAWL_DEBUG must be false")
+    if "*" in settings.cors_origin_list:
+        problems.append("PAPERMATE_CORS_ORIGINS cannot contain * when credentials are enabled")
+    if problems:
+        raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))
 
 
 @lru_cache

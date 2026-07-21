@@ -62,7 +62,7 @@ def papers(
 
 
 @router.post("/smart-search", response_model=ApiResponse[SmartSearchResponse], summary="智能论文检索（查询改写+模糊匹配+生成回答）")
-def smart_search(payload: SmartSearchRequest, request: Request, db: Session = Depends(db_session)):
+def smart_search(payload: SmartSearchRequest, request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     data = smart_search_papers(
         db,
         query=payload.query.strip(),
@@ -193,7 +193,7 @@ def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
 
 
 @router.get("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="读取个性化辅助阅读")
-def reading_assist_get(paper_id: int, request: Request, mode: str = Query(default="研究", max_length=16), db: Session = Depends(db_session)):
+def reading_assist_get(paper_id: int, request: Request, mode: str = Query(default="研究", max_length=16), _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     try:
         data = get_reading_assist(db, paper_id, mode=mode, settings=request.app.state.settings)
     except PaperServiceError as exc:
@@ -202,7 +202,7 @@ def reading_assist_get(paper_id: int, request: Request, mode: str = Query(defaul
 
 
 @router.get("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="读取论文知识图谱")
-def paper_graph(paper_id: int, request: Request, force: bool = Query(default=False), db: Session = Depends(db_session)):
+def paper_graph(paper_id: int, request: Request, force: bool = Query(default=False), _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     try:
         data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=force)
     except PaperServiceError as exc:
@@ -211,7 +211,7 @@ def paper_graph(paper_id: int, request: Request, force: bool = Query(default=Fal
 
 
 @router.post("/{paper_id}/graph", response_model=ApiResponse[PaperGraphData], summary="刷新论文知识图谱")
-def rebuild_paper_graph(paper_id: int, request: Request, db: Session = Depends(db_session)):
+def rebuild_paper_graph(paper_id: int, request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     try:
         data = get_paper_graph(db, paper_id, settings=request.app.state.settings, force=True)
     except PaperServiceError as exc:
@@ -220,7 +220,7 @@ def rebuild_paper_graph(paper_id: int, request: Request, db: Session = Depends(d
 
 
 @router.post("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="生成个性化辅助阅读")
-def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Request, db: Session = Depends(db_session)):
+def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     try:
         data = get_reading_assist(db, paper_id, mode=payload.mode, force=payload.force, settings=request.app.state.settings)
     except PaperServiceError as exc:
@@ -229,7 +229,7 @@ def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Reques
 
 
 @router.post("/{paper_id}/qa", response_model=ApiResponse[AskPaperResult], summary="单论文问答")
-def qa(paper_id: str, payload: AskPaperRequest, request: Request, db: Session = Depends(db_session)):
+def qa(paper_id: str, payload: AskPaperRequest, request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     if paper_id.isdigit():
         try:
             result = answer_question(

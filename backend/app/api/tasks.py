@@ -1,11 +1,8 @@
-import secrets
-
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.auth import db_session, require_admin, require_current_user
-from app.core.database import get_db
+from app.core.auth import db_session, require_admin, require_current_user, require_worker_access
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import ParseResultCommit, StructuredResultBatch, TaskClaimRequest, TaskQueueStats, TaskResponse, TaskUpdate
@@ -35,25 +32,12 @@ def map_error(request: Request, error: ValueError):
     return error_response(request, code, message, status_code)
 
 
-def require_worker_access(
-    request: Request,
-    worker_token: str | None = Header(default=None, alias="X-Worker-Token"),
-) -> None:
-    settings = request.app.state.settings
-    expected = settings.worker_token.strip()
-    # Local development / tests may omit Worker token. Production always requires it.
-    if settings.environment in {"dev", "test"} and (not expected or expected.startswith("replace-with-")):
-        return
-    if not expected or not worker_token or not secrets.compare_digest(worker_token, expected):
-        raise HTTPException(status_code=403, detail="Worker 内部接口未授权")
-
-
 @router.get("/stats", response_model=ApiResponse[TaskQueueStats], summary="查询解析队列统计")
 def task_stats(
     request: Request,
+    _admin: AuthUser = Depends(require_admin),
     db: Session = Depends(db_session),
     timeout_seconds: int = Query(default=900, ge=60, le=86400),
-    _user: AuthUser = Depends(require_current_user),
 ):
     return ApiResponse(
         data=queue_stats(db, timeout_seconds),
@@ -89,10 +73,10 @@ def task_detail(
 @router.get("", response_model=ApiResponse[list[TaskResponse]], summary="查询解析任务队列")
 def task_list(
     request: Request,
+    _admin: AuthUser = Depends(require_admin),
     db: Session = Depends(db_session),
     status: str | None = Query(default=None, max_length=32),
     limit: int = Query(default=20, ge=1, le=100),
-    _user: AuthUser = Depends(require_current_user),
 ):
     try:
         data = list_tasks(db, status=status, limit=limit)
@@ -104,7 +88,7 @@ def task_list(
 @router.post("/recover-stale", response_model=ApiResponse[dict], summary="恢复超时解析任务")
 def recover_stale(
     request: Request,
-    _worker: None = Depends(require_worker_access),
+    _admin: AuthUser = Depends(require_admin),
     db: Session = Depends(db_session),
     timeout_seconds: int = Query(default=900, ge=60, le=86400),
 ):
@@ -143,7 +127,7 @@ def task_retry(
     task_id: int,
     request: Request,
     db: Session = Depends(db_session),
-    _user: AuthUser = Depends(require_current_user),
+    _admin: AuthUser = Depends(require_admin),
 ):
     try:
         data = retry_task(db, task_id)
