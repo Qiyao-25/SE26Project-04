@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { getPaperDetail } from '../../services/paperService';
 import { getConceptDictionary, getLearningProfile, listActions, updateLearningProfile } from '../../services/learningService';
 import { USE_MOCK } from '../../services/runtimeConfig';
+import { formatDateKey, parseApiDate } from '../../utils/datetime';
 import PaperCard from '../../components/paper/PaperCard';
 
 const { Text, Paragraph } = Typography;
@@ -98,20 +99,26 @@ export default function LearningPage() {
 
   const mockHistory = READING_HISTORY[historyKey];
   const apiHistory = useMemo(() => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+    const today = formatDateKey(new Date());
+    const yesterday = formatDateKey(new Date(Date.now() - 86400000));
+    const dayKey = (item) => formatDateKey(item.occurred_at) || item.occurred_at?.slice(0, 10);
     const matches = {
-      today: (item) => item.occurred_at?.slice(0, 10) === today,
-      yesterday: (item) => item.occurred_at?.slice(0, 10) === yesterday,
-      earlier: (item) => ![today, yesterday].includes(item.occurred_at?.slice(0, 10))
+      today: (item) => dayKey(item) === today,
+      yesterday: (item) => dayKey(item) === yesterday,
+      earlier: (item) => ![today, yesterday].includes(dayKey(item))
     };
-    const items = library.history.filter(matches[historyKey]).map((item) => ({
-      paper: String(item.paper_id),
-      time: item.payload_json?.time || item.occurred_at?.slice(11, 16) || '',
-      section: item.payload_json?.section || '论文主体',
-      duration: item.payload_json?.duration || '已记录'
-    }));
+    const items = library.history.filter(matches[historyKey]).map((item) => {
+      const occurred = parseApiDate(item.occurred_at);
+      const hhmm = occurred
+        ? occurred.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false })
+        : (item.occurred_at?.slice(11, 16) || '');
+      return {
+        paper: String(item.paper_id),
+        time: item.payload_json?.time || hhmm,
+        section: item.payload_json?.section || '论文主体',
+        duration: item.payload_json?.duration || '已记录'
+      };
+    });
     return { label: historyKey === 'today' ? '今天' : historyKey === 'yesterday' ? '昨天' : '更早', items };
   }, [historyKey, library.history]);
 

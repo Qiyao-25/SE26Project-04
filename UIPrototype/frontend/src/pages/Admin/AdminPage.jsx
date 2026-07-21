@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { TASK_STATUS_LABELS } from '../../data/admin';
 import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus } from '../../services/adminService';
+import { formatDateTime } from '../../utils/datetime';
 
 const { Text } = Typography;
 
@@ -65,7 +66,7 @@ function OverviewTab({ onGo, overview, activities = [] }) {
       </Row>
       <Card title="近期活动动态" size="small" style={{ marginTop: 16 }}>
         <List size="small" dataSource={activities} locale={{ emptyText: '暂无近期活动' }} renderItem={(a) => (
-          <List.Item actions={[<Text type="secondary" key="t">{a.time}</Text>]}>{a.detail}</List.Item>
+          <List.Item actions={[<Text type="secondary" key="t">{formatDateTime(a.time)}</Text>]}>{a.detail}</List.Item>
         )} />
       </Card>
     </>
@@ -156,7 +157,7 @@ function QualityTab({ quality }) {
             <List.Item actions={[
               <Button size="small" key="fix" onClick={() => navigate(`/paper/${e.paper}`)}>人工修正</Button>
             ]}>
-              <List.Item.Meta title={e.title} description={<>{e.detail}<br /><Text type="secondary">{e.type} · {e.time}</Text></>} />
+              <List.Item.Meta title={e.title} description={<>{e.detail}<br /><Text type="secondary">{e.type} · {formatDateTime(e.time)}</Text></>} />
             </List.Item>
           )} />
         </Card>
@@ -198,7 +199,7 @@ function AuditTab({ logs = [] }) {
       <Col xs={24} lg={12}>
         <Card title="操作审计日志" size="small">
           <List size="small" dataSource={filteredLogs} locale={{ emptyText: '暂无审计记录' }} renderItem={(l) => (
-            <List.Item><List.Item.Meta title={l.detail} description={`${l.user} · ${l.time} · ${l.type}`} /></List.Item>
+            <List.Item><List.Item.Meta title={l.detail} description={`${l.user} · ${formatDateTime(l.time)} · ${l.type}`} /></List.Item>
           )} />
         </Card>
       </Col>
@@ -243,7 +244,7 @@ export default function AdminPage() {
           agent: '解析 Agent',
           status: task.status === 'queued' ? 'pending' : task.status === 'running' ? 'processing' : task.status === 'succeeded' ? 'done' : 'failed',
           progress: task.progress,
-          start: task.started_at || '—',
+          start: formatDateTime(task.started_at),
           duration: task.finished_at && task.started_at ? '已完成' : '—'
         })));
         setQuality(nextQuality);
