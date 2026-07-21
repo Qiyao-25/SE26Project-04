@@ -73,8 +73,6 @@ class Settings(BaseSettings):
     arxiv_min_interval_s: float = 5.0
     arxiv_max_retries: int = 4
     arxiv_rate_limit_wait_s: float = 45.0
-    # DEBUG: manual crawl trigger API; set false / remove debug_crawl.py to drop
-    enable_crawl_debug: bool = False
     # Production: set false to hide /docs /redoc /openapi.json
     enable_docs: bool | None = None
 
@@ -164,8 +162,6 @@ def validate_production_settings(settings: Settings) -> None:
         problems.append("PAPERMATE_CORS_ORIGINS must be non-empty")
     if settings.enable_docs:
         problems.append("PAPERMATE_ENABLE_DOCS must be false")
-    if settings.enable_crawl_debug:
-        problems.append("PAPERMATE_ENABLE_CRAWL_DEBUG must be false")
     if "*" in settings.cors_origin_list:
         problems.append("PAPERMATE_CORS_ORIGINS cannot contain * when credentials are enabled")
     if problems:

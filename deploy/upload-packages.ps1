@@ -70,6 +70,5 @@ Write-Host "Upload done. On the server run:"
 Write-Host ("  ssh {0}@{1}" -f $User, $HostName)
 Write-Host ("  sed -i 's/\r$//' {0}/deploy-on-host.sh" -f $RemoteDir)
 Write-Host ("  bash {0}/deploy-on-host.sh" -f $RemoteDir)
-Write-Host "  # ensure PAPERMATE_ENABLE_CRAWL_DEBUG=true in /opt/papermate/backend/.env"
 Write-Host "  systemctl restart papermate-backend"
 Write-Host "See docs/服务器运维与更新.md"
