@@ -105,6 +105,8 @@ def admin_quality(session: Session, limit: int = 50) -> dict:
     exceptions = []
     for task in failed:
         paper = session.get(Paper, task.paper_id)
+        if paper is not None and paper.deleted_at is not None:
+            continue
         exceptions.append({
             "paper": task.paper_id,
             "task_id": task.id,

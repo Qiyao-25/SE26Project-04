@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
   Alert, Card, Tabs, Row, Col, Statistic, List, Tag, Table, Progress, Select, Button,
-  Input, Typography, message, Space, Popconfirm
+  Input, Typography, message, Space, Popconfirm, Modal, Radio
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { TASK_STATUS_LABELS } from '../../data/admin';
-import { getAdminAudit, getAdminOverview, getAdminQuality, getAdminTasks, getAdminUsers, updateAdminUserStatus, deleteAdminUser, retryAdminParseTask, enqueuePendingParseTasks, forceParsePaper } from '../../services/adminService';
+import {
+  getAdminAudit,
+  getAdminOverview,
+  getAdminQuality,
+  getAdminTasks,
+  getAdminUsers,
+  updateAdminUserStatus,
+  deleteAdminUser,
+  retryAdminParseTask,
+  enqueuePendingParseTasks,
+  deleteAdminParseTask,
+} from '../../services/adminService';
+import { deletePaper } from '../../services/paperService';
 import { formatDateTime } from '../../utils/datetime';
 
 const { Text } = Typography;
@@ -159,6 +171,8 @@ function QualityTab({ quality, onRefresh }) {
   const rates = quality?.rates || {};
   const queue = quality?.queue || {};
   const [busyKey, setBusyKey] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteMode, setDeleteMode] = useState('task');
 
   const runAction = async (key, action, successText) => {
     setBusyKey(key);
@@ -173,6 +187,32 @@ function QualityTab({ quality, onRefresh }) {
     }
   };
 
+  const openDeleteModal = (item) => {
+    setDeleteTarget(item);
+    setDeleteMode('task');
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const key = `delete-${deleteTarget.task_id}`;
+    const mode = deleteMode;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (mode === 'paper') {
+      await runAction(
+        key,
+        () => deletePaper(target.paper),
+        '已删除论文（软删除）',
+      );
+      return;
+    }
+    await runAction(
+      key,
+      () => deleteAdminParseTask(target.task_id),
+      '已删除解析任务',
+    );
+  };
+
   return (
     <Row gutter={16}>
       <Col span={24} style={{ marginBottom: 16 }}>
@@ -180,7 +220,7 @@ function QualityTab({ quality, onRefresh }) {
           type="info"
           showIcon
           message="质量异常处理说明"
-          description="重试=失败任务再跑；强制解析=新建任务；入队待解析=把未解析论文入队；打开论文=人工查看。"
+          description="重试=失败任务再跑；删除=可仅删任务或直接删论文；入队待解析=把未解析论文入队；打开论文=人工查看。"
         />
       </Col>
       <Col xs={24} lg={14}>
@@ -201,7 +241,7 @@ function QualityTab({ quality, onRefresh }) {
           )}
         >
           <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-            汇总解析失败 / 超时任务。可重试失败任务、强制重新解析，或打开论文详情人工修正。
+            汇总解析失败 / 超时任务。可重试失败任务，或删除任务 / 删除论文。
           </Text>
           <List dataSource={exceptions} locale={{ emptyText: '暂无质量异常' }} renderItem={(e) => (
             <List.Item actions={[
@@ -217,11 +257,12 @@ function QualityTab({ quality, onRefresh }) {
               ) : null,
               <Button
                 size="small"
-                key="force"
-                loading={busyKey === `force-${e.paper}`}
-                onClick={() => runAction(`force-${e.paper}`, () => forceParsePaper(e.paper), '已强制重新解析')}
+                danger
+                key="delete"
+                loading={busyKey === `delete-${e.task_id}`}
+                onClick={() => openDeleteModal(e)}
               >
-                强制解析
+                删除
               </Button>,
               <Button size="small" key="view" onClick={() => navigate(`/paper/${e.paper}`)}>打开论文</Button>
             ].filter(Boolean)}
@@ -269,6 +310,28 @@ function QualityTab({ quality, onRefresh }) {
           ))}
         </Card>
       </Col>
+
+      <Modal
+        title="删除异常项"
+        open={Boolean(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+        onOk={confirmDelete}
+        okText="确认删除"
+        okButtonProps={{ danger: true }}
+        cancelText="取消"
+      >
+        <Text style={{ display: 'block', marginBottom: 12 }}>
+          {deleteTarget?.title || '选中的异常论文'}
+        </Text>
+        <Radio.Group
+          value={deleteMode}
+          onChange={(event) => setDeleteMode(event.target.value)}
+          style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+        >
+          <Radio value="task">仅删除解析任务（保留论文）</Radio>
+          <Radio value="paper">直接删除论文（软删除，论文库不再展示）</Radio>
+        </Radio.Group>
+      </Modal>
     </Row>
   );
 }

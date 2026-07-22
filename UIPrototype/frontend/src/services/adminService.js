@@ -36,11 +36,8 @@ export async function enqueuePendingParseTasks(limit = 20) {
   return apiClient.post('/tasks/enqueue-pending', null, { params: { limit } });
 }
 
-export async function forceParsePaper(paperId) {
-  const key = `admin-retry-${paperId}-${Date.now()}`;
-  return apiClient.post(`/papers/${paperId}/parse`, { task_type: 'full_parse', force: true }, {
-    headers: { 'Idempotency-Key': key }
-  });
+export async function deleteAdminParseTask(taskId) {
+  return apiClient.delete(`/tasks/${taskId}`);
 }
 
 export async function getAdminCrawlSettings() {

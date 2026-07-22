@@ -6,7 +6,7 @@ from app.core.auth import db_session, require_admin, require_current_user, requi
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import ParseResultCommit, StructuredResultBatch, TaskClaimRequest, TaskQueueStats, TaskResponse, TaskUpdate
-from app.service.tasks import claim_task, create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
+from app.service.tasks import claim_task, create_task, delete_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -26,6 +26,7 @@ def map_error(request: Request, error: ValueError):
         "TASK_RETRY_CONFLICT": ("TASK_RETRY_CONFLICT", "当前任务状态不允许重试", 409),
         "TASK_RETRY_EXHAUSTED": ("TASK_RETRY_EXHAUSTED", "解析任务已达到最大重试次数", 409),
         "TASK_STATE_CONFLICT": ("TASK_STATE_CONFLICT", "解析任务状态不允许该操作", 409),
+        "TASK_DELETE_CONFLICT": ("TASK_DELETE_CONFLICT", "运行中的解析任务不可删除", 409),
         "WORKER_ID_INVALID": ("WORKER_ID_INVALID", "Worker 标识不能为空", 400),
     }
     code, message, status_code = mapping.get(str(error), ("INTERNAL_ERROR", "任务处理失败", 500))
@@ -131,6 +132,20 @@ def task_retry(
 ):
     try:
         data = retry_task(db, task_id)
+    except ValueError as exc:
+        return map_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.delete("/{task_id}", response_model=ApiResponse[dict], summary="删除解析任务")
+def task_delete(
+    task_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    _admin: AuthUser = Depends(require_admin),
+):
+    try:
+        data = delete_task(db, task_id)
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)

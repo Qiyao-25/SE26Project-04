@@ -282,6 +282,18 @@ def retry_task(session: Session, task_id: int) -> TaskResponse:
     return to_task(task)
 
 
+def delete_task(session: Session, task_id: int) -> dict:
+    task = session.get(ParseTask, task_id)
+    if task is None:
+        raise ValueError("TASK_NOT_FOUND")
+    if task.status == "running":
+        raise ValueError("TASK_DELETE_CONFLICT")
+    paper_id = task.paper_id
+    session.delete(task)
+    session.commit()
+    return {"deleted": True, "task_id": task_id, "paper_id": paper_id}
+
+
 def recover_stale_tasks(session: Session, stale_after_seconds: int = 900) -> list[TaskResponse]:
     cutoff = _now() - timedelta(seconds=stale_after_seconds)
     tasks = session.scalars(
