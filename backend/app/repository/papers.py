@@ -106,7 +106,11 @@ def list_papers(
         papers = list(session.scalars(stmt).unique())
         papers = _rank_papers(papers, keyword_terms)
         start = (page - 1) * page_size
-        return papers[start : start + page_size], total
+        if start >= total:
+            return [], total
+        # Do not pad the last page: return only remaining items (e.g. 8 of 12).
+        end = min(start + page_size, total, len(papers))
+        return papers[start:end], total
     stmt = (
         select(Paper)
         .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))

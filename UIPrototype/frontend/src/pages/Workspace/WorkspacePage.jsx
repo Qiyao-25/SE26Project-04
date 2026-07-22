@@ -64,6 +64,15 @@ function clearSearchCache() {
   }
 }
 
+/** Last page should show only remaining items (e.g. 8 of 12), never pad to pageSize. */
+function slicePageItems(items, page, pageSize, total) {
+  const list = Array.isArray(items) ? items : [];
+  if (!total || total <= 0) return list.slice(0, pageSize);
+  const start = (Math.max(1, page) - 1) * pageSize;
+  const remaining = Math.max(0, total - start);
+  return list.slice(0, Math.min(pageSize, remaining));
+}
+
 export default function WorkspacePage() {
   const {
     workspaceSearched,
@@ -103,8 +112,8 @@ export default function WorkspacePage() {
 
   const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot, rewrittenQuery, keywords, category, categoryHints } = {}) => {
     const nextPage = page || data.page || 1;
-    const nextItems = data.items || [];
     const nextTotal = data.total || 0;
+    const nextItems = slicePageItems(data.items || [], nextPage, data.pageSize || searchPageSize, nextTotal);
     const nextAnswer = answerText
       || data.answer
       || (nextTotal > 0
@@ -153,10 +162,18 @@ export default function WorkspacePage() {
       && cache.query === lastSearchQuery
       && Array.isArray(cache.items)
     ) {
-      setResults(cache.items);
-      setResultTotal(cache.total || cache.items.length);
-      setSearchPage(cache.page || 1);
-      setSearchStatus((cache.total || cache.items.length) > 0 ? 'success' : 'empty');
+      const restoredPage = cache.page || 1;
+      const restoredTotal = cache.total || cache.items.length;
+      const restoredItems = slicePageItems(
+        cache.items,
+        restoredPage,
+        cache.pageSize || searchPageSize,
+        restoredTotal,
+      );
+      setResults(restoredItems);
+      setResultTotal(restoredTotal);
+      setSearchPage(restoredPage);
+      setSearchStatus(restoredTotal > 0 ? 'success' : 'empty');
       if (Array.isArray(cache.messages) && cache.messages.length) {
         setMessages(cache.messages);
       }
@@ -329,14 +346,17 @@ export default function WorkspacePage() {
   const handlePageChange = async (page) => {
     if (!lastSearchQuery || page === searchPage || pageLoading) return;
     const cache = readSearchCache();
+    const stableTotal = cache?.total || resultTotal || 0;
     const cachedPage = cache?.pageItems?.[String(page)];
     if (Array.isArray(cachedPage) && cachedPage.length) {
-      setResults(cachedPage);
+      const capped = slicePageItems(cachedPage, page, searchPageSize, stableTotal);
+      setResults(capped);
       setSearchPage(page);
       writeSearchCache({
         ...cache,
         page,
-        items: cachedPage,
+        items: capped,
+        pageItems: { ...(cache.pageItems || {}), [String(page)]: capped },
       });
       return;
     }
@@ -353,15 +373,14 @@ export default function WorkspacePage() {
         includeAnswer: false,
       });
       const previous = readSearchCache() || {};
-      const nextItems = data.items || [];
+      const pinnedTotal = previous.total || data.total || 0;
+      const nextItems = slicePageItems(data.items || [], page, searchPageSize, pinnedTotal);
       const pageItems = { ...(previous.pageItems || {}) };
       pageItems[String(page)] = nextItems;
-      // Keep the first-search total so pagination chrome does not jump if filters drift.
-      const stableTotal = previous.total || data.total || 0;
       setResults(nextItems);
-      setResultTotal(stableTotal);
+      setResultTotal(pinnedTotal);
       setSearchPage(page);
-      if (stableTotal > 0) {
+      if (pinnedTotal > 0) {
         setSearchStatus('success');
       }
       writeSearchCache({
@@ -369,7 +388,7 @@ export default function WorkspacePage() {
         query: lastSearchQuery,
         page,
         pageSize: searchPageSize,
-        total: stableTotal,
+        total: pinnedTotal,
         items: nextItems,
         pageItems,
         rewrittenQuery: previous.rewrittenQuery || data.rewrittenQuery,
