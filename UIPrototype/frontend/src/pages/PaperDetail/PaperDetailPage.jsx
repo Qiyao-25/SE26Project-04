@@ -48,7 +48,15 @@ function getParseStatusLabel(status) {
 export default function PaperDetailPage() {
   const { paperId } = useParams();
   const navigate = useNavigate();
-  const { userId, setCompareForPaper, setLockedPaperId, exitLockedPaper } = useApp();
+  const {
+    userId,
+    setCompareForPaper,
+    setLockedPaperId,
+    exitLockedPaper,
+    comparePaperB,
+    comparePreviewActive,
+    setComparePreviewActive,
+  } = useApp();
 
   const [paper, setPaper] = useState(null);
   const [content, setContent] = useState(null);
@@ -62,6 +70,20 @@ export default function PaperDetailPage() {
   const [mainTab, setMainTab] = useState('content');
   const historyRecordedFor = useRef(null);
 
+  const [previewPaper, setPreviewPaper] = useState(null);
+  const [previewContent, setPreviewContent] = useState(null);
+  const [previewSummary, setPreviewSummary] = useState(null);
+  const [previewGraph, setPreviewGraph] = useState(null);
+  const [previewGraphError, setPreviewGraphError] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+
+  const viewingOther = Boolean(
+    comparePreviewActive
+    && comparePaperB
+    && String(comparePaperB) !== String(paperId)
+  );
+
   useEffect(() => {
     if (paperId) setCompareForPaper(paperId);
   }, [paperId, setCompareForPaper]);
@@ -70,6 +92,15 @@ export default function PaperDetailPage() {
   useEffect(() => {
     if (paperId) setLockedPaperId(String(paperId));
   }, [paperId, setLockedPaperId]);
+
+  // Switching base paper exits compare preview; keep the original compare page intact.
+  useEffect(() => {
+    setComparePreviewActive(false);
+  }, [paperId, setComparePreviewActive]);
+
+  useEffect(() => {
+    if (!comparePaperB) setComparePreviewActive(false);
+  }, [comparePaperB, setComparePreviewActive]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +150,51 @@ export default function PaperDetailPage() {
   }, [paperId, reloadToken]);
 
   useEffect(() => {
+    if (!viewingOther) {
+      setPreviewPaper(null);
+      setPreviewContent(null);
+      setPreviewSummary(null);
+      setPreviewGraph(null);
+      setPreviewGraphError('');
+      setPreviewError('');
+      setPreviewLoading(false);
+      return undefined;
+    }
+
+    const previewId = String(comparePaperB);
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError('');
+
+    (async () => {
+      try {
+        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
+          getPaperDetail(previewId),
+          getPaperContent(previewId),
+          getPaperSummary(previewId),
+          getPaperGraph(previewId)
+        ]);
+        if (cancelled) return;
+        if (detailResult.status === 'rejected') throw detailResult.reason;
+        setPreviewPaper(detailResult.value);
+        setPreviewContent(contentResult.status === 'fulfilled' ? contentResult.value : null);
+        setPreviewSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
+        setPreviewGraph(graphResult.status === 'fulfilled' ? graphResult.value : null);
+        setPreviewGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
+      } catch (error) {
+        if (!cancelled) {
+          setPreviewPaper(null);
+          setPreviewError(error.message || '对比论文加载失败');
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [viewingOther, comparePaperB]);
+
+  useEffect(() => {
     if (!paper || !isPersistedPaperId(paperId) || historyRecordedFor.current === paperId) return;
     historyRecordedFor.current = paperId;
     createAction({
@@ -138,10 +214,17 @@ export default function PaperDetailPage() {
 
   const handleGraphRefresh = async () => {
     if (graphRefreshing) return;
+    const targetId = viewingOther ? String(comparePaperB) : paperId;
     setGraphRefreshing(true);
     try {
-      setGraphData(await rebuildPaperGraph(paperId));
-      setGraphError('');
+      const nextGraph = await rebuildPaperGraph(targetId);
+      if (viewingOther) {
+        setPreviewGraph(nextGraph);
+        setPreviewGraphError('');
+      } else {
+        setGraphData(nextGraph);
+        setGraphError('');
+      }
       message.success('知识图谱已刷新');
     } catch (error) {
       message.error(error.message || '知识图谱刷新失败');
@@ -150,7 +233,12 @@ export default function PaperDetailPage() {
     }
   };
 
-  const structuredSummaryReady = ['completed', 'qa_ready'].includes(summaryData?.parseStatus);
+  const viewPaper = viewingOther ? previewPaper : paper;
+  const viewContent = viewingOther ? previewContent : content;
+  const viewSummary = viewingOther ? previewSummary : summaryData;
+  const viewGraph = viewingOther ? previewGraph : graphData;
+  const viewGraphError = viewingOther ? previewGraphError : graphError;
+  const viewPaperId = viewingOther ? String(comparePaperB) : paperId;
 
   if (loading) {
     return (
@@ -191,6 +279,14 @@ export default function PaperDetailPage() {
     );
   }
 
+  const shownPaper = viewPaper || paper;
+  const shownContent = viewingOther && viewPaper ? viewContent : content;
+  const shownSummary = viewingOther && viewPaper ? viewSummary : summaryData;
+  const shownGraph = viewingOther && viewPaper ? viewGraph : graphData;
+  const shownGraphError = viewingOther && viewPaper ? viewGraphError : graphError;
+  const shownPaperId = viewingOther && viewPaper ? viewPaperId : paperId;
+  const shownSummaryReady = ['completed', 'qa_ready'].includes(shownSummary?.parseStatus);
+
   const mainTabs = [
     {
       key: 'content',
@@ -198,27 +294,27 @@ export default function PaperDetailPage() {
       children: (
         <div>
           <Title level={4} style={{ marginTop: 0 }}>
-            {paper.title}
+            {shownPaper.title}
           </Title>
 
           <Space size={6} wrap style={{ marginBottom: 12 }}>
-            <Tag color="blue">{paper.primaryCategory || paper.tag}</Tag>
-            <Tag>arXiv:{paper.arxivId || paper.arxiv}</Tag>
-            <Tag>{paper.publishedAt || paper.date}</Tag>
-            <Tag color={['completed', 'qa_ready'].includes(paper.parseStatus) ? 'success' : 'warning'}>
-              解析状态：{getParseStatusLabel(paper.parseStatus)}
+            <Tag color="blue">{shownPaper.primaryCategory || shownPaper.tag}</Tag>
+            <Tag>arXiv:{shownPaper.arxivId || shownPaper.arxiv}</Tag>
+            <Tag>{shownPaper.publishedAt || shownPaper.date}</Tag>
+            <Tag color={['completed', 'qa_ready'].includes(shownPaper.parseStatus) ? 'success' : 'warning'}>
+              解析状态：{getParseStatusLabel(shownPaper.parseStatus)}
             </Tag>
           </Space>
 
           <Paragraph type="secondary">
-            {(paper.authors || []).join?.(', ') || paper.authorsText || paper.authors}
+            {(shownPaper.authors || []).join?.(', ') || shownPaper.authorsText || shownPaper.authors}
           </Paragraph>
 
-          {content?.pdfUrl ? (
+          {shownContent?.pdfUrl ? (
             <>
               <iframe
-                title={`${paper.title} PDF`}
-                src={content.pdfUrl}
+                title={`${shownPaper.title} PDF`}
+                src={shownContent.pdfUrl}
                 style={{
                   width: '100%',
                   height: '72vh',
@@ -233,17 +329,17 @@ export default function PaperDetailPage() {
                 <Button
                   type="primary"
                   icon={<FilePdfOutlined />}
-                  href={content.pdfUrl}
+                  href={shownContent.pdfUrl}
                   target="_blank"
                   rel="noreferrer"
                 >
                   新窗口打开 PDF
                 </Button>
 
-                {content.htmlUrl && (
+                {shownContent.htmlUrl && (
                   <Button
                     icon={<LinkOutlined />}
-                    href={content.htmlUrl}
+                    href={shownContent.htmlUrl}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -251,10 +347,10 @@ export default function PaperDetailPage() {
                   </Button>
                 )}
 
-                {paper.sourceUrl && (
+                {shownPaper.sourceUrl && (
                   <Button
                     icon={<LinkOutlined />}
-                    href={paper.sourceUrl}
+                    href={shownPaper.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -263,7 +359,7 @@ export default function PaperDetailPage() {
                 )}
 
                 <Text type="secondary">
-                  {content.pageCount ? `共 ${content.pageCount} 页` : '页数待后端解析'}
+                  {shownContent.pageCount ? `共 ${shownContent.pageCount} 页` : '页数待后端解析'}
                 </Text>
               </Space>
             </>
@@ -280,27 +376,27 @@ export default function PaperDetailPage() {
         <div>
           <Space size={6} wrap style={{ marginBottom: 12 }}>
             <Tag
-              color={['completed', 'qa_ready'].includes(summaryData?.parseStatus) ? 'success' : 'warning'}
+              color={['completed', 'qa_ready'].includes(shownSummary?.parseStatus) ? 'success' : 'warning'}
             >
-              解析状态：{getParseStatusLabel(summaryData?.parseStatus)}
+              解析状态：{getParseStatusLabel(shownSummary?.parseStatus)}
             </Tag>
-            {!structuredSummaryReady ? (
+            {!shownSummaryReady ? (
               <Text type="secondary">未解析论文由后台自动解析（优先新入库），完成后刷新即可查看</Text>
             ) : null}
           </Space>
 
-          {structuredSummaryReady ? (
+          {shownSummaryReady ? (
             <>
               <Title level={5}>
-                结构化摘要 {summaryData.uncertainFields?.includes('summary') ? <Tag color="orange">不确定</Tag> : null}
+                结构化摘要 {shownSummary.uncertainFields?.includes('summary') ? <Tag color="orange">不确定</Tag> : null}
               </Title>
-              <Paragraph>{summaryData.summary}</Paragraph>
+              <Paragraph>{shownSummary.summary}</Paragraph>
 
               <Title level={5}>
-                核心概念 {summaryData.uncertainFields?.includes('concepts') ? <Tag color="orange">不确定</Tag> : null}
+                核心概念 {shownSummary.uncertainFields?.includes('concepts') ? <Tag color="orange">不确定</Tag> : null}
               </Title>
               <Space direction="vertical" style={{ width: '100%' }}>
-                {(summaryData.concepts || []).map((concept) => (
+                {(shownSummary.concepts || []).map((concept) => (
                   <Card size="small" key={concept.conceptId}>
                     <Text strong>{concept.name}</Text>
                     <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
@@ -311,10 +407,10 @@ export default function PaperDetailPage() {
               </Space>
 
               <Title level={5} style={{ marginTop: 20 }}>
-                方法步骤 {summaryData.uncertainFields?.includes('methods') ? <Tag color="orange">不确定</Tag> : null}
+                方法步骤 {shownSummary.uncertainFields?.includes('methods') ? <Tag color="orange">不确定</Tag> : null}
               </Title>
               <ol style={{ paddingLeft: 22 }}>
-                {(summaryData.methods || []).map((method) => (
+                {(shownSummary.methods || []).map((method) => (
                   <li key={method.order} style={{ marginBottom: 12 }}>
                     <Text strong>{method.title}</Text>
                     <Paragraph style={{ marginBottom: 0 }}>{method.description}</Paragraph>
@@ -323,11 +419,11 @@ export default function PaperDetailPage() {
               </ol>
 
               <Title level={5}>
-                实验与结果 {summaryData.uncertainFields?.includes('experiments') ? <Tag color="orange">不确定</Tag> : null}
+                实验与结果 {shownSummary.uncertainFields?.includes('experiments') ? <Tag color="orange">不确定</Tag> : null}
               </Title>
-              {(summaryData.experiments || []).length > 0 ? (
+              {(shownSummary.experiments || []).length > 0 ? (
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {summaryData.experiments.map((experiment, index) => (
+                  {shownSummary.experiments.map((experiment, index) => (
                     <Card size="small" key={`${experiment.title}-${index}`}>
                       <Text strong>{experiment.title}</Text>
                       <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 4 }}>
@@ -341,11 +437,11 @@ export default function PaperDetailPage() {
               )}
 
               <Title level={5}>
-                局限性 {summaryData.uncertainFields?.includes('limitations') ? <Tag color="orange">不确定</Tag> : null}
+                局限性 {shownSummary.uncertainFields?.includes('limitations') ? <Tag color="orange">不确定</Tag> : null}
               </Title>
-              {(summaryData.limitations || []).length > 0 ? (
+              {(shownSummary.limitations || []).length > 0 ? (
                 <ul style={{ paddingLeft: 22 }}>
-                  {summaryData.limitations.map((limitation) => (
+                  {shownSummary.limitations.map((limitation) => (
                     <li key={limitation} style={{ marginBottom: 8 }}>
                       {limitation}
                     </li>
@@ -355,7 +451,7 @@ export default function PaperDetailPage() {
                 <Text type="secondary">暂无局限性解析结果。</Text>
               )}
 
-              {(summaryData.validationFlags || []).length > 0 && (
+              {(shownSummary.validationFlags || []).length > 0 && (
                 <Alert
                   type="warning"
                   showIcon
@@ -363,13 +459,13 @@ export default function PaperDetailPage() {
                   description={
                     <div>
                       <div style={{ marginBottom: 8 }}>
-                        {(summaryData.validationLabels || summaryData.validationFlags).map((label) => (
+                        {(shownSummary.validationLabels || shownSummary.validationFlags).map((label) => (
                           <Tag key={label} color="gold" style={{ marginBottom: 4 }}>{label}</Tag>
                         ))}
                       </div>
-                      {(summaryData.uncertainFields || []).length > 0 && (
+                      {(shownSummary.uncertainFields || []).length > 0 && (
                         <Text type="secondary">
-                          待复核字段：{summaryData.uncertainFields.join('、')}
+                          待复核字段：{shownSummary.uncertainFields.join('、')}
                         </Text>
                       )}
                     </div>
@@ -394,20 +490,20 @@ export default function PaperDetailPage() {
       label: 'c · 知识图谱&脉络',
       children: (
         <div className="graph-placeholder">
-          {graphData ? (
+          {shownGraph ? (
             <>
               <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Space wrap>
-                  <Tag color={graphData.preview ? 'default' : 'success'}>
-                    {graphData.preview ? '解析前主题预览' : '解析后结构化脉络'}
+                  <Tag color={shownGraph.preview ? 'default' : 'success'}>
+                    {shownGraph.preview ? '解析前主题预览' : '解析后结构化脉络'}
                   </Tag>
-                  <Text type="secondary">节点 {graphData.nodes.length} 个 · 关系 {graphData.edges.length} 条 · 来源 {graphData.source || 'heuristic'}</Text>
+                  <Text type="secondary">节点 {shownGraph.nodes.length} 个 · 关系 {shownGraph.edges.length} 条 · 来源 {shownGraph.source || 'heuristic'}</Text>
                 </Space>
                 <Button icon={<ReloadOutlined />} loading={graphRefreshing} onClick={handleGraphRefresh}>
                   刷新图谱
                 </Button>
               </Space>
-              {graphData.preview && (
+              {shownGraph.preview && (
                 <Alert
                   type="info"
                   showIcon
@@ -416,13 +512,13 @@ export default function PaperDetailPage() {
                   style={{ marginBottom: 12 }}
                 />
               )}
-              <Paragraph>{graphData.narrative || '暂无研究脉络说明。'}</Paragraph>
-              <PaperGraphCanvas paperId={paperId} nodes={graphData.nodes} edges={graphData.edges} />
+              <Paragraph>{shownGraph.narrative || '暂无研究脉络说明。'}</Paragraph>
+              <PaperGraphCanvas paperId={shownPaperId} nodes={shownGraph.nodes} edges={shownGraph.edges} />
               <List
                 size="small"
                 style={{ marginTop: 12 }}
                 header={<Text strong>研究脉络</Text>}
-                dataSource={graphData.lineage}
+                dataSource={shownGraph.lineage}
                 locale={{ emptyText: '暂无相关论文' }}
                 renderItem={(item) => (
                   <List.Item>
@@ -435,12 +531,12 @@ export default function PaperDetailPage() {
                 )}
               />
             </>
-          ) : graphError ? (
+          ) : shownGraphError ? (
             <Alert
               type="error"
               showIcon
               message="知识图谱加载失败"
-              description={graphError}
+              description={shownGraphError}
               action={<Button size="small" onClick={handleGraphRefresh}>重新加载</Button>}
             />
           ) : <Spin size="small" tip="正在生成知识图谱..." />}
@@ -473,7 +569,35 @@ export default function PaperDetailPage() {
       <Row gutter={16} align="stretch">
         <Col xs={24} lg={15}>
           <Card className="section-card paper-main-card">
-            <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
+            {viewingOther ? (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="正在查看对比论文"
+                description="对比阅读侧栏仍锚定原论文。再次点击「返回原论文」可切回。"
+                action={(
+                  <Button size="small" onClick={() => setComparePreviewActive(false)}>
+                    返回原论文
+                  </Button>
+                )}
+              />
+            ) : null}
+            {viewingOther && previewLoading ? (
+              <div style={{ minHeight: 260, display: 'grid', placeItems: 'center' }}>
+                <Spin tip="正在加载对比论文..." />
+              </div>
+            ) : viewingOther && previewError ? (
+              <Alert
+                type="error"
+                showIcon
+                message="对比论文加载失败"
+                description={previewError}
+                action={<Button size="small" onClick={() => setComparePreviewActive(false)}>返回原论文</Button>}
+              />
+            ) : (
+              <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
+            )}
           </Card>
         </Col>
         <Col xs={24} lg={9}>

@@ -38,9 +38,11 @@ export function AppProvider({ children }) {
   const [lastSearchQuery, setLastSearchQuery] = useState(() => readSessionText(WORKSPACE_LAST_QUERY_KEY));
   const [lockedPaperId, setLockedPaperId] = useState(null);
   const [paperNotes, setPaperNotes] = useState(() => JSON.parse(JSON.stringify(DEFAULT_PAPER_NOTES)));
-  const [comparePaperA, setComparePaperA] = useState('attention');
-  const [comparePaperB, setComparePaperB] = useState('bert');
+  const [comparePaperA, setComparePaperA] = useState(null);
+  const [comparePaperB, setComparePaperB] = useState(null);
   const [compareActiveSlot, setCompareActiveSlot] = useState('a');
+  // When true, paper detail main pane shows comparePaperB without leaving the original route.
+  const [comparePreviewActive, setComparePreviewActive] = useState(false);
 
   const clearAuth = useCallback(() => {
     setLoggedIn(false);
@@ -125,6 +127,7 @@ export function AppProvider({ children }) {
     setWorkspaceSearched(false);
     setLastSearchQuery('');
     setLockedPaperId(null);
+    setComparePreviewActive(false);
   }, [clearAuth]);
 
   useEffect(() => {
@@ -156,11 +159,11 @@ export function AppProvider({ children }) {
   // Entering a paper must not reshuffle A/B: if it is already A or B, keep slots.
   const setCompareForPaper = useCallback((paperId) => {
     const id = String(paperId);
-    if (String(comparePaperA) === id) {
+    if (comparePaperA != null && String(comparePaperA) === id) {
       setCompareActiveSlot('a');
       return;
     }
-    if (String(comparePaperB) === id) {
+    if (comparePaperB != null && String(comparePaperB) === id) {
       setCompareActiveSlot('b');
       return;
     }
@@ -169,17 +172,18 @@ export function AppProvider({ children }) {
   }, [comparePaperA, comparePaperB]);
   const exitLockedPaper = useCallback(() => {
     setLockedPaperId(null);
+    setComparePreviewActive(false);
   }, []);
 
   const value = useMemo(() => ({
     loggedIn, authReady, isAdmin, userId, email, persona, topics, workspaceSearched, lastSearchQuery,
-    lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, showAdminNav,
+    lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, comparePreviewActive, showAdminNav,
     login, register, applyAuthResponse: applyAuth, logout, setPersona, setTopics, setWorkspaceSearched, setLastSearchQuery,
-    setLockedPaperId, exitLockedPaper, setComparePaperA, setComparePaperB, setCompareActiveSlot,
+    setLockedPaperId, exitLockedPaper, setComparePaperA, setComparePaperB, setCompareActiveSlot, setComparePreviewActive,
     getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
   }), [
     loggedIn, authReady, isAdmin, userId, email, persona, topics, workspaceSearched, lastSearchQuery,
-    lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, showAdminNav,
+    lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, comparePreviewActive, showAdminNav,
     login, register, applyAuth, logout, exitLockedPaper, getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
   ]);
 

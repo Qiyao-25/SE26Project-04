@@ -11,7 +11,6 @@ import {
   message
 } from 'antd';
 import { SearchOutlined, StarOutlined, ApartmentOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../../context/AppContext';
 import { PAPER_LIST, PAPERS } from '../../../../data/papers';
 import {
@@ -63,8 +62,13 @@ function displayField(paper, key) {
 }
 
 export default function SidebarComparePanel({ paperId, paper }) {
-  const navigate = useNavigate();
-  const { userId, comparePaperB, setComparePaperB } = useApp();
+  const {
+    userId,
+    comparePaperB,
+    setComparePaperB,
+    comparePreviewActive,
+    setComparePreviewActive,
+  } = useApp();
 
   const [remotePapers, setRemotePapers] = useState({});
   const remoteCacheRef = useRef({});
@@ -257,6 +261,16 @@ export default function SidebarComparePanel({ paperId, paper }) {
     message.success('已选定对比论文，下方自动生成对比');
   };
 
+  const toggleOpenComparePaper = () => {
+    if (comparePreviewActive) {
+      setComparePreviewActive(false);
+      message.success('已返回原论文');
+      return;
+    }
+    setComparePreviewActive(true);
+    message.success('已打开对比论文（对比阅读页不关闭）');
+  };
+
   const renderPickerItem = (item) => (
     <List.Item
       key={item.paperId}
@@ -347,7 +361,7 @@ export default function SidebarComparePanel({ paperId, paper }) {
     <div className="sidebar-scroll">
       <Text strong>对比阅读</Text>
       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-        当前论文固定为对比基准；请搜索或从收藏选择另一篇，选定后下方自动生成对比。
+        当前论文固定为对比基准；请搜索或从收藏选择另一篇。打开对比论文时不会离开本页，再次点击可返回原论文。
       </Text>
 
       <div className="compare-slot" style={{ marginTop: 12 }}>
@@ -386,8 +400,13 @@ export default function SidebarComparePanel({ paperId, paper }) {
       </div>
 
       {hasOther ? (
-        <Button block style={{ marginTop: 12 }} onClick={() => navigate(`/paper/${comparePaperB}`)}>
-          打开对比论文
+        <Button
+          block
+          type={comparePreviewActive ? 'default' : 'primary'}
+          style={{ marginTop: 12 }}
+          onClick={toggleOpenComparePaper}
+        >
+          {comparePreviewActive ? '返回原论文' : '打开对比论文'}
         </Button>
       ) : null}
     </div>
