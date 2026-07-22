@@ -205,6 +205,61 @@ def get_paper_detail(session: Session, paper_id: int) -> PaperItem:
     return to_item(paper)
 
 
+def compare_papers(session: Session, *, paper_id: int, other_paper_id: int, settings=None):
+    from app.agents.compare_agent import CompareAgent
+    from app.core.config import get_settings
+    from app.schema.papers import PaperCompareDimension, PaperCompareResponse
+
+    if paper_id == other_paper_id:
+        raise PaperServiceError("COMPARE_SAME_PAPER", "不能与当前论文自身对比", 400)
+
+    left = get_paper(session, paper_id)
+    right = get_paper(session, other_paper_id)
+    if left is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", f"论文不存在：{paper_id}", 404)
+    if right is None:
+        raise PaperServiceError("PAPER_NOT_FOUND", f"对比论文不存在：{other_paper_id}", 404)
+
+    settings = settings or get_settings()
+
+    def _payload(paper) -> dict:
+        item = to_item(paper)
+        structured_summary = ""
+        try:
+            wiki = get_wiki(session, paper.id)
+            structured_summary = wiki.summary or ""
+        except PaperServiceError:
+            structured_summary = ""
+        return {
+            "title": item.title,
+            "authors": item.authors,
+            "primary_category": item.primary_category,
+            "arxiv_id": item.arxiv_id,
+            "abstract": item.abstract or "",
+            "summary": structured_summary,
+        }
+
+    result = CompareAgent(settings).compare(paper_a=_payload(left), paper_b=_payload(right))
+    return PaperCompareResponse(
+        paper_id=paper_id,
+        other_paper_id=other_paper_id,
+        summary=result.summary,
+        similarities=result.similarities,
+        differences=result.differences,
+        dimensions=[
+            PaperCompareDimension(
+                aspect=item.aspect,
+                paper_a=item.paper_a,
+                paper_b=item.paper_b,
+                comment=item.comment,
+            )
+            for item in result.dimensions
+        ],
+        recommendation=result.recommendation,
+        source=result.source,
+    )
+
+
 def get_wiki(session: Session, paper_id: int) -> WikiData:
     paper = get_paper(session, paper_id)
     if paper is None:

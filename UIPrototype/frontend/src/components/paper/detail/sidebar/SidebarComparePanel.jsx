@@ -14,6 +14,7 @@ import { SearchOutlined, StarOutlined, ApartmentOutlined } from '@ant-design/ico
 import { useApp } from '../../../../context/AppContext';
 import { PAPER_LIST, PAPERS } from '../../../../data/papers';
 import {
+  generatePaperCompare,
   getPaperDetail,
   getPaperGraph,
   searchPapers,
@@ -22,17 +23,7 @@ import {
 import { listActions } from '../../../../services/learningService';
 import { USE_MOCK } from '../../../../services/runtimeConfig';
 
-const { Text } = Typography;
-
-const ROWS = [
-  { key: 'title', label: '标题' },
-  { key: 'authors', label: '作者' },
-  { key: 'tag', label: '学科' },
-  { key: 'direction', label: '研究方向' },
-  { key: 'keywords', label: '关键词', fmt: (p) => (p.keywords || []).join(' · ') },
-  { key: 'conceptTags', label: '概念标签', fmt: (p) => (p.conceptTags || []).join(' · ') },
-  { key: 'summary', label: '摘要' }
-];
+const { Text, Paragraph } = Typography;
 
 const EMPTY_PAPER = { title: '请选择对比论文', authors: [], keywords: [], conceptTags: [] };
 
@@ -51,14 +42,6 @@ function normalizePickerItem(paper) {
     researchDirection: paper.researchDirection || paper.research_direction || paper.direction || '',
     source: paper.source || ''
   };
-}
-
-function displayField(paper, key) {
-  if (key === 'authors') {
-    if (Array.isArray(paper.authors)) return paper.authors.join(', ');
-    return paper.authorsText || paper.authors || '';
-  }
-  return paper[key];
 }
 
 export default function SidebarComparePanel({ paperId, paper }) {
@@ -81,6 +64,9 @@ export default function SidebarComparePanel({ paperId, paper }) {
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [relatedPapers, setRelatedPapers] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [compareResult, setCompareResult] = useState(null);
+  const [compareGenerating, setCompareGenerating] = useState(false);
+  const [compareError, setCompareError] = useState('');
 
   const currentId = String(paperId);
 
@@ -196,6 +182,12 @@ export default function SidebarComparePanel({ paperId, paper }) {
   }, [comparePaperB, currentId, ensureRemotePaper]);
 
   useEffect(() => {
+    setCompareResult(null);
+    setCompareError('');
+    setCompareGenerating(false);
+  }, [comparePaperB, currentId]);
+
+  useEffect(() => {
     if (pickerTab === 'favorites') loadFavorites();
     if (pickerTab === 'related') loadRelated();
   }, [loadFavorites, loadRelated, pickerTab]);
@@ -258,7 +250,27 @@ export default function SidebarComparePanel({ paperId, paper }) {
     }
     setComparePaperB(nextId);
     ensureRemotePaper(nextId);
-    message.success('已选定对比论文，下方自动生成对比');
+    message.success('已选定对比论文，可点击「生成对比」');
+  };
+
+  const handleGenerateCompare = async () => {
+    if (!hasOther) {
+      message.warning('请先选择对比论文');
+      return;
+    }
+    setCompareGenerating(true);
+    setCompareError('');
+    try {
+      const result = await generatePaperCompare(paperId, comparePaperB);
+      setCompareResult(result);
+      message.success(result.source === 'llm' ? '智能对比已生成' : '对比已生成');
+    } catch (error) {
+      setCompareResult(null);
+      setCompareError(error.message || '对比生成失败');
+      message.error(error.message || '对比生成失败');
+    } finally {
+      setCompareGenerating(false);
+    }
   };
 
   const toggleOpenComparePaper = () => {
@@ -361,7 +373,7 @@ export default function SidebarComparePanel({ paperId, paper }) {
     <div className="sidebar-scroll">
       <Text strong>对比阅读</Text>
       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-        当前论文固定为对比基准；请搜索或从收藏选择另一篇。打开对比论文时不会离开本页，再次点击可返回原论文。
+        先选定对比论文，再点击「生成对比」由 LLM 输出智能总结；打开对比论文不会离开本页。
       </Text>
 
       <div className="compare-slot" style={{ marginTop: 12 }}>
@@ -381,21 +393,79 @@ export default function SidebarComparePanel({ paperId, paper }) {
         <Tabs size="small" activeKey={pickerTab} onChange={setPickerTab} items={pickerTabs} />
       </div>
 
+      {hasOther ? (
+        <Button
+          block
+          type="primary"
+          style={{ marginTop: 12 }}
+          loading={compareGenerating}
+          onClick={handleGenerateCompare}
+        >
+          {compareResult ? '重新生成对比' : '生成对比'}
+        </Button>
+      ) : null}
+
       <div className="compare-body" style={{ marginTop: 12 }}>
         {!hasOther ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选定对比论文后自动生成对比内容" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请先选择对比论文" />
+        ) : compareGenerating ? (
+          <div style={{ textAlign: 'center', padding: 24 }}><Spin tip="正在生成智能对比…" /></div>
+        ) : compareError ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={compareError} />
+        ) : !compareResult ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选定后点击「生成对比」查看 LLM 总结" />
         ) : (
-          ROWS.map((row) => {
-            const va = row.fmt ? row.fmt(currentPaper) : displayField(currentPaper, row.key);
-            const vb = row.fmt ? row.fmt(otherPaper) : displayField(otherPaper, row.key);
-            return (
-              <div key={row.key} className="compare-row">
-                <Text type="secondary" style={{ fontSize: 11, fontWeight: 600 }}>{row.label}</Text>
-                <div className={`compare-col ${va !== vb ? 'diff' : ''}`}><Tag color="blue">当前</Tag>{va || '—'}</div>
-                <div className={`compare-col ${va !== vb ? 'diff' : ''}`}><Tag>对比</Tag>{vb || '—'}</div>
+          <>
+            <div style={{ marginBottom: 8 }}>
+              <Tag color={compareResult.source === 'llm' ? 'purple' : 'default'}>
+                {compareResult.source === 'llm' ? 'LLM 对比' : compareResult.source === 'mock' ? 'Mock 对比' : '启发式对比'}
+              </Tag>
+            </div>
+            <Text strong style={{ display: 'block', marginBottom: 6 }}>总体概述</Text>
+            <Paragraph style={{ fontSize: 13, marginBottom: 12 }}>{compareResult.summary}</Paragraph>
+
+            {(compareResult.similarities || []).length > 0 ? (
+              <>
+                <Text strong style={{ display: 'block', marginBottom: 6 }}>相似点</Text>
+                <ul style={{ paddingLeft: 18, marginTop: 0, marginBottom: 12 }}>
+                  {compareResult.similarities.map((item) => (
+                    <li key={item} style={{ marginBottom: 4, fontSize: 12 }}>{item}</li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+
+            {(compareResult.differences || []).length > 0 ? (
+              <>
+                <Text strong style={{ display: 'block', marginBottom: 6 }}>差异点</Text>
+                <ul style={{ paddingLeft: 18, marginTop: 0, marginBottom: 12 }}>
+                  {compareResult.differences.map((item) => (
+                    <li key={item} style={{ marginBottom: 4, fontSize: 12 }}>{item}</li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+
+            {(compareResult.dimensions || []).map((dim) => (
+              <div key={dim.aspect} className="compare-row">
+                <Text type="secondary" style={{ fontSize: 11, fontWeight: 600 }}>{dim.aspect}</Text>
+                <div className="compare-col"><Tag color="blue">当前</Tag>{dim.paperA || '—'}</div>
+                <div className="compare-col"><Tag>对比</Tag>{dim.paperB || '—'}</div>
+                {dim.comment ? (
+                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>{dim.comment}</Text>
+                ) : null}
               </div>
-            );
-          })
+            ))}
+
+            {compareResult.recommendation ? (
+              <>
+                <Text strong style={{ display: 'block', marginTop: 8, marginBottom: 6 }}>阅读建议</Text>
+                <Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
+                  {compareResult.recommendation}
+                </Paragraph>
+              </>
+            ) : null}
+          </>
         )}
       </div>
 
@@ -403,6 +473,7 @@ export default function SidebarComparePanel({ paperId, paper }) {
         <Button
           block
           type={comparePreviewActive ? 'default' : 'primary'}
+          ghost={!comparePreviewActive}
           style={{ marginTop: 12 }}
           onClick={toggleOpenComparePaper}
         >

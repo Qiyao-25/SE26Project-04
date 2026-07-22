@@ -239,6 +239,54 @@ export async function getPaperSummary(paperId) {
   };
 }
 
+export async function generatePaperCompare(paperId, otherPaperId) {
+  const leftId = String(paperId);
+  const rightId = String(otherPaperId);
+  if (USE_MOCK) {
+    const left = PAPERS[leftId] || { title: `论文 ${leftId}` };
+    const right = PAPERS[rightId] || { title: `论文 ${rightId}` };
+    return {
+      paperId: leftId,
+      otherPaperId: rightId,
+      summary: `（Mock）对比《${left.title}》与《${right.title}》：二者问题设定与方法路径不同，可从贡献主张与实验证据强度并排阅读。`,
+      similarities: ['均属于可检索的学术论文材料', '都可通过摘要快速把握研究动机'],
+      differences: ['标题与核心主张不同', '适用场景与证据侧重点可能不同'],
+      dimensions: [
+        {
+          aspect: '问题/目标',
+          paperA: left.summary || left.title || '原文未给出',
+          paperB: right.summary || right.title || '原文未给出',
+          comment: 'Mock 模式仅作界面联调'
+        }
+      ],
+      recommendation: '正式环境将调用 LLM 生成更细的对比总结。',
+      source: 'mock'
+    };
+  }
+  const numericOther = Number(otherPaperId);
+  if (!Number.isFinite(numericOther) || numericOther < 1) {
+    throw new Error('对比论文 ID 无效');
+  }
+  const data = await apiClient.post(`/papers/${paperId}/compare`, {
+    other_paper_id: numericOther
+  });
+  return {
+    paperId: String(data.paper_id || data.paperId || paperId),
+    otherPaperId: String(data.other_paper_id || data.otherPaperId || otherPaperId),
+    summary: data.summary || '',
+    similarities: data.similarities || [],
+    differences: data.differences || [],
+    dimensions: (data.dimensions || []).map((item) => ({
+      aspect: item.aspect || '',
+      paperA: item.paper_a || item.paperA || '',
+      paperB: item.paper_b || item.paperB || '',
+      comment: item.comment || ''
+    })),
+    recommendation: data.recommendation || '',
+    source: data.source || 'llm'
+  };
+}
+
 export async function createParseTask(paperId, { force = false } = {}) {
   if (USE_MOCK) {
     markMockParsed(paperId);

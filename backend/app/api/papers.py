@@ -9,10 +9,10 @@ from app.agents.llm_client import LlmError
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
-from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
+from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperCompareRequest, PaperCompareResponse, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
-from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, delete_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
+from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
@@ -184,6 +184,29 @@ def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
         data = require_summary(paper_id)
     except KeyError:
         return _not_found(request, paper_id)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/compare", response_model=ApiResponse[PaperCompareResponse], summary="生成两篇论文的智能对比总结")
+def compare_paper(
+    paper_id: int,
+    payload: PaperCompareRequest,
+    request: Request,
+    _user: AuthUser = Depends(require_current_user),
+    db: Session = Depends(db_session),
+):
+    try:
+        data = compare_papers(
+            db,
+            paper_id=paper_id,
+            other_paper_id=payload.other_paper_id,
+            settings=request.app.state.settings,
+        )
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    except LlmError as exc:
+        body = ApiResponse[dict](code="LLM_ERROR", message=str(exc), data={}, request_id=request.state.request_id)
+        return JSONResponse(status_code=502, content=body.model_dump())
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

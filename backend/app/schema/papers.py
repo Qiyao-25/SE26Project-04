@@ -294,6 +294,28 @@ class ReadingAssistRequest(BaseModel):
     force: bool = False
 
 
+class PaperCompareRequest(BaseModel):
+    other_paper_id: int = Field(ge=1)
+
+
+class PaperCompareDimension(BaseModel):
+    aspect: str
+    paper_a: str = ""
+    paper_b: str = ""
+    comment: str = ""
+
+
+class PaperCompareResponse(BaseModel):
+    paper_id: int
+    other_paper_id: int
+    summary: str
+    similarities: list[str] = Field(default_factory=list)
+    differences: list[str] = Field(default_factory=list)
+    dimensions: list[PaperCompareDimension] = Field(default_factory=list)
+    recommendation: str = ""
+    source: str = "template"
+
+
 class ReadingAssistSection(BaseModel):
     title: str
     bullets: list[str] = Field(default_factory=list)
