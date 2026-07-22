@@ -59,6 +59,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    from app.service.runtime_settings import apply_runtime_settings
+
+    apply_runtime_settings(settings)
     app.state.engine = create_engine_for(settings)
     app.add_middleware(
         CORSMiddleware,

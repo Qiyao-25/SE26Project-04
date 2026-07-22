@@ -42,3 +42,11 @@ export async function forceParsePaper(paperId) {
     headers: { 'Idempotency-Key': key }
   });
 }
+
+export async function getAdminCrawlSettings() {
+  return apiClient.get('/admin/crawl-settings');
+}
+
+export async function updateAdminCrawlSettings(payload) {
+  return apiClient.patch('/admin/crawl-settings', payload);
+}

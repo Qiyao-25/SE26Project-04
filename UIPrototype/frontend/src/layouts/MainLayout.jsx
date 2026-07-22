@@ -25,32 +25,10 @@ import {
 } from 'react-router-dom';
 
 import { useApp } from '../context/AppContext';
+import { useI18n } from '../i18n';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
-
-const PAGE_TITLES = {
-  '/workspace': {
-    title: '论文检索与发现',
-    sub: '工作空间 · 推荐与搜索',
-  },
-  '/learning': {
-    title: '学习空间',
-    sub: '收藏 / 笔记 / 历史 / 画像',
-  },
-  '/admin': {
-    title: '管理员后台',
-    sub: '系统管理端',
-  },
-  '/papers': {
-    title: '论文库',
-    sub: '管理员 · 论文元数据与管理',
-  },
-  '/settings': {
-    title: '设置',
-    sub: '订阅同步 / 账户 / 界面',
-  },
-};
 
 export default function MainLayout({
   themeMode,
@@ -58,6 +36,7 @@ export default function MainLayout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useI18n();
 
   const {
     logout,
@@ -74,16 +53,27 @@ export default function MainLayout({
 
   const workspaceMeta = lockedPaperId
     ? {
-        title: onPaperDetail ? '论文详情' : PAGE_TITLES['/workspace'].title,
+        title: onPaperDetail ? t('page.workspace.readingTitle') : t('page.workspace.title'),
         sub: onPaperDetail
-          ? '工作空间 · 阅读中（可切换其他页签，返回工作空间仍保留本篇）'
-          : '工作空间仍保留正在阅读的论文 · 点「工作空间」可回到详情',
+          ? t('page.workspace.readingSub')
+          : t('page.workspace.lockedSub'),
       }
-    : PAGE_TITLES['/workspace'];
+    : {
+        title: t('page.workspace.title'),
+        sub: t('page.workspace.sub'),
+      };
+
+  const pageTitles = {
+    '/workspace': workspaceMeta,
+    '/learning': { title: t('page.learning.title'), sub: t('page.learning.sub') },
+    '/admin': { title: t('page.admin.title'), sub: t('page.admin.sub') },
+    '/papers': { title: t('page.library.title'), sub: t('page.library.sub') },
+    '/settings': { title: t('page.settings.title'), sub: t('page.settings.sub') },
+  };
 
   const meta = onPaperDetail || pathKey === '/workspace'
     ? workspaceMeta
-    : (PAGE_TITLES[pathKey] || {
+    : (pageTitles[pathKey] || {
         title: 'PaperMate',
         sub: '',
       });
@@ -92,31 +82,31 @@ export default function MainLayout({
     {
       key: '/workspace',
       icon: <HomeOutlined />,
-      label: lockedPaperId ? '工作空间（阅读中）' : '工作空间',
+      label: lockedPaperId ? t('nav.workspaceReading') : t('nav.workspace'),
     },
     {
       key: '/learning',
       icon: <BookOutlined />,
-      label: '学习空间',
+      label: t('nav.learning'),
     },
     ...(showAdminNav
       ? [
           {
             key: '/papers',
             icon: <DatabaseOutlined />,
-            label: '论文库',
+            label: t('nav.library'),
           },
           {
             key: '/admin',
             icon: <DashboardOutlined />,
-            label: '管理员后台',
+            label: t('nav.admin'),
           },
         ]
       : []),
     {
       key: '/settings',
       icon: <SettingOutlined />,
-      label: '设置',
+      label: t('nav.settings'),
     },
   ];
 
@@ -205,7 +195,7 @@ export default function MainLayout({
             icon={<LogoutOutlined />}
             onClick={handleLogout}
           >
-            退出登录
+            {t('nav.logout')}
           </Button>
         </div>
       </Sider>
@@ -245,8 +235,8 @@ export default function MainLayout({
               }
             >
               {themeMode === 'dark'
-                ? '浅色模式'
-                : '深色模式'}
+                ? t('nav.themeLight')
+                : t('nav.themeDark')}
             </Button>
 
             <Tag color={isAdmin ? 'red' : 'blue'}>

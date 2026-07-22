@@ -2,7 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as AntApp, ConfigProvider } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import zhCN from 'antd/locale/zh_CN';
+import enUS from 'antd/locale/en_US';
 import { AppProvider } from '../context/AppContext';
+import { LanguageProvider, useI18n } from '../i18n';
 import ProtectedRoute from './ProtectedRoute';
 import MainLayout from '../layouts/MainLayout';
 import LoginPage from '../pages/Login/LoginPage';
@@ -232,7 +234,17 @@ export default function AppRoutes() {
 
   const theme = useMemo(() => getAntdTheme(themeMode), [themeMode]);
   return (
-    <ConfigProvider locale={zhCN} theme={theme}>
+    <LanguageProvider>
+      <LocalizedApp theme={theme} themeMode={themeMode} setThemeMode={setThemeMode} />
+    </LanguageProvider>
+  );
+}
+
+function LocalizedApp({ theme, themeMode, setThemeMode }) {
+  const { language } = useI18n();
+  const locale = language === 'en' ? enUS : zhCN;
+  return (
+    <ConfigProvider locale={locale} theme={theme}>
       <AntApp>
         <AppProvider>
           <BrowserRouter>

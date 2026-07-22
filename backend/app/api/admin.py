@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.auth import require_admin
 from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.service.admin import admin_audit, admin_overview, admin_quality, admin_tasks, admin_users, delete_user, update_user_status
+from app.service.runtime_settings import apply_runtime_settings, update_crawl_settings
 
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -15,6 +16,11 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
+
+
+class CrawlSettingsUpdate(BaseModel):
+    crawl_enabled: bool | None = None
+    crawl_interval_s: int | None = Field(default=None, ge=60, le=7 * 24 * 3600)
 
 
 def db_session(request: Request):
@@ -93,6 +99,22 @@ def user_delete(user_id: int, request: Request, _admin: AuthUser = Depends(requi
                 ).model_dump(),
             )
         raise
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/crawl-settings", response_model=ApiResponse[dict], summary="读取自动抓取调度设置")
+def crawl_settings_get(request: Request, _admin: AuthUser = Depends(require_admin)):
+    data = apply_runtime_settings(request.app.state.settings)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.patch("/crawl-settings", response_model=ApiResponse[dict], summary="更新自动抓取调度设置")
+def crawl_settings_patch(payload: CrawlSettingsUpdate, request: Request, _admin: AuthUser = Depends(require_admin)):
+    data = update_crawl_settings(
+        request.app.state.settings,
+        crawl_enabled=payload.crawl_enabled,
+        crawl_interval_s=payload.crawl_interval_s,
+    )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

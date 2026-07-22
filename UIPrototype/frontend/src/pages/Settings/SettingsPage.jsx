@@ -25,12 +25,15 @@ import {
   TagsOutlined,
 } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
+import { useI18n } from '../../i18n';
 import { updateAccount } from '../../services/authService';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
 import { syncSubscriptions } from '../../services/recommendationService';
+import { getAdminCrawlSettings, updateAdminCrawlSettings } from '../../services/adminService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { ARXIV_CATEGORIES, ARXIV_CATEGORY_LABEL_MAP } from '../../data/arxivCategories';
 import {
+  getLanguage,
   getUiPrefs,
   getWorkspacePageSize,
   setUiPrefs,
@@ -82,11 +85,13 @@ function loadSessionSubscriptions() {
 }
 
 export default function SettingsPage() {
-  const { userId, email, applyAuthResponse } = useApp();
+  const { userId, email, applyAuthResponse, isAdmin } = useApp();
+  const { t, language, setLanguage } = useI18n();
 
   const [crawlForm] = Form.useForm();
   const [accountForm] = Form.useForm();
   const [uiForm] = Form.useForm();
+  const [crawlAdminForm] = Form.useForm();
 
   const [subscriptions, setSubscriptions] = useState(loadSessionSubscriptions);
   const [subscriptionType, setSubscriptionType] = useState('keyword');
@@ -98,6 +103,7 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(() => isSubscriptionSyncing());
   const [accountSaving, setAccountSaving] = useState(false);
   const [lastSyncMessage, setLastSyncMessage] = useState('');
+  const [crawlAdminSaving, setCrawlAdminSaving] = useState(false);
 
   useEffect(() => subscribeSubscriptionSync(setSyncing), []);
 
@@ -117,9 +123,28 @@ export default function SettingsPage() {
     const ui = getUiPrefs();
     uiForm.setFieldsValue({
       workspacePageSize: getWorkspacePageSize(12),
+      language: getLanguage('zh'),
       ...(ui || {}),
+      language: ui?.language === 'en' ? 'en' : getLanguage('zh'),
     });
-  }, [uiForm]);
+  }, [uiForm, language]);
+
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    if (USE_MOCK) {
+      crawlAdminForm.setFieldsValue({ crawlEnabled: true, crawlIntervalHours: 6 });
+      return undefined;
+    }
+    getAdminCrawlSettings()
+      .then((data) => {
+        crawlAdminForm.setFieldsValue({
+          crawlEnabled: data.crawl_enabled !== false,
+          crawlIntervalHours: Math.max(1 / 60, Number(data.crawl_interval_s || 21600) / 3600),
+        });
+      })
+      .catch(() => message.error(t('settings.crawlAdmin.loadFailed')));
+    return undefined;
+  }, [crawlAdminForm, isAdmin, t]);
 
   useEffect(() => {
     if (USE_MOCK) return undefined;
@@ -144,7 +169,11 @@ export default function SettingsPage() {
           setUiPrefs(preferences.ui);
           uiForm.setFieldsValue({
             workspacePageSize: preferences.ui.workspacePageSize || getWorkspacePageSize(12),
+            language: preferences.ui.language === 'en' ? 'en' : getLanguage('zh'),
           });
+          if (preferences.ui.language === 'en' || preferences.ui.language === 'zh') {
+            setLanguage(preferences.ui.language);
+          }
         }
         if (preferences.last_subscription_sync_stats) {
           const stats = preferences.last_subscription_sync_stats;
@@ -312,11 +341,44 @@ export default function SettingsPage() {
   };
 
   const handleUiSave = async (values) => {
+    const nextLang = values.language === 'en' ? 'en' : 'zh';
     const ui = {
       workspacePageSize: Number(values.workspacePageSize) || 12,
+      language: nextLang,
     };
+    setLanguage(nextLang);
     setUiPrefs(ui);
-    await savePreferences({ ui }, '界面设置已保存');
+    await savePreferences({ ui }, t('settings.ui.saved'));
+  };
+
+  const handleCrawlAdminSave = async (values) => {
+    if (!isAdmin) return;
+    setCrawlAdminSaving(true);
+    try {
+      const hours = Number(values.crawlIntervalHours);
+      const seconds = Math.max(60, Math.round((Number.isFinite(hours) ? hours : 6) * 3600));
+      if (USE_MOCK) {
+        crawlAdminForm.setFieldsValue({
+          crawlEnabled: Boolean(values.crawlEnabled),
+          crawlIntervalHours: seconds / 3600,
+        });
+        message.success(t('settings.crawlAdmin.saved'));
+        return;
+      }
+      const data = await updateAdminCrawlSettings({
+        crawl_enabled: Boolean(values.crawlEnabled),
+        crawl_interval_s: seconds,
+      });
+      crawlAdminForm.setFieldsValue({
+        crawlEnabled: data.crawl_enabled !== false,
+        crawlIntervalHours: Math.max(1 / 60, Number(data.crawl_interval_s || seconds) / 3600),
+      });
+      message.success(t('settings.crawlAdmin.saved'));
+    } catch (error) {
+      message.error(error.message || t('settings.crawlAdmin.loadFailed'));
+    } finally {
+      setCrawlAdminSaving(false);
+    }
   };
 
   const subscriptionColumns = [
@@ -364,14 +426,14 @@ export default function SettingsPage() {
   const tabItems = [
     {
       key: 'fetch',
-      label: '订阅与同步',
+      label: t('settings.tab.fetch'),
       children: (
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={14}>
-            <Card title="我的订阅" size="small">
+            <Card title={t('settings.subscriptions.title')} size="small">
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Typography.Text type="secondary">
-                  关键词或 arXiv 学科均可订阅；学科可从列表选择，也可输入任意代码（如 cs.NE）。关闭「启用」后不会参与同步。
+                  {t('settings.subscriptions.hint')}
                 </Typography.Text>
                 <Segmented
                   className="subscription-type-segmented"
@@ -384,8 +446,8 @@ export default function SettingsPage() {
                     setCategorySearch('');
                   }}
                   options={[
-                    { label: '关键词', value: 'keyword', icon: <TagsOutlined /> },
-                    { label: '学科分类', value: 'category', icon: <AppstoreOutlined /> },
+                    { label: t('settings.subscriptions.keyword'), value: 'keyword', icon: <TagsOutlined /> },
+                    { label: t('settings.subscriptions.category'), value: 'category', icon: <AppstoreOutlined /> },
                   ]}
                 />
                 <Space.Compact style={{ width: '100%' }}>
@@ -444,12 +506,12 @@ export default function SettingsPage() {
             </Card>
           </Col>
           <Col xs={24} lg={10}>
-            <Card title="同步设置" size="small">
+            <Card title={t('settings.sync.title')} size="small">
               <Alert
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message={`当前启用 ${enabledCount} 项订阅。定时抓取由服务器统一调度；此处可立即同步并配置过滤条件。`}
+                message={t('settings.sync.alert', { count: enabledCount })}
               />
               <Form
                 form={crawlForm}
@@ -460,26 +522,26 @@ export default function SettingsPage() {
                     maxPerSubscription: Number(values.maxPerSubscription) || 5,
                     codeOnly: Boolean(values.codeOnly),
                   },
-                }, '同步设置已保存')}
+                }, t('settings.sync.save'))}
               >
                 <Form.Item
                   name="maxPerSubscription"
-                  label="每个订阅每次抓取新论文数"
-                  extra="会跳过库中已有论文，尽量只入库新条目"
+                  label={t('settings.sync.maxPer')}
+                  extra={t('settings.sync.maxPerExtra')}
                 >
                   <InputNumber min={1} max={15} style={{ width: '100%' }} />
                 </Form.Item>
                 <Form.Item
                   name="codeOnly"
-                  label="仅同步疑似有代码的论文"
+                  label={t('settings.sync.codeOnly')}
                   valuePropName="checked"
-                  extra="根据摘要/标题中的 GitHub、开源等信号过滤"
+                  extra={t('settings.sync.codeOnlyExtra')}
                 >
                   <Switch />
                 </Form.Item>
                 <Space wrap>
-                  <Button type="primary" htmlType="submit">保存设置</Button>
-                  <Button loading={syncing} onClick={handleSyncNow}>立即同步 arXiv</Button>
+                  <Button type="primary" htmlType="submit">{t('settings.sync.save')}</Button>
+                  <Button loading={syncing} onClick={handleSyncNow}>{t('settings.sync.now')}</Button>
                 </Space>
                 {lastSyncMessage ? (
                   <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
@@ -488,15 +550,45 @@ export default function SettingsPage() {
                 ) : null}
               </Form>
             </Card>
+            {isAdmin ? (
+              <Card title={t('settings.crawlAdmin.title')} size="small" style={{ marginTop: 16 }}>
+                <Form
+                  form={crawlAdminForm}
+                  layout="vertical"
+                  initialValues={{ crawlEnabled: true, crawlIntervalHours: 6 }}
+                  onFinish={handleCrawlAdminSave}
+                >
+                  <Form.Item
+                    name="crawlEnabled"
+                    label={t('settings.crawlAdmin.enabled')}
+                    valuePropName="checked"
+                    extra={t('settings.crawlAdmin.enabledExtra')}
+                  >
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item
+                    name="crawlIntervalHours"
+                    label={t('settings.crawlAdmin.interval')}
+                    extra={t('settings.crawlAdmin.intervalExtra')}
+                    rules={[{ required: true, message: t('settings.crawlAdmin.interval') }]}
+                  >
+                    <InputNumber min={1 / 60} max={168} step={0.5} style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" loading={crawlAdminSaving}>
+                    {t('settings.crawlAdmin.save')}
+                  </Button>
+                </Form>
+              </Card>
+            ) : null}
           </Col>
         </Row>
       ),
     },
     {
       key: 'account',
-      label: '个人账户',
+      label: t('settings.tab.account'),
       children: (
-        <Card style={{ maxWidth: 480 }} size="small" title="账户安全">
+        <Card style={{ maxWidth: 480 }} size="small" title={t('settings.account.title')}>
           <Form
             form={accountForm}
             layout="vertical"
@@ -505,42 +597,42 @@ export default function SettingsPage() {
           >
             <Form.Item
               name="email"
-              label="登录邮箱"
+              label={t('settings.account.email')}
               rules={[
-                { required: true, message: '请输入邮箱' },
-                { type: 'email', message: '请输入正确的邮箱格式' },
+                { required: true, message: t('settings.account.email') },
+                { type: 'email', message: 'Invalid email' },
               ]}
             >
               <Input placeholder="you@example.com" />
             </Form.Item>
-            <Form.Item name="currentPassword" label="当前密码" extra="仅在修改密码时需要">
-              <Input.Password autoComplete="current-password" placeholder="修改密码时填写" />
+            <Form.Item name="currentPassword" label={t('settings.account.currentPassword')} extra={t('settings.account.currentPasswordExtra')}>
+              <Input.Password autoComplete="current-password" />
             </Form.Item>
             <Form.Item
               name="newPassword"
-              label="新密码"
-              rules={[{ min: 6, message: '新密码至少 6 位' }]}
+              label={t('settings.account.newPassword')}
+              rules={[{ min: 6, message: 'min 6' }]}
             >
-              <Input.Password autoComplete="new-password" placeholder="不修改请留空" />
+              <Input.Password autoComplete="new-password" />
             </Form.Item>
             <Form.Item
               name="confirmPassword"
-              label="确认新密码"
+              label={t('settings.account.confirmPassword')}
               dependencies={['newPassword']}
               rules={[
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const next = getFieldValue('newPassword');
                     if (!next || value === next) return Promise.resolve();
-                    return Promise.reject(new Error('两次输入的新密码不一致'));
+                    return Promise.reject(new Error('Password mismatch'));
                   },
                 }),
               ]}
             >
-              <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+              <Input.Password autoComplete="new-password" />
             </Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit" loading={accountSaving}>保存账户</Button>
+              <Button type="primary" htmlType="submit" loading={accountSaving}>{t('settings.account.save')}</Button>
             </Space>
           </Form>
         </Card>
@@ -548,28 +640,40 @@ export default function SettingsPage() {
     },
     {
       key: 'web',
-      label: '界面',
+      label: t('settings.tab.web'),
       children: (
-        <Card style={{ maxWidth: 480 }} size="small" title="显示与列表">
+        <Card style={{ maxWidth: 480 }} size="small" title={t('settings.ui.title')}>
           <Form
             form={uiForm}
             layout="vertical"
             initialValues={{
               workspacePageSize: getWorkspacePageSize(12),
+              language: getLanguage('zh'),
             }}
             onFinish={handleUiSave}
           >
-            <Form.Item name="workspacePageSize" label="工作台检索每页条数" extra="影响智能检索结果列表">
-              <Select
+            <Form.Item name="language" label={t('settings.ui.language')} extra={t('settings.ui.languageExtra')}>
+              <Segmented
+                block
                 options={[
-                  { value: 8, label: '8 条' },
-                  { value: 12, label: '12 条' },
-                  { value: 16, label: '16 条' },
-                  { value: 24, label: '24 条' },
+                  { label: t('settings.ui.zh'), value: 'zh' },
+                  { label: t('settings.ui.en'), value: 'en' },
                 ]}
+                onChange={(value) => {
+                  setLanguage(value);
+                  uiForm.setFieldsValue({ language: value });
+                }}
               />
             </Form.Item>
-            <Button type="primary" htmlType="submit">保存界面设置</Button>
+            <Form.Item name="workspacePageSize" label={t('settings.ui.pageSize')} extra={t('settings.ui.pageSizeExtra')}>
+              <Select
+                options={[8, 12, 16, 24].map((n) => ({
+                  value: n,
+                  label: t('settings.ui.pageSizeOption', { n }),
+                }))}
+              />
+            </Form.Item>
+            <Button type="primary" htmlType="submit">{t('settings.ui.save')}</Button>
           </Form>
         </Card>
       ),

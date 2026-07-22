@@ -28,3 +28,12 @@ export function getLibraryPageSize(defaultSize = 20) {
   const value = Number(getUiPrefs().libraryPageSize);
   return [10, 20, 50].includes(value) ? value : defaultSize;
 }
+
+export function getLanguage(defaultLang = 'zh') {
+  const value = getUiPrefs().language;
+  return value === 'en' ? 'en' : (value === 'zh' ? 'zh' : defaultLang);
+}
+
+export function setLanguage(language) {
+  return setUiPrefs({ language: language === 'en' ? 'en' : 'zh' });
+}
