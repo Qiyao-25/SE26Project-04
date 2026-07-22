@@ -267,6 +267,7 @@ class SmartSearchRequest(BaseModel):
     category: str | None = Field(default=None, max_length=128)
     rewritten_query: str | None = Field(default=None, max_length=500)
     keywords: list[str] | None = None
+    category_hints: list[str] | None = None
     include_answer: bool = True
 
 
@@ -275,6 +276,8 @@ class SmartSearchResponse(BaseModel):
     rewritten_query: str
     keywords: list[str]
     intent: str = ""
+    category: str | None = None
+    category_hints: list[str] = Field(default_factory=list)
     answer: str
     highlights: list[str] = Field(default_factory=list)
     plan_source: str = "heuristic"

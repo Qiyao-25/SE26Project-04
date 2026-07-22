@@ -101,7 +101,7 @@ export default function WorkspacePage() {
   useEffect(() => { profileRef.current = profilePapers; }, [profilePapers]);
   useEffect(() => { subscriptionRef.current = subscriptionPapers; }, [subscriptionPapers]);
 
-  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot, rewrittenQuery, keywords } = {}) => {
+  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot, rewrittenQuery, keywords, category, categoryHints } = {}) => {
     const nextPage = page || data.page || 1;
     const nextItems = data.items || [];
     const nextTotal = data.total || 0;
@@ -112,6 +112,8 @@ export default function WorkspacePage() {
         : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
     const nextRewritten = rewrittenQuery || data.rewrittenQuery || query;
     const nextKeywords = keywords || data.keywords || [];
+    const nextCategory = category !== undefined ? category : (data.category || null);
+    const nextCategoryHints = categoryHints || data.categoryHints || [];
     setResults(nextItems);
     setResultTotal(nextTotal);
     setSearchPage(nextPage);
@@ -130,6 +132,8 @@ export default function WorkspacePage() {
       pageItems,
       rewrittenQuery: nextRewritten,
       keywords: nextKeywords,
+      category: nextCategory,
+      categoryHints: nextCategoryHints,
       answer: nextAnswer,
       messages: messagesSnapshot || (sameQuery ? previous?.messages : undefined)
     });
@@ -345,16 +349,19 @@ export default function WorkspacePage() {
         pageSize: searchPageSize,
         rewrittenQuery: cache?.rewrittenQuery,
         keywords: cache?.keywords,
+        category: cache?.category || undefined,
         includeAnswer: false,
       });
       const previous = readSearchCache() || {};
       const nextItems = data.items || [];
       const pageItems = { ...(previous.pageItems || {}) };
       pageItems[String(page)] = nextItems;
+      // Keep the first-search total so pagination chrome does not jump if filters drift.
+      const stableTotal = previous.total || data.total || 0;
       setResults(nextItems);
-      setResultTotal(data.total || previous.total || 0);
+      setResultTotal(stableTotal);
       setSearchPage(page);
-      if ((data.total || previous.total || 0) > 0) {
+      if (stableTotal > 0) {
         setSearchStatus('success');
       }
       writeSearchCache({
@@ -362,11 +369,13 @@ export default function WorkspacePage() {
         query: lastSearchQuery,
         page,
         pageSize: searchPageSize,
-        total: data.total || previous.total || 0,
+        total: stableTotal,
         items: nextItems,
         pageItems,
-        rewrittenQuery: data.rewrittenQuery || previous.rewrittenQuery,
-        keywords: data.keywords?.length ? data.keywords : previous.keywords,
+        rewrittenQuery: previous.rewrittenQuery || data.rewrittenQuery,
+        keywords: previous.keywords?.length ? previous.keywords : data.keywords,
+        category: previous.category ?? data.category,
+        categoryHints: previous.categoryHints?.length ? previous.categoryHints : data.categoryHints,
       });
     } catch (error) {
       message.error(error.message || '翻页失败');

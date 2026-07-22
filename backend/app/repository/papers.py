@@ -93,7 +93,9 @@ def list_papers(
     count_stmt = select(func.count(Paper.id)).where(*filters)
     total = session.scalar(count_stmt) or 0
     if keyword_terms:
-        fetch_size = min(max(page * page_size * 3, page_size * 2), 120)
+        # Fetch a window large enough for the requested page after relevance re-ranking.
+        need = page * page_size
+        fetch_size = min(max(need + page_size * 2, page_size * 5), 500)
         stmt = (
             select(Paper)
             .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))

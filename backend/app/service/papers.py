@@ -80,6 +80,7 @@ def smart_search_papers(
     category: str | None = None,
     rewritten_query: str | None = None,
     keywords: list[str] | None = None,
+    category_hints: list[str] | None = None,
     include_answer: bool = True,
     settings=None,
 ) -> SmartSearchResponse:
@@ -93,12 +94,15 @@ def smart_search_papers(
         plan = SearchPlan(
             rewritten_query=(rewritten_query or query).strip() or query,
             keywords=[item for item in (keywords or []) if item] or [query],
+            category_hints=[item for item in (category_hints or []) if item],
             intent="",
             source="reused",
         )
+        # Reuse the exact filter from the first page; do not re-derive from hints.
+        category_filter = category
     else:
         plan = agent.plan(query)
-    category_filter = category or (plan.category_hints[0] if plan.category_hints else None)
+        category_filter = category or (plan.category_hints[0] if plan.category_hints else None)
     papers, total = list_papers(
         session,
         keyword=plan.rewritten_query or query,
@@ -122,6 +126,7 @@ def smart_search_papers(
             page=page,
             page_size=page_size,
         )
+        category_filter = None
     if total == 0 and plan.keywords:
         papers, total = list_papers(
             session,
@@ -134,6 +139,7 @@ def smart_search_papers(
             page=page,
             page_size=page_size,
         )
+        category_filter = None
     items = [to_item(paper) for paper in papers]
     if include_answer:
         paper_payload = [
@@ -159,6 +165,8 @@ def smart_search_papers(
         rewritten_query=plan.rewritten_query or query,
         keywords=plan.keywords,
         intent=plan.intent,
+        category=category_filter,
+        category_hints=list(plan.category_hints or []),
         answer=answer_text,
         highlights=highlights,
         plan_source=plan.source,

@@ -147,6 +147,7 @@ export async function smartSearchPapers({
   category,
   rewrittenQuery,
   keywords,
+  categoryHints,
   includeAnswer = true,
 } = {}) {
   if (USE_MOCK) {
@@ -155,6 +156,8 @@ export async function smartSearchPapers({
       ...data,
       rewrittenQuery: rewrittenQuery || query,
       keywords: keywords?.length ? keywords : (query ? [query] : []),
+      category: category || null,
+      categoryHints: categoryHints || [],
       intent: '',
       answer: includeAnswer
         ? (data.total > 0 ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。` : `（Mock）未找到与“${query}”匹配的论文。`)
@@ -171,6 +174,7 @@ export async function smartSearchPapers({
     category: category || undefined,
     rewritten_query: rewrittenQuery || undefined,
     keywords: keywords?.length ? keywords : undefined,
+    category_hints: categoryHints?.length ? categoryHints : undefined,
     include_answer: includeAnswer,
   });
   return {
@@ -178,6 +182,8 @@ export async function smartSearchPapers({
     query: data.query || query,
     rewrittenQuery: data.rewritten_query || data.rewrittenQuery || rewrittenQuery || query,
     keywords: data.keywords || keywords || [],
+    category: data.category || category || null,
+    categoryHints: data.category_hints || data.categoryHints || categoryHints || [],
     intent: data.intent || '',
     answer: data.answer || '',
     highlights: data.highlights || [],
