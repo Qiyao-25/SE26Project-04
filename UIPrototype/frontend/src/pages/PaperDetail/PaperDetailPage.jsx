@@ -487,7 +487,7 @@ export default function PaperDetailPage() {
     },
     {
       key: 'graph',
-      label: 'c · 知识图谱&脉络',
+      label: 'c · 知识图谱与研究脉络',
       children: (
         <div className="graph-placeholder">
           {shownGraph ? (

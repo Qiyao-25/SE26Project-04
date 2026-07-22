@@ -25,7 +25,7 @@ RELATED_SCORE_THRESHOLD = 0.18
 MAX_RELATED_PAPERS = 5
 MAX_CONCEPTS = 6
 MAX_METHODS = 5
-MAX_DATASETS = 4
+MAX_DATASETS = 3
 
 
 @dataclass
@@ -260,19 +260,26 @@ class GraphAgent:
         concept_nodes = [node for node in nodes if node["type"] == "concept"]
         for method_index, method in enumerate(method_items, 1):
             method_tokens = _tokens(f"{method['label']} {method['description']}")
+            best = None
             for concept in concept_nodes:
                 shared = sorted(method_tokens & _tokens(f"{concept['label']} {concept['description']}"))
-                if shared:
-                    edges.append({
-                        "id": f"edge-method-concept-{method_index}-{concept['id']}",
-                        "source": f"method-{method_index}",
-                        "target": concept["id"],
-                        "type": "implements",
-                        "label": "实现概念",
-                        "tier": "secondary",
-                        "weight": 0.4,
-                        "evidence": shared[:4],
-                    })
+                if not shared:
+                    continue
+                weight = min(0.85, 0.35 + 0.08 * len(shared))
+                candidate = {
+                    "id": f"edge-method-concept-{method_index}-{concept['id']}",
+                    "source": f"method-{method_index}",
+                    "target": concept["id"],
+                    "type": "implements",
+                    "label": "实现概念",
+                    "tier": "secondary",
+                    "weight": round(weight, 3),
+                    "evidence": shared[:4],
+                }
+                if best is None or candidate["weight"] > best["weight"]:
+                    best = candidate
+            if best:
+                edges.append(best)
 
         lineage = [{
             "paper_id": paper_id,

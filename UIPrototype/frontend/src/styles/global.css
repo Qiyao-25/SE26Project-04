@@ -1520,56 +1520,37 @@ body {
   background: var(--pm-accent);
 }
 
-/* 论文知识图谱 */
+/* 论文知识图谱 · 地铁线路图 */
 .paper-graph-wrap {
   width: 100%;
 }
 
-.paper-graph-canvas {
-  position: relative;
-  min-height: 560px;
-  overflow: auto;
-  border: 1px solid var(--pm-border);
-  border-radius: 12px;
-  background:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    var(--pm-surface);
-  background-size: 24px 24px;
-  padding: 28px 18px 36px;
-}
-
-.paper-graph-canvas-swim {
-  min-height: 320px;
-  padding: 12px;
-}
-
-.paper-graph-hint {
-  margin-bottom: 8px;
+.paper-graph-metro .paper-graph-hint {
+  margin-bottom: 10px;
   color: var(--pm-muted, #64748b);
   font-size: 12px;
+  line-height: 1.55;
 }
 
-.paper-graph-lane-title {
-  fill: #64748b;
-  font-size: 11px;
-  font-weight: 600;
+.paper-graph-canvas {
+  position: relative;
+  min-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--pm-border);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
-.paper-graph-node-card {
-  width: 132px;
-  min-height: 56px;
-  transform: none;
+.paper-graph-canvas-metro {
+  touch-action: pan-x pan-y;
 }
 
-.paper-graph-node.is-dimmed {
-  opacity: 0.35;
-}
-
-.paper-graph-node.is-active {
-  z-index: 6;
-  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.28);
-  border-color: #2563eb;
+.paper-graph-stage {
+  position: relative;
+  min-height: 100%;
 }
 
 .paper-graph-edges {
@@ -1581,65 +1562,106 @@ body {
   z-index: 0;
 }
 
-.paper-graph-node {
+.paper-graph-node-metro {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   display: flex;
-  width: min(168px, 24%);
-  min-height: 68px;
-  transform: translate(-50%, -50%);
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 10px 12px;
-  overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--node-color) 45%, var(--pm-border));
+  gap: 2px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--node-color) 40%, #cbd5e1);
   border-left: 4px solid var(--node-color);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--pm-surface) 92%, white);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-  color: var(--pm-text);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  color: #0f172a;
   text-align: left;
+  cursor: default;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.paper-graph-node.is-current {
+.paper-graph-node-metro.is-size-hub,
+.paper-graph-node-metro.is-current {
+  z-index: 4;
+  border-width: 2px;
+  border-color: #1e40af;
+  border-left-width: 5px;
+  background: #1e40af;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(30, 64, 175, 0.28);
+}
+
+.paper-graph-node-metro.is-current .paper-graph-node-type,
+.paper-graph-node-metro.is-current .paper-graph-node-meta {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.paper-graph-node-metro.is-size-paper {
   z-index: 3;
-  width: min(190px, 28%);
-  min-height: 78px;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
-.paper-graph-node.is-link {
+.paper-graph-node-metro.is-size-entity {
+  background: #fafafa;
+}
+
+.paper-graph-node-metro.is-topic {
+  border-style: dashed;
+  background: #f8fafc;
+}
+
+.paper-graph-node-metro.is-dimmed {
+  opacity: 0.28;
+}
+
+.paper-graph-node-metro.is-active,
+.paper-graph-node-metro:hover {
+  z-index: 6;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+}
+
+.paper-graph-node-metro.is-link {
   cursor: pointer;
 }
 
-.paper-graph-node.is-link:hover,
-.paper-graph-node.is-link:focus-visible {
-  z-index: 5;
-  border-color: var(--node-color);
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.18);
-  outline: none;
-}
-
-.paper-graph-node-paper[style*="--node-color"] {
-  min-height: 74px;
+.paper-graph-node-metro.is-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .paper-graph-node-type {
   color: var(--node-color);
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 
 .paper-graph-node-label {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   word-break: break-word;
+}
+
+.paper-graph-node-metro.is-size-hub .paper-graph-node-label,
+.paper-graph-node-metro.is-size-paper .paper-graph-node-label {
+  font-size: 13px;
+  -webkit-line-clamp: 3;
+}
+
+.paper-graph-node-meta {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .paper-graph-legend,
@@ -1649,60 +1671,107 @@ body {
   flex-wrap: wrap;
   gap: 8px 14px;
   margin-top: 12px;
-  color: var(--pm-text-muted);
+  color: var(--pm-text-muted, #64748b);
   font-size: 12px;
 }
 
-.paper-graph-jumps {
-  align-items: center;
-}
-
-.paper-graph-jumps-label {
-  color: var(--pm-text);
-  font-weight: 600;
-}
-
-.paper-graph-jump-chip {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.paper-graph-legend {
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding: 8px 10px;
   border: 1px solid var(--pm-border);
-  border-radius: 999px;
-  background: var(--pm-surface);
-  color: var(--pm-text);
-  padding: 4px 12px;
-  cursor: pointer;
-}
-
-.paper-graph-jump-chip:hover,
-.paper-graph-jump-chip:focus-visible {
-  border-color: var(--pm-accent);
-  color: var(--pm-accent);
-  outline: none;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .paper-graph-legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .paper-graph-legend-item i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
 }
 
-.paper-graph-edge-list span {
+.paper-graph-legend-item i.is-dash {
+  height: 0;
+  border-top: 2px dashed;
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.paper-graph-legend-item i.is-hub {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #1e40af;
+}
+
+.paper-graph-legend-item i.is-paper {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.5px solid #334155;
+  background: #fff;
+}
+
+.paper-graph-legend-item i.is-entity {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid #94a3b8;
+  background: #fafafa;
+}
+
+.paper-graph-edge-list {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.paper-graph-edge-list-title {
+  flex: 0 0 100%;
+  margin-bottom: 2px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.paper-graph-edge-list .paper-graph-rel {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.paper-graph-edge-list .paper-graph-rel em {
+  margin-right: 6px;
+  color: #64748b;
+  font-style: normal;
+  font-size: 11px;
+}
+
+.paper-graph-edge-list .paper-graph-rel.is-topic em {
+  color: #94a3b8;
+}
+
+.paper-graph-edge-list .paper-graph-rel.is-lineage em {
+  color: #475569;
+}
+
+.paper-graph-edge-list .paper-graph-rel.is-theme em {
+  color: #2563eb;
 }
 
 .paper-graph-edge-list b {
-  color: var(--pm-text);
+  color: var(--pm-text, #0f172a);
   font-weight: 600;
 }
 
@@ -1710,23 +1779,23 @@ body {
   display: grid;
   min-height: 220px;
   place-items: center;
-  color: var(--pm-text-muted);
+  color: var(--pm-text-muted, #64748b);
 }
 
 @media (max-width: 640px) {
-  .paper-graph-canvas {
-    min-height: 420px;
-    padding: 20px 10px 28px;
+  .paper-graph-canvas-metro {
+    min-height: 360px;
   }
 
-  .paper-graph-node {
-    width: min(140px, 34%);
-    min-height: 58px;
-    padding: 7px 8px;
+  .paper-graph-node-metro {
+    min-width: 150px;
   }
 
   .paper-graph-node-label {
     font-size: 12px;
-    -webkit-line-clamp: 2;
+  }
+
+  .paper-graph-legend {
+    gap: 8px 10px;
   }
 }
