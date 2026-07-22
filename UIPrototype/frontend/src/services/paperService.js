@@ -140,31 +140,44 @@ export async function searchPaperWiki(query, { pageSize = 20 } = {}) {
   }));
 }
 
-export async function smartSearchPapers({ query = '', page = 1, pageSize = 12, category } = {}) {
+export async function smartSearchPapers({
+  query = '',
+  page = 1,
+  pageSize = 12,
+  category,
+  rewrittenQuery,
+  keywords,
+  includeAnswer = true,
+} = {}) {
   if (USE_MOCK) {
-    const data = await searchMockPapers({ query, page, pageSize });
+    const data = await searchMockPapers({ query: rewrittenQuery || query, page, pageSize });
     return {
       ...data,
-      rewrittenQuery: query,
-      keywords: query ? [query] : [],
+      rewrittenQuery: rewrittenQuery || query,
+      keywords: keywords?.length ? keywords : (query ? [query] : []),
       intent: '',
-      answer: data.total > 0 ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。` : `（Mock）未找到与“${query}”匹配的论文。`,
+      answer: includeAnswer
+        ? (data.total > 0 ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。` : `（Mock）未找到与“${query}”匹配的论文。`)
+        : '',
       highlights: [],
-      planSource: 'mock',
-      answerSource: 'mock'
+      planSource: rewrittenQuery || keywords ? 'reused' : 'mock',
+      answerSource: includeAnswer ? 'mock' : 'skipped'
     };
   }
   const data = await apiClient.post('/papers/smart-search', {
     query,
     page,
     page_size: pageSize,
-    category: category || undefined
+    category: category || undefined,
+    rewritten_query: rewrittenQuery || undefined,
+    keywords: keywords?.length ? keywords : undefined,
+    include_answer: includeAnswer,
   });
   return {
     searchId: `smart-search-${Date.now()}`,
     query: data.query || query,
-    rewrittenQuery: data.rewritten_query || data.rewrittenQuery || query,
-    keywords: data.keywords || [],
+    rewrittenQuery: data.rewritten_query || data.rewrittenQuery || rewrittenQuery || query,
+    keywords: data.keywords || keywords || [],
     intent: data.intent || '',
     answer: data.answer || '',
     highlights: data.highlights || [],

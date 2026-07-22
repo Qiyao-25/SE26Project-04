@@ -78,14 +78,26 @@ def smart_search_papers(
     page: int = 1,
     page_size: int = 12,
     category: str | None = None,
+    rewritten_query: str | None = None,
+    keywords: list[str] | None = None,
+    include_answer: bool = True,
     settings=None,
 ) -> SmartSearchResponse:
-    from app.agents.search_agent import SearchAgent
+    from app.agents.search_agent import SearchAgent, SearchPlan
     from app.core.config import get_settings
 
     settings = settings or get_settings()
     agent = SearchAgent(settings)
-    plan = agent.plan(query)
+    reused_plan = bool(rewritten_query or keywords)
+    if reused_plan:
+        plan = SearchPlan(
+            rewritten_query=(rewritten_query or query).strip() or query,
+            keywords=[item for item in (keywords or []) if item] or [query],
+            intent="",
+            source="reused",
+        )
+    else:
+        plan = agent.plan(query)
     category_filter = category or (plan.category_hints[0] if plan.category_hints else None)
     papers, total = list_papers(
         session,
@@ -123,26 +135,34 @@ def smart_search_papers(
             page_size=page_size,
         )
     items = [to_item(paper) for paper in papers]
-    paper_payload = [
-        {
-            "title": item.title,
-            "authors": item.authors,
-            "primary_category": item.primary_category,
-            "abstract": item.abstract,
-            "arxiv_id": item.arxiv_id,
-        }
-        for item in items
-    ]
-    answer = agent.answer(query=query, plan=plan, papers=paper_payload, total=total)
+    if include_answer:
+        paper_payload = [
+            {
+                "title": item.title,
+                "authors": item.authors,
+                "primary_category": item.primary_category,
+                "abstract": item.abstract,
+                "arxiv_id": item.arxiv_id,
+            }
+            for item in items
+        ]
+        answer = agent.answer(query=query, plan=plan, papers=paper_payload, total=total)
+        answer_text = answer.answer
+        highlights = answer.highlights
+        answer_source = answer.source
+    else:
+        answer_text = ""
+        highlights = []
+        answer_source = "skipped"
     return SmartSearchResponse(
         query=query,
         rewritten_query=plan.rewritten_query or query,
         keywords=plan.keywords,
         intent=plan.intent,
-        answer=answer.answer,
-        highlights=answer.highlights,
+        answer=answer_text,
+        highlights=highlights,
         plan_source=plan.source,
-        answer_source=answer.source,
+        answer_source=answer_source,
         items=items,
         total=total,
         page=page,

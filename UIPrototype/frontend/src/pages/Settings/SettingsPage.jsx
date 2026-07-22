@@ -24,7 +24,6 @@ import {
   PlusOutlined,
   TagsOutlined,
 } from '@ant-design/icons';
-import { useOutletContext } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { updateAccount } from '../../services/authService';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
@@ -32,11 +31,15 @@ import { syncSubscriptions } from '../../services/recommendationService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { ARXIV_CATEGORIES, ARXIV_CATEGORY_LABEL_MAP } from '../../data/arxivCategories';
 import {
-  getLibraryPageSize,
   getUiPrefs,
   getWorkspacePageSize,
   setUiPrefs,
 } from '../../utils/uiPrefs';
+import {
+  isSubscriptionSyncing,
+  runSubscriptionSync,
+  subscribeSubscriptionSync,
+} from '../../utils/subscriptionSyncLock';
 
 const SUBSCRIPTIONS_STORAGE_KEY = 'papermate-session-subscriptions';
 const CATEGORY_LABEL_MAP = ARXIV_CATEGORY_LABEL_MAP;
@@ -80,9 +83,6 @@ function loadSessionSubscriptions() {
 
 export default function SettingsPage() {
   const { userId, email, applyAuthResponse } = useApp();
-  const outlet = useOutletContext() || {};
-  const themeMode = outlet.themeMode || localStorage.getItem('papermate-theme') || 'dark';
-  const setThemeMode = outlet.setThemeMode;
 
   const [crawlForm] = Form.useForm();
   const [accountForm] = Form.useForm();
@@ -95,9 +95,11 @@ export default function SettingsPage() {
   const [categorySearch, setCategorySearch] = useState('');
   const [profileReady, setProfileReady] = useState(USE_MOCK);
   const [savedPreferences, setSavedPreferences] = useState({});
-  const [syncing, setSyncing] = useState(false);
+  const [syncing, setSyncing] = useState(() => isSubscriptionSyncing());
   const [accountSaving, setAccountSaving] = useState(false);
   const [lastSyncMessage, setLastSyncMessage] = useState('');
+
+  useEffect(() => subscribeSubscriptionSync(setSyncing), []);
 
   useEffect(() => {
     try {
@@ -115,10 +117,9 @@ export default function SettingsPage() {
     const ui = getUiPrefs();
     uiForm.setFieldsValue({
       workspacePageSize: getWorkspacePageSize(12),
-      libraryPageSize: getLibraryPageSize(20),
       ...(ui || {}),
     });
-  }, [themeMode, uiForm]);
+  }, [uiForm]);
 
   useEffect(() => {
     if (USE_MOCK) return undefined;
@@ -143,23 +144,21 @@ export default function SettingsPage() {
           setUiPrefs(preferences.ui);
           uiForm.setFieldsValue({
             workspacePageSize: preferences.ui.workspacePageSize || getWorkspacePageSize(12),
-            libraryPageSize: preferences.ui.libraryPageSize || getLibraryPageSize(20),
           });
-          if (preferences.ui.theme && setThemeMode) {
-            setThemeMode(preferences.ui.theme);
-          }
         }
         if (preferences.last_subscription_sync_stats) {
           const stats = preferences.last_subscription_sync_stats;
+          const updatedPart = stats.updated ? `，更新 ${stats.updated}` : '';
+          const skipPart = stats.deduped ? `，跳过 ${stats.deduped}` : '';
           setLastSyncMessage(
-            `上次同步：抓取 ${stats.fetched ?? 0}，新建 ${stats.created ?? 0}${stats.deduped ? `，跳过 ${stats.deduped}` : ''}`,
+            `上次同步：抓取 ${stats.fetched ?? 0}，新建 ${stats.created ?? 0}${updatedPart}${skipPart}`,
           );
         }
         setProfileReady(true);
       })
       .catch(() => setProfileReady(true));
     return undefined;
-  }, [crawlForm, setThemeMode, themeMode, uiForm, userId]);
+  }, [crawlForm, uiForm, userId]);
 
   useEffect(() => {
     if (!profileReady || USE_MOCK) return;
@@ -185,29 +184,29 @@ export default function SettingsPage() {
       message.info('Mock 模式无法同步 arXiv');
       return;
     }
-    setSyncing(true);
     try {
-      const crawl = crawlForm.getFieldsValue();
-      const maxPerSubscription = Number(crawl.maxPerSubscription) || 5;
-      await updateLearningProfile(userId, {
-        preferences: {
-          ...savedPreferences,
-          subscriptions,
-          crawl: {
-            maxPerSubscription,
-            codeOnly: Boolean(crawl.codeOnly),
+      const result = await runSubscriptionSync(async () => {
+        const crawl = crawlForm.getFieldsValue();
+        const maxPerSubscription = Number(crawl.maxPerSubscription) || 5;
+        await updateLearningProfile(userId, {
+          preferences: {
+            ...savedPreferences,
+            subscriptions,
+            crawl: {
+              maxPerSubscription,
+              codeOnly: Boolean(crawl.codeOnly),
+            },
           },
-        },
+        });
+        const syncResult = await syncSubscriptions(userId, { maxPerSubscription });
+        const profile = await getLearningProfile(userId);
+        setSavedPreferences(profile.preferences || {});
+        return syncResult;
       });
-      const result = await syncSubscriptions(userId, { maxPerSubscription });
       setLastSyncMessage(result.message || '同步完成');
       message.success(result.message || '订阅同步完成');
-      const profile = await getLearningProfile(userId);
-      setSavedPreferences(profile.preferences || {});
     } catch (error) {
       message.error(error.message || '同步失败');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -314,9 +313,7 @@ export default function SettingsPage() {
 
   const handleUiSave = async (values) => {
     const ui = {
-      theme: themeMode,
       workspacePageSize: Number(values.workspacePageSize) || 12,
-      libraryPageSize: Number(values.libraryPageSize) || 20,
     };
     setUiPrefs(ui);
     await savePreferences({ ui }, '界面设置已保存');
@@ -559,7 +556,6 @@ export default function SettingsPage() {
             layout="vertical"
             initialValues={{
               workspacePageSize: getWorkspacePageSize(12),
-              libraryPageSize: getLibraryPageSize(20),
             }}
             onFinish={handleUiSave}
           >
@@ -570,15 +566,6 @@ export default function SettingsPage() {
                   { value: 12, label: '12 条' },
                   { value: 16, label: '16 条' },
                   { value: 24, label: '24 条' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item name="libraryPageSize" label="论文库默认每页条数" extra="仅管理员论文库页面">
-              <Select
-                options={[
-                  { value: 10, label: '10 条' },
-                  { value: 20, label: '20 条' },
-                  { value: 50, label: '50 条' },
                 ]}
               />
             </Form.Item>

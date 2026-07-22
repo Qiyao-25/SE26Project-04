@@ -265,6 +265,9 @@ class SmartSearchRequest(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=12, ge=1, le=50)
     category: str | None = Field(default=None, max_length=128)
+    rewritten_query: str | None = Field(default=None, max_length=500)
+    keywords: list[str] | None = None
+    include_answer: bool = True
 
 
 class SmartSearchResponse(BaseModel):

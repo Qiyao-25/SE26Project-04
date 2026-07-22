@@ -69,6 +69,9 @@ def smart_search(payload: SmartSearchRequest, request: Request, _user: AuthUser 
         page=payload.page,
         page_size=payload.page_size,
         category=payload.category,
+        rewritten_query=payload.rewritten_query,
+        keywords=payload.keywords,
+        include_answer=payload.include_answer,
         settings=request.app.state.settings,
     )
     return ApiResponse(data=data, request_id=request.state.request_id)

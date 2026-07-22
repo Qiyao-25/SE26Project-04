@@ -84,6 +84,7 @@ export default function WorkspacePage() {
   const [searchPageSize] = useState(() => getWorkspacePageSize(12));
   const [searchStatus, setSearchStatus] = useState('idle');
   const [searchError, setSearchError] = useState('');
+  const [pageLoading, setPageLoading] = useState(false);
   const [dailyPapers, setDailyPapers] = useState([]);
   const [profilePapers, setProfilePapers] = useState([]);
   const [subscriptionPapers, setSubscriptionPapers] = useState([]);
@@ -100,7 +101,7 @@ export default function WorkspacePage() {
   useEffect(() => { profileRef.current = profilePapers; }, [profilePapers]);
   useEffect(() => { subscriptionRef.current = subscriptionPapers; }, [subscriptionPapers]);
 
-  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot } = {}) => {
+  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot, rewrittenQuery, keywords } = {}) => {
     const nextPage = page || data.page || 1;
     const nextItems = data.items || [];
     const nextTotal = data.total || 0;
@@ -109,20 +110,28 @@ export default function WorkspacePage() {
       || (nextTotal > 0
         ? `检索完成，共找到 ${nextTotal} 篇相关论文。`
         : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
+    const nextRewritten = rewrittenQuery || data.rewrittenQuery || query;
+    const nextKeywords = keywords || data.keywords || [];
     setResults(nextItems);
     setResultTotal(nextTotal);
     setSearchPage(nextPage);
     setSearchStatus(nextTotal > 0 ? 'success' : 'empty');
     if (messagesSnapshot) setMessages(messagesSnapshot);
     const previous = readSearchCache();
+    const sameQuery = previous?.query === query;
+    const pageItems = sameQuery ? { ...(previous?.pageItems || {}) } : {};
+    pageItems[String(nextPage)] = nextItems;
     writeSearchCache({
       query,
       page: nextPage,
       pageSize: data.pageSize || searchPageSize,
       total: nextTotal,
       items: nextItems,
+      pageItems,
+      rewrittenQuery: nextRewritten,
+      keywords: nextKeywords,
       answer: nextAnswer,
-      messages: messagesSnapshot || previous?.messages
+      messages: messagesSnapshot || (sameQuery ? previous?.messages : undefined)
     });
     return nextAnswer;
   }, [searchPageSize]);
@@ -314,8 +323,56 @@ export default function WorkspacePage() {
   };
 
   const handlePageChange = async (page) => {
-    if (!lastSearchQuery || page === searchPage) return;
-    await runSearch({ query: lastSearchQuery, page, appendUser: false });
+    if (!lastSearchQuery || page === searchPage || pageLoading) return;
+    const cache = readSearchCache();
+    const cachedPage = cache?.pageItems?.[String(page)];
+    if (Array.isArray(cachedPage) && cachedPage.length) {
+      setResults(cachedPage);
+      setSearchPage(page);
+      writeSearchCache({
+        ...cache,
+        page,
+        items: cachedPage,
+      });
+      return;
+    }
+
+    setPageLoading(true);
+    try {
+      const data = await smartSearchPapers({
+        query: lastSearchQuery,
+        page,
+        pageSize: searchPageSize,
+        rewrittenQuery: cache?.rewrittenQuery,
+        keywords: cache?.keywords,
+        includeAnswer: false,
+      });
+      const previous = readSearchCache() || {};
+      const nextItems = data.items || [];
+      const pageItems = { ...(previous.pageItems || {}) };
+      pageItems[String(page)] = nextItems;
+      setResults(nextItems);
+      setResultTotal(data.total || previous.total || 0);
+      setSearchPage(page);
+      if ((data.total || previous.total || 0) > 0) {
+        setSearchStatus('success');
+      }
+      writeSearchCache({
+        ...previous,
+        query: lastSearchQuery,
+        page,
+        pageSize: searchPageSize,
+        total: data.total || previous.total || 0,
+        items: nextItems,
+        pageItems,
+        rewrittenQuery: data.rewrittenQuery || previous.rewrittenQuery,
+        keywords: data.keywords?.length ? data.keywords : previous.keywords,
+      });
+    } catch (error) {
+      message.error(error.message || '翻页失败');
+    } finally {
+      setPageLoading(false);
+    }
   };
 
   const handleBackHome = () => {
@@ -430,7 +487,9 @@ export default function WorkspacePage() {
           {searchStatus === 'empty' && <Empty description="未找到匹配论文，请修改检索词后重试" />}
           {searchStatus === 'success' && (
             <>
-              {renderPaperGrid(results)}
+              <Spin spinning={pageLoading} tip="加载本页…">
+                {renderPaperGrid(results)}
+              </Spin>
               <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <Text type="secondary">共 {resultTotal} 篇，当前第 {searchPage} 页</Text>
                 <Pagination
@@ -439,6 +498,7 @@ export default function WorkspacePage() {
                   total={resultTotal}
                   onChange={handlePageChange}
                   showSizeChanger={false}
+                  disabled={pageLoading}
                 />
               </div>
             </>
