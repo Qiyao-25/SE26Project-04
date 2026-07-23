@@ -1,3 +1,5 @@
+import re
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 
 from sqlalchemy import Text, cast, exists, func, or_, select
@@ -268,7 +270,7 @@ def list_papers(
             .limit(fetch_size)
         )
         papers = list(session.scalars(stmt).unique())
-        papers = _rank_papers(papers, keyword_terms)
+        papers = _rank_papers(papers, keyword_terms, query=keyword or " ".join(keyword_terms))
         start = (page - 1) * page_size
         if start >= total:
             return [], total
@@ -287,16 +289,90 @@ def list_papers(
     return list(session.scalars(stmt).unique()), total
 
 
-def _rank_papers(papers: list[Paper], keywords: list[str]) -> list[Paper]:
-    lowered = [keyword.casefold() for keyword in keywords if keyword]
+def _normalize_title(value: str | None) -> str:
+    text = (value or "").casefold()
+    text = re.sub(r"[^\w\u4e00-\u9fff]+", " ", text, flags=re.UNICODE)
+    return " ".join(text.split())
 
-    def score(paper: Paper) -> tuple[int, int]:
-        blob = " ".join([paper.title or "", paper.abstract or "", paper.arxiv_id or "", paper.primary_category or ""]).casefold()
+
+def looks_like_title_query(query: str | None) -> bool:
+    """Heuristic: long / multi-token queries are treated as title lookups."""
+    q = (query or "").strip()
+    if not q:
+        return False
+    if len(q) >= 36:
+        return True
+    latin_words = re.findall(r"[A-Za-z][A-Za-z0-9\-]{1,}", q)
+    cjk_chars = re.findall(r"[\u4e00-\u9fff]", q)
+    if len(latin_words) >= 5:
+        return True
+    if len(cjk_chars) >= 12:
+        return True
+    return False
+
+
+def title_similarity(query: str, title: str) -> float:
+    nq = _normalize_title(query)
+    nt = _normalize_title(title)
+    if not nq or not nt:
+        return 0.0
+    if nq == nt:
+        return 1.0
+    if nq in nt or nt in nq:
+        return max(0.93, SequenceMatcher(None, nq, nt).ratio())
+    ratio = SequenceMatcher(None, nq, nt).ratio()
+    # token overlap for slight title differences
+    q_tokens = set(nq.split())
+    t_tokens = set(nt.split())
+    if q_tokens and t_tokens:
+        overlap = len(q_tokens & t_tokens) / max(len(q_tokens), 1)
+        if overlap >= 0.7:
+            ratio = max(ratio, 0.7 + 0.25 * overlap)
+    return ratio
+
+
+def _rank_papers(papers: list[Paper], keywords: list[str], query: str | None = None) -> list[Paper]:
+    lowered = [keyword.casefold() for keyword in keywords if keyword]
+    nq = _normalize_title(query) if query else ""
+
+    def score(paper: Paper) -> tuple[float, int, int, int]:
+        title = paper.title or ""
+        blob = " ".join([title, paper.abstract or "", paper.arxiv_id or "", paper.primary_category or ""]).casefold()
         hits = sum(1 for keyword in lowered if keyword in blob)
-        title_hits = sum(1 for keyword in lowered if keyword in (paper.title or "").casefold())
-        return (title_hits * 3 + hits, len(paper.abstract or ""))
+        title_hits = sum(1 for keyword in lowered if keyword in title.casefold())
+        sim = title_similarity(query, title) if query else 0.0
+        # Primary: title similarity (stable title lookup); then keyword hits; tie-break by id.
+        return (sim, title_hits * 3 + hits, 0, -int(paper.id or 0))
 
     return sorted(papers, key=score, reverse=True)
+
+
+def find_title_candidates(session: Session, query: str, *, limit: int = 40) -> list[Paper]:
+    """Find papers whose titles are near-matches to the query (slight typos / punctuation diffs)."""
+    q = (query or "").strip()
+    if not q:
+        return []
+    tokens = [t for t in _normalize_title(q).split() if len(t) >= 3][:8]
+    filters = [Paper.deleted_at.is_(None)]
+    if tokens:
+        term_filters = [Paper.title.ilike(f"%{token}%") for token in tokens]
+        # Also try a long contiguous fragment of the raw query.
+        frag = q.strip()[:80]
+        if len(frag) >= 12:
+            term_filters.append(Paper.title.ilike(f"%{frag}%"))
+        filters.append(or_(*term_filters))
+    else:
+        filters.append(Paper.title.ilike(f"%{q[:80]}%"))
+    stmt = (
+        select(Paper)
+        .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
+        .where(*filters)
+        .limit(min(max(limit * 3, 60), 300))
+    )
+    papers = list(session.scalars(stmt).unique())
+    ranked = sorted(papers, key=lambda p: (title_similarity(q, p.title or ""), -p.id), reverse=True)
+    strong = [p for p in ranked if title_similarity(q, p.title or "") >= 0.72]
+    return (strong or ranked)[:limit]
 
 
 def get_paper(session: Session, paper_id: int) -> Paper | None:

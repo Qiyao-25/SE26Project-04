@@ -240,6 +240,24 @@ def wiki(paper_id: int, request: Request, db: Session = Depends(db_session)):
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
+@router.get("/{paper_id}/chunks", response_model=ApiResponse[list[dict]], summary="读取论文段落块（供段落笔记）")
+def paper_chunks(
+    paper_id: int,
+    request: Request,
+    limit: int = Query(default=40, ge=1, le=120),
+    _user: AuthUser = Depends(require_current_user),
+    db: Session = Depends(db_session),
+):
+    from app.model import Paper
+    from app.repository.chunks import list_chunks_for_paper
+    from app.repository.papers import get_paper
+
+    paper = get_paper(db, paper_id)
+    if paper is None:
+        return _db_error(request, PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404))
+    return ApiResponse(data=list_chunks_for_paper(db, paper_id, limit=limit), request_id=request.state.request_id)
+
+
 @router.get("/{paper_id}/assist", response_model=ApiResponse[ReadingAssistData], summary="读取个性化辅助阅读")
 def reading_assist_get(paper_id: int, request: Request, mode: str = Query(default="研究", max_length=16), _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     try:

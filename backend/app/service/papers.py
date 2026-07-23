@@ -12,7 +12,15 @@ from app.agents.qa_agent import QaAgent
 from app.agents.graph_agent import GraphAgent
 from app.model import Paper, StructuredResult
 from app.repository.chunks import search_chunks
-from app.repository.papers import get_paper, list_papers, soft_delete_paper, upsert_paper
+from app.repository.papers import (
+    find_title_candidates,
+    get_paper,
+    list_papers,
+    looks_like_title_query,
+    soft_delete_paper,
+    title_similarity,
+    upsert_paper,
+)
 from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
 
 class PaperServiceError(Exception):
@@ -108,6 +116,7 @@ def smart_search_papers(
 
     settings = settings or get_settings()
     agent = SearchAgent(settings)
+    title_mode = looks_like_title_query(query)
     reused_plan = bool(rewritten_query or keywords)
     if reused_plan:
         plan = SearchPlan(
@@ -121,67 +130,121 @@ def smart_search_papers(
         category_filter = category
     else:
         plan = agent.plan(query)
-        category_filter = category or (plan.category_hints[0] if plan.category_hints else None)
-    papers, total = list_papers(
-        session,
-        keyword=plan.rewritten_query or query,
-        keywords=plan.keywords or [query],
-        author=None,
-        category=category_filter,
-        published_from=None,
-        published_to=None,
-        page=page,
-        page_size=page_size,
-        topic=None,
-        sort_by="relevance",
-        search_field="all",
-    )
-    if total == 0 and category_filter and not category:
+        # Title-like queries: do not apply LLM category hints (keeps recall stable).
+        category_filter = category if title_mode else (category or (plan.category_hints[0] if plan.category_hints else None))
+
+    # Prefer near-exact title matches so slight title variants still hit.
+    title_hits = find_title_candidates(session, query, limit=max(page_size * 2, 24))
+    strong_titles = [p for p in title_hits if title_similarity(query, p.title or "") >= 0.78]
+
+    if title_mode and strong_titles:
+        total = len(strong_titles)
+        start = (page - 1) * page_size
+        papers = strong_titles[start:start + page_size]
+        category_filter = category
+    else:
+        search_field = "title" if title_mode else "all"
+        keywords = plan.keywords or [query]
+        # For title mode keep the full query as primary keyword for ranking.
+        if title_mode and query not in keywords:
+            keywords = [query, *keywords]
         papers, total = list_papers(
             session,
             keyword=plan.rewritten_query or query,
-            keywords=plan.keywords or [query],
+            keywords=keywords,
             author=None,
-            category=None,
+            category=category_filter,
             published_from=None,
             published_to=None,
             page=page,
             page_size=page_size,
+            topic=None,
+            sort_by="relevance",
+            search_field=search_field,
         )
-        category_filter = None
-    if total == 0 and plan.keywords:
-        papers, total = list_papers(
-            session,
-            keyword=query,
-            keywords=None,
-            author=None,
-            category=None,
-            published_from=None,
-            published_to=None,
-            page=page,
-            page_size=page_size,
-        )
-        category_filter = None
+        if total == 0 and category_filter and not category:
+            papers, total = list_papers(
+                session,
+                keyword=plan.rewritten_query or query,
+                keywords=keywords,
+                author=None,
+                category=None,
+                published_from=None,
+                published_to=None,
+                page=page,
+                page_size=page_size,
+                topic=None,
+                sort_by="relevance",
+                search_field=search_field,
+            )
+            category_filter = None
+        if total == 0:
+            papers, total = list_papers(
+                session,
+                keyword=query,
+                keywords=None,
+                author=None,
+                category=None,
+                published_from=None,
+                published_to=None,
+                page=page,
+                page_size=page_size,
+                topic=None,
+                sort_by="relevance",
+                search_field="title" if title_mode else "all",
+            )
+            category_filter = None
+        # Merge any strong title hits to the front of page 1 (dedupe by id).
+        if page == 1 and strong_titles:
+            seen = {p.id for p in papers}
+            merged = [p for p in strong_titles if p.id not in seen]
+            if merged:
+                papers = (merged + papers)[:page_size]
+                total = max(total, len(strong_titles))
+
     items = [to_item(paper) for paper in papers]
     if include_answer:
-        paper_payload = [
-            {
-                "title": item.title,
-                "authors": item.authors,
-                "primary_category": item.primary_category,
-                "abstract": item.abstract,
-                "arxiv_id": item.arxiv_id,
-            }
-            for item in items
-        ]
+        if strong_titles:
+            paper_payload = [
+                {
+                    "paper_id": paper.id,
+                    "title": paper.title,
+                    "authors": [
+                        link.author.display_name
+                        for link in sorted(paper.authors, key=lambda link: link.author_order)
+                    ],
+                    "primary_category": paper.primary_category,
+                    "abstract": paper.abstract,
+                    "arxiv_id": paper.arxiv_id,
+                }
+                for paper in strong_titles[:8]
+            ]
+        else:
+            paper_payload = [
+                {
+                    "paper_id": item.paper_id,
+                    "title": item.title,
+                    "authors": item.authors,
+                    "primary_category": item.primary_category,
+                    "abstract": item.abstract,
+                    "arxiv_id": item.arxiv_id,
+                }
+                for item in items[:8]
+            ]
         answer = agent.answer(query=query, plan=plan, papers=paper_payload, total=total)
         answer_text = answer.answer
         highlights = answer.highlights
         answer_source = answer.source
+        citations = [
+            {"paperId": str(row["paper_id"]), "title": row.get("title") or ""}
+            for row in paper_payload
+            if row.get("paper_id")
+        ][:5]
     else:
         answer_text = ""
         highlights = []
         answer_source = "skipped"
+        citations = []
     return SmartSearchResponse(
         query=query,
         rewritten_query=plan.rewritten_query or query,
@@ -193,6 +256,7 @@ def smart_search_papers(
         highlights=highlights,
         plan_source=plan.source,
         answer_source=answer_source,
+        citations=citations,
         items=items,
         total=total,
         page=page,

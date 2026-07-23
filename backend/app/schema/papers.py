@@ -285,6 +285,7 @@ class SmartSearchResponse(BaseModel):
     highlights: list[str] = Field(default_factory=list)
     plan_source: str = "heuristic"
     answer_source: str = "template"
+    citations: list[dict] = Field(default_factory=list)
     items: list[PaperItem]
     total: int
     page: int

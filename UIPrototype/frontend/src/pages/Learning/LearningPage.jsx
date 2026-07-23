@@ -93,7 +93,7 @@ export default function LearningPage() {
         setPaperMap(Object.fromEntries(details.filter(([, paper]) => paper)));
         setLibrary({
           favorites: actions.filter((action) => action.action_type === 'favorite' && action.payload_json?.favorite !== false),
-          notes: actions.filter((action) => action.action_type === 'note'),
+          notes: actions.filter((action) => action.action_type === 'note' && action.payload_json?.kind !== 'comment'),
           history: (() => {
             const seen = new Set();
             const rows = [];

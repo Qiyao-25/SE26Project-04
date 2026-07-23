@@ -28,6 +28,14 @@ def validate_action(session: Session, payload: UserActionInput) -> None:
 
 def create_action(session: Session, payload: UserActionInput) -> tuple[UserActionItem, bool]:
     validate_action(session, payload)
+    payload_json = dict(payload.payload_json or {})
+    kind = str(payload_json.get("kind") or "note")
+    if kind == "comment":
+        payload_json["kind"] = "comment"
+        payload_json["visibility"] = "public"
+    elif kind in {"note", "annotation"}:
+        payload_json["kind"] = kind
+        payload_json["visibility"] = "private"
     if payload.action_type == "favorite":
         existing = session.scalar(
             select(UserAction).where(
@@ -49,7 +57,7 @@ def create_action(session: Session, payload: UserActionInput) -> tuple[UserActio
         if existing is not None:
             existing.occurred_at = datetime.now(timezone.utc)
             if payload.payload_json is not None:
-                existing.payload_json = payload.payload_json
+                existing.payload_json = payload_json
             session.commit()
             session.refresh(existing)
             return to_action(existing), False
@@ -57,12 +65,33 @@ def create_action(session: Session, payload: UserActionInput) -> tuple[UserActio
         user_id=payload.user_id,
         paper_id=payload.paper_id,
         action_type=payload.action_type,
-        payload_json=payload.payload_json,
+        payload_json=payload_json,
     )
     session.add(action)
     session.commit()
     session.refresh(action)
     return to_action(action), True
+
+
+def list_public_comments(session: Session, paper_id: int, *, limit: int = 100) -> list[UserActionItem]:
+    paper = session.get(Paper, paper_id)
+    if paper is None or paper.deleted_at is not None:
+        raise ValueError("PAPER_NOT_FOUND")
+    rows = session.scalars(
+        select(UserAction)
+        .where(UserAction.paper_id == paper_id, UserAction.action_type == "note")
+        .order_by(UserAction.occurred_at.desc(), UserAction.id.desc())
+        .limit(limit * 3)
+    ).all()
+    items = []
+    for action in rows:
+        payload = action.payload_json or {}
+        if payload.get("kind") != "comment":
+            continue
+        items.append(to_action(action))
+        if len(items) >= limit:
+            break
+    return items
 
 
 def list_actions(session: Session, user_id: str, paper_id: int | None, action_type: str | None) -> list[UserActionItem]:

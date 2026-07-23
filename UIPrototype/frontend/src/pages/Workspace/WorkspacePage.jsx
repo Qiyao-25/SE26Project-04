@@ -299,16 +299,23 @@ export default function WorkspacePage() {
     try {
       const data = await smartSearchPapers({ query, page, pageSize: searchPageSize });
       const keywordHint = data.keywords?.length ? `（匹配词：${data.keywords.slice(0, 5).join('、')}）` : '';
+      const planHint = data.rewrittenQuery && data.rewrittenQuery !== query
+        ? `\n检索改写：${data.rewrittenQuery}`
+        : '';
       const answerText = data.answer || (data.total > 0
-        ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}`
+        ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}${planHint}`
         : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
+      const citations = (data.citations || data.items?.slice(0, 5) || []).map((item, index) => ({
+        paperId: String(item.paperId || item.paper_id || ''),
+        title: item.title || `相关论文 ${index + 1}`,
+      })).filter((item) => item.paperId);
       const withAssistant = appendUser
         ? [...nextMessages, {
           messageId: `workspace-assistant-${Date.now()}`,
           role: 'assistant',
           content: answerText,
           status: 'success',
-          citations: []
+          citations
         }]
         : nextMessages;
       applySearchResult(data, {

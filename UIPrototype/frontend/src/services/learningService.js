@@ -59,6 +59,13 @@ export async function listPaperNotes(userId, paperId) {
   return listActions({ userId, paperId, actionType: 'note' });
 }
 
+export async function listPublicComments(paperId) {
+  if (USE_MOCK) return [];
+  return apiClient.get('/learning/actions/public-comments', {
+    params: { paper_id: Number(paperId), limit: 50 },
+  });
+}
+
 export async function getLearningProfile(userId) {
   if (USE_MOCK) return { user_id: userId, persona: '研究', topics: ['cs.CL'], preferences: {} };
   return apiClient.get('/learning/profile', { params: { user_id: userId } });

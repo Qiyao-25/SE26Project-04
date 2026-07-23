@@ -25,13 +25,6 @@ const { Text } = Typography;
 function OverviewTab({ onGo, overview, activities = [] }) {
   const metrics = overview?.metrics || {};
   const agents = overview?.agents || [];
-  const pipeline = overview?.pipeline || [
-    { stage: 'fetch', agent: '抓取/正文提取', description: '拉取 PDF/HTML 或摘要' },
-    { stage: 'summarize', agent: '摘要 Agent', description: '生成 summary / concepts / methods' },
-    { stage: 'validate', agent: '校验 Agent', description: '完整性与不确定字段标记' },
-    { stage: 'graph', agent: '图谱 Agent', description: '主题/概念关联与脉络' },
-    { stage: 'persist', agent: '持久化', description: '写入 Wiki 与文本块' },
-  ];
   return (
     <>
       <Row gutter={[12, 12]}>
@@ -47,28 +40,6 @@ function OverviewTab({ onGo, overview, activities = [] }) {
           </Col>
         ))}
       </Row>
-      <Card title="多 Agent 解析流水线" size="small" style={{ marginTop: 16 }}>
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="抓取 → 摘要 → 校验 → 图谱 → 持久化；问答/检索/阅读/对比 Agent 按需调用，协同完成论文处理与知识服务。"
-        />
-        <List
-          size="small"
-          grid={{ gutter: 12, xs: 1, sm: 2, md: 3, lg: 5 }}
-          dataSource={pipeline}
-          renderItem={(step, index) => (
-            <List.Item>
-              <Card size="small">
-                <Text type="secondary">{index + 1}. {step.stage}</Text>
-                <div><Text strong>{step.agent}</Text></div>
-                <Text type="secondary" style={{ fontSize: 12 }}>{step.description}</Text>
-              </Card>
-            </List.Item>
-          )}
-        />
-      </Card>
       <Row gutter={16} style={{ marginTop: 16 }}>
         <Col xs={24} lg={14}>
           <Card title="Agent 就绪状态" size="small">
@@ -245,10 +216,13 @@ function QualityTab({ quality, onRefresh }) {
                 title={e.title}
                 description={(
                   <>
-                    {e.detail}
-                    <br />
+                    <div>
+                      <Tag color="blue">{e.agent || '解析流水线'}</Tag>
+                      <Tag>{e.stage_label || e.type || '未知阶段'}</Tag>
+                    </div>
+                    <div style={{ marginTop: 6 }}>{e.detail}</div>
                     <Text type="secondary">
-                      {e.type} · {e.status} · 第 {e.attempt || 1} 次 · {formatDateTime(e.time)}
+                      {e.error_code || e.type} · {e.status} · 第 {e.attempt || 1} 次 · {formatDateTime(e.time)}
                     </Text>
                   </>
                 )}

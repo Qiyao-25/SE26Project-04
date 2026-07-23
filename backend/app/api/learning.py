@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import UserActionInput, UserActionItem, UserActionUpdate
-from app.service.learning import create_action, delete_action, delete_actions_by_type, list_actions, update_action
+from app.service.learning import create_action, delete_action, delete_actions_by_type, list_actions, list_public_comments, update_action
 
 router = APIRouter(prefix="/api/learning/actions", tags=["learning"])
 
@@ -39,6 +39,21 @@ def action_create(payload: UserActionInput, request: Request, current_user: Auth
     ensure_same_user(payload.user_id, current_user)
     try:
         data, _created = create_action(db, payload)
+    except ValueError as exc:
+        return map_error(request, exc)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/public-comments", response_model=ApiResponse[list[UserActionItem]], summary="读取论文公开评论")
+def action_public_comments(
+    request: Request,
+    paper_id: int = Query(ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    _user: AuthUser = Depends(require_current_user),
+    db: Session = Depends(db_session),
+):
+    try:
+        data = list_public_comments(db, paper_id, limit=limit)
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)

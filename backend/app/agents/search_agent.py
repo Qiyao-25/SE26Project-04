@@ -25,6 +25,8 @@ REWRITE_PROMPT = """你是 PaperMate 的论文检索 Agent。
 1. keywords 3-8 个，包含中英文同义表达（如 注意力/attention、Transformer）。
 2. 不要编造具体 arXiv ID，除非用户明确给出。
 3. category_hints 可选，使用 arXiv 分类如 cs.CL、cs.LG、cs.CV。
+4. 若用户输入看起来像完整论文标题，rewritten_query 应尽量保留原标题用语，keywords 以标题核心词为主，category_hints 可为空。
+5. 同一意图应输出稳定、可复现的 keywords（按重要性排序），不要随意换词。
 """
 
 

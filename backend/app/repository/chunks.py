@@ -39,6 +39,28 @@ def _write_chunks(session: Session, paper_id: int, payload: TextChunkBatch) -> i
     return len(payload.chunks)
 
 
+def list_chunks_for_paper(session: Session, paper_id: int, *, limit: int = 40) -> list[dict]:
+    paper = session.get(Paper, paper_id)
+    if paper is None or paper.deleted_at is not None:
+        return []
+    rows = session.scalars(
+        select(TextChunk)
+        .where(TextChunk.paper_id == paper_id)
+        .order_by(TextChunk.page_no.asc().nullslast(), TextChunk.id.asc())
+        .limit(limit)
+    ).all()
+    return [
+        {
+            "chunk_id": row.chunk_id,
+            "page_no": row.page_no,
+            "section": row.section,
+            "preview": (row.content or "")[:160],
+        }
+        for row in rows
+        if (row.content or "").strip()
+    ]
+
+
 def search_chunks(session: Session, request: ChunkSearchRequest):
     paper_ids = set(request.paper_ids)
     if request.paper_id:

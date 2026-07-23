@@ -287,6 +287,7 @@ export async function smartSearchPapers({
     highlights: data.highlights || [],
     planSource: data.plan_source || data.planSource || '',
     answerSource: data.answer_source || data.answerSource || '',
+    citations: data.citations || [],
     searchType: 'smart',
     sortBy: 'relevance',
     total: data.total || 0,
@@ -295,6 +296,11 @@ export async function smartSearchPapers({
     searchTimeMs: 0,
     items: (data.items || []).map(toPaperListItem)
   };
+}
+
+export async function listPaperChunks(paperId, { limit = 40 } = {}) {
+  if (USE_MOCK) return [];
+  return apiClient.get(`/papers/${paperId}/chunks`, { params: { limit } });
 }
 
 export async function getPaperDetail(paperId) {

@@ -7,6 +7,73 @@ from app.model import ParseTask, Paper, User, UserAction, UserProfile
 from app.service.tasks import MAX_ATTEMPTS
 
 
+def explain_parse_failure(*, error_code: str | None, stage: str | None, status: str | None) -> dict:
+    """Map raw task failure into multi-agent stage + human-readable reason."""
+    code = (error_code or "").upper()
+    stage_key = (stage or "").lower()
+    status_key = (status or "").lower()
+
+    if code in {"CONTENT_EMPTY", "PARSE_FAILED"} or stage_key == "fetch":
+        return {
+            "agent": "抓取 Agent",
+            "stage_label": "抓取 / 正文提取",
+            "reason": "未能从 PDF 或 HTML 获得可用正文，抓取环节判定内容为空或不可解析。",
+        }
+    if code == "PAPER_NOT_FOUND":
+        return {
+            "agent": "抓取 Agent",
+            "stage_label": "抓取 / 入库校验",
+            "reason": "任务关联的论文记录不存在或已被删除。",
+        }
+    if code == "STALE_TASK" or status_key == "timed_out":
+        return {
+            "agent": "调度器",
+            "stage_label": "任务调度",
+            "reason": "解析任务长时间未完成，已被超时回收。",
+        }
+    if code == "SUPERSEDED":
+        return {
+            "agent": "调度器",
+            "stage_label": "任务调度",
+            "reason": "该任务被更新的强制解析请求取代。",
+        }
+    if stage_key in {"summarize", "parse"}:
+        return {
+            "agent": "摘要 Agent",
+            "stage_label": "结构化摘要",
+            "reason": "摘要 Agent 在生成 summary / concepts / methods 时失败。",
+        }
+    if stage_key == "validate":
+        return {
+            "agent": "校验 Agent",
+            "stage_label": "内容校验",
+            "reason": "校验 Agent 处理结构化结果时出现异常。",
+        }
+    if stage_key == "graph":
+        return {
+            "agent": "图谱 Agent",
+            "stage_label": "知识图谱",
+            "reason": "图谱 Agent 构建主题 / 概念关联时失败。",
+        }
+    if stage_key == "persist":
+        return {
+            "agent": "持久化",
+            "stage_label": "结果落库",
+            "reason": "解析结果写入数据库或文本块时失败。",
+        }
+    if code == "WORKER_ERROR":
+        return {
+            "agent": "解析流水线",
+            "stage_label": stage_key or "未知阶段",
+            "reason": "流水线执行过程中发生未捕获异常（任务崩溃），已记录为 WORKER_ERROR。",
+        }
+    return {
+        "agent": "解析流水线",
+        "stage_label": stage_key or "未知阶段",
+        "reason": f"解析失败（{code or 'UNKNOWN'}）。",
+    }
+
+
 def admin_overview(session: Session, settings: Settings, *, started_at=None) -> dict:
     task_counts = {
         status: session.scalar(select(func.count(ParseTask.id)).where(ParseTask.status == status)) or 0
@@ -34,13 +101,6 @@ def admin_overview(session: Session, settings: Settings, *, started_at=None) -> 
             {"id": "search", "name": "检索 Agent", "ready": settings.search_agent_ready, "status": "可用" if settings.search_agent_ready else "规则检索", "role": "search"},
             {"id": "assist", "name": "阅读 Agent", "ready": settings.assist_agent_ready, "status": "可用" if settings.assist_agent_ready else "模板回退", "role": "assist"},
             {"id": "compare", "name": "对比 Agent", "ready": settings.assist_agent_ready, "status": "可用" if settings.assist_agent_ready else "模板回退", "role": "compare"},
-        ],
-        "pipeline": [
-            {"stage": "fetch", "agent": "抓取/正文提取", "description": "拉取 PDF/HTML 或摘要"},
-            {"stage": "summarize", "agent": "摘要 Agent", "description": "生成 summary / concepts / methods"},
-            {"stage": "validate", "agent": "校验 Agent", "description": "完整性与不确定字段标记"},
-            {"stage": "graph", "agent": "图谱 Agent", "description": "主题/概念关联与脉络"},
-            {"stage": "persist", "agent": "持久化", "description": "写入 Wiki 结构化结果与文本块"},
         ],
     }
 
@@ -124,11 +184,15 @@ def admin_quality(session: Session, limit: int = 50) -> dict:
         paper = session.get(Paper, task.paper_id)
         if paper is not None and paper.deleted_at is not None:
             continue
+        explained = explain_parse_failure(error_code=task.error_code, stage=task.stage, status=task.status)
         exceptions.append({
             "paper": task.paper_id,
             "task_id": task.id,
             "title": paper.title if paper else f"paper-{task.paper_id}",
-            "detail": task.error_code or "解析任务失败",
+            "detail": explained["reason"],
+            "error_code": task.error_code,
+            "agent": explained["agent"],
+            "stage_label": explained["stage_label"],
             "type": task.stage or "parse",
             "status": task.status,
             "attempt": task.attempt,
