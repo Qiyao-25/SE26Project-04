@@ -33,6 +33,16 @@ SORT_OPTIONS = {
     "title_desc",
     "id_asc",
     "id_desc",
+    "author_asc",
+    "author_desc",
+    "topic_asc",
+    "topic_desc",
+    "category_asc",
+    "category_desc",
+    "arxiv_asc",
+    "arxiv_desc",
+    "status_asc",
+    "status_desc",
     "relevance",
 }
 
@@ -85,7 +95,22 @@ def upsert_paper(session: Session, payload: PaperUpsert) -> tuple[Paper, bool]:
     return paper, created
 
 
+def _first_author_name():
+    return (
+        select(Author.display_name)
+        .select_from(PaperAuthor)
+        .join(Author, Author.id == PaperAuthor.author_id)
+        .where(PaperAuthor.paper_id == Paper.id)
+        .order_by(PaperAuthor.author_order.asc())
+        .limit(1)
+        .scalar_subquery()
+        .correlate(Paper)
+    )
+
+
 def _order_clause(sort_by: str):
+    first_author = _first_author_name()
+    category_key = func.lower(func.coalesce(Paper.primary_category, ""))
     if sort_by == "published_asc":
         return (Paper.published_at.asc().nullslast(), Paper.id.asc())
     if sort_by == "created_desc":
@@ -100,6 +125,26 @@ def _order_clause(sort_by: str):
         return (Paper.id.asc(),)
     if sort_by == "id_desc":
         return (Paper.id.desc(),)
+    if sort_by == "author_asc":
+        return (func.lower(func.coalesce(first_author, "")).asc(), Paper.id.asc())
+    if sort_by == "author_desc":
+        return (func.lower(func.coalesce(first_author, "")).desc(), Paper.id.desc())
+    if sort_by == "topic_asc":
+        return (category_key.asc(), Paper.id.asc())
+    if sort_by == "topic_desc":
+        return (category_key.desc(), Paper.id.desc())
+    if sort_by == "category_asc":
+        return (category_key.asc(), Paper.id.asc())
+    if sort_by == "category_desc":
+        return (category_key.desc(), Paper.id.desc())
+    if sort_by == "arxiv_asc":
+        return (func.lower(Paper.arxiv_id).asc(), Paper.id.asc())
+    if sort_by == "arxiv_desc":
+        return (func.lower(Paper.arxiv_id).desc(), Paper.id.desc())
+    if sort_by == "status_asc":
+        return (func.lower(Paper.ingest_status).asc(), Paper.id.asc())
+    if sort_by == "status_desc":
+        return (func.lower(Paper.ingest_status).desc(), Paper.id.desc())
     # published_desc / relevance fallback
     return (Paper.published_at.desc().nullslast(), Paper.id.desc())
 

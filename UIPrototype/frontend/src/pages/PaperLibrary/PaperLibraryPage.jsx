@@ -25,17 +25,30 @@ import { getLibraryPageSize } from '../../utils/uiPrefs';
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-const SORT_OPTIONS = [
-  { value: 'published_desc', label: '发表时间 ↓' },
-  { value: 'published_asc', label: '发表时间 ↑' },
-  { value: 'created_desc', label: '入库时间 ↓' },
-  { value: 'created_asc', label: '入库时间 ↑' },
-  { value: 'title_asc', label: '标题首字母 A→Z' },
-  { value: 'title_desc', label: '标题首字母 Z→A' },
-  { value: 'id_desc', label: '序号 ↓' },
-  { value: 'id_asc', label: '序号 ↑' },
-  { value: 'relevance', label: '相关度（有关键词时）' },
-];
+/** column key → API sort field prefix */
+const COLUMN_SORT_FIELD = {
+  paperId: 'id',
+  title: 'title',
+  authors: 'author',
+  topic: 'topic',
+  primaryCategory: 'category',
+  arxivId: 'arxiv',
+  publishedAt: 'published',
+  createdAt: 'created',
+  parseStatus: 'status',
+};
+
+const SORT_LABELS = {
+  id: '序号',
+  title: '标题',
+  author: '作者',
+  topic: '主题',
+  category: '类别',
+  arxiv: 'arXiv',
+  published: '发表时间',
+  created: '入库时间',
+  status: '状态',
+};
 
 const emptyFilters = {
   keyword: '',
@@ -43,13 +56,24 @@ const emptyFilters = {
   topic: undefined,
   category: undefined,
   publishedRange: null,
-  sortBy: 'published_desc',
 };
+
+function toSortBy(field, order) {
+  if (!field || !order) return 'published_desc';
+  return `${field}_${order === 'ascend' ? 'asc' : 'desc'}`;
+}
+
+function parseSortBy(sortBy = 'published_desc') {
+  const match = String(sortBy).match(/^(id|title|author|topic|category|arxiv|published|created|status)_(asc|desc)$/);
+  if (!match) return { field: 'published', order: 'descend' };
+  return { field: match[1], order: match[2] === 'asc' ? 'ascend' : 'descend' };
+}
 
 export default function PaperLibraryPage() {
   const navigate = useNavigate();
   const [draft, setDraft] = useState(emptyFilters);
   const [applied, setApplied] = useState(emptyFilters);
+  const [sortBy, setSortBy] = useState('published_desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => getLibraryPageSize(20));
   const [total, setTotal] = useState(0);
@@ -57,12 +81,7 @@ export default function PaperLibraryPage() {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const categoryOptions = useMemo(() => {
-    if (!applied.topic) return ARXIV_CATEGORIES;
-    return ARXIV_CATEGORIES.filter(
-      (item) => item.value === applied.topic || item.value.startsWith(`${applied.topic}.`),
-    );
-  }, [applied.topic]);
+  const { field: sortField, order: sortOrder } = useMemo(() => parseSortBy(sortBy), [sortBy]);
 
   const draftCategoryOptions = useMemo(() => {
     if (!draft.topic) return ARXIV_CATEGORIES;
@@ -82,7 +101,7 @@ export default function PaperLibraryPage() {
         category: applied.category,
         publishedFrom: from ? dayjs(from).startOf('day').toISOString() : undefined,
         publishedTo: to ? dayjs(to).endOf('day').toISOString() : undefined,
-        sortBy: applied.sortBy,
+        sortBy,
         page,
         pageSize,
       });
@@ -95,7 +114,7 @@ export default function PaperLibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [applied, page, pageSize]);
+  }, [applied, sortBy, page, pageSize]);
 
   useEffect(() => {
     loadPapers();
@@ -109,6 +128,7 @@ export default function PaperLibraryPage() {
   const handleReset = () => {
     setDraft(emptyFilters);
     setApplied(emptyFilters);
+    setSortBy('published_desc');
     setPage(1);
   };
 
@@ -125,62 +145,66 @@ export default function PaperLibraryPage() {
     }
   };
 
+  const sortableColumn = (key, config) => {
+    const field = COLUMN_SORT_FIELD[key];
+    return {
+      ...config,
+      key,
+      dataIndex: key,
+      sorter: true,
+      sortOrder: sortField === field ? sortOrder : null,
+      sortDirections: ['ascend', 'descend', 'ascend'],
+      showSorterTooltip: { title: '点击排序，再次点击切换正序/倒序' },
+    };
+  };
+
   const columns = [
-    {
+    sortableColumn('paperId', {
       title: '序号',
-      dataIndex: 'paperId',
-      width: 72,
-    },
-    {
+      width: 88,
+    }),
+    sortableColumn('title', {
       title: '标题',
-      dataIndex: 'title',
       ellipsis: true,
       render: (title, record) => (
         <Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => navigate(`/paper/${record.paperId}`)}>
           {title}
         </Button>
       ),
-    },
-    {
+    }),
+    sortableColumn('authors', {
       title: '作者',
-      dataIndex: 'authors',
       width: 180,
       ellipsis: true,
       render: (authors) => (Array.isArray(authors) ? authors.join(', ') : authors) || '—',
-    },
-    {
+    }),
+    sortableColumn('topic', {
       title: '主题',
-      dataIndex: 'topic',
       width: 90,
       render: (value, record) => <Tag color="geekblue">{value || (record.primaryCategory || '').split('.')[0] || '—'}</Tag>,
-    },
-    {
+    }),
+    sortableColumn('primaryCategory', {
       title: '类别',
-      dataIndex: 'primaryCategory',
       width: 110,
       render: (value) => <Tag>{value || '未分类'}</Tag>,
-    },
-    {
+    }),
+    sortableColumn('arxivId', {
       title: 'arXiv',
-      dataIndex: 'arxivId',
       width: 130,
       render: (value) => value || '—',
-    },
-    {
+    }),
+    sortableColumn('publishedAt', {
       title: '发表时间',
-      dataIndex: 'publishedAt',
       width: 150,
       render: (value) => (value ? formatDateTime(value) : '—'),
-    },
-    {
+    }),
+    sortableColumn('createdAt', {
       title: '入库时间',
-      dataIndex: 'createdAt',
       width: 150,
       render: (value) => (value ? formatDateTime(value) : '—'),
-    },
-    {
+    }),
+    sortableColumn('parseStatus', {
       title: '状态',
-      dataIndex: 'parseStatus',
       width: 100,
       render: (value, record) => (
         <Space direction="vertical" size={0}>
@@ -188,7 +212,7 @@ export default function PaperLibraryPage() {
           <Text type="secondary" style={{ fontSize: 12 }}>块 {record.chunkCount ?? 0}</Text>
         </Space>
       ),
-    },
+    }),
     {
       title: '操作',
       key: 'actions',
@@ -214,11 +238,29 @@ export default function PaperLibraryPage() {
     },
   ];
 
+  const handleTableChange = (pagination, _filters, sorter) => {
+    const nextPage = pagination?.current || 1;
+    const nextSize = pagination?.pageSize || pageSize;
+    if (nextPage !== page) setPage(nextPage);
+    if (nextSize !== pageSize) setPageSize(nextSize);
+
+    const active = Array.isArray(sorter) ? sorter.find((item) => item.order) || sorter[0] : sorter;
+    const columnKey = active?.columnKey || active?.field;
+    const field = COLUMN_SORT_FIELD[columnKey];
+    if (!field || !active?.order) return;
+
+    const nextSortBy = toSortBy(field, active.order);
+    if (nextSortBy !== sortBy) {
+      setSortBy(nextSortBy);
+      setPage(1);
+    }
+  };
+
   return (
     <div className="page-paper-library">
       <Card className="section-card" title="论文库">
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          支持按关键词、作者、发表时间、主题大类与 arXiv 类别筛选，并按首字母、序号或入库时间排序。
+          支持按关键词、作者、发表时间、主题大类与 arXiv 类别筛选。点击表头列名排序，箭头表示当前方向，再次点击切换正序/倒序。
         </Text>
         <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
           <Col xs={24} sm={12} md={8} lg={6}>
@@ -277,14 +319,6 @@ export default function PaperLibraryPage() {
               placeholder={['发表起', '发表止']}
             />
           </Col>
-          <Col xs={24} sm={12} md={8} lg={5}>
-            <Select
-              style={{ width: '100%' }}
-              options={SORT_OPTIONS}
-              value={draft.sortBy}
-              onChange={(value) => setDraft((current) => ({ ...current, sortBy: value }))}
-            />
-          </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
             <Space wrap>
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>筛选</Button>
@@ -293,17 +327,16 @@ export default function PaperLibraryPage() {
             </Space>
           </Col>
         </Row>
-        {(applied.topic || applied.category || applied.author || applied.keyword || applied.publishedRange) && (
+        {(applied.topic || applied.category || applied.author || applied.keyword || applied.publishedRange || sortBy !== 'published_desc') && (
           <Space wrap size={4} style={{ marginBottom: 12 }}>
             {applied.keyword ? <Tag>关键词：{applied.keyword}</Tag> : null}
             {applied.author ? <Tag>作者：{applied.author}</Tag> : null}
             {applied.topic ? <Tag color="blue">主题：{applied.topic}</Tag> : null}
             {applied.category ? <Tag color="cyan">类别：{applied.category}</Tag> : null}
             {applied.publishedRange ? <Tag>时间范围已选</Tag> : null}
-            <Tag>排序：{SORT_OPTIONS.find((item) => item.value === applied.sortBy)?.label || applied.sortBy}</Tag>
-            {categoryOptions.length < ARXIV_CATEGORIES.length ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>当前主题下可选类别 {categoryOptions.length} 项</Text>
-            ) : null}
+            <Tag color="purple">
+              排序：{SORT_LABELS[sortField] || sortField} {sortOrder === 'ascend' ? '↑' : '↓'}
+            </Tag>
           </Space>
         )}
         <Table
@@ -312,16 +345,13 @@ export default function PaperLibraryPage() {
           columns={columns}
           dataSource={items}
           scroll={{ x: 1280 }}
+          onChange={handleTableChange}
           pagination={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
             showTotal: (count) => `共 ${count} 篇`,
-            onChange: (nextPage, nextSize) => {
-              setPage(nextPage);
-              setPageSize(nextSize);
-            },
           }}
         />
       </Card>

@@ -57,7 +57,7 @@ def papers(
     published_to: datetime | None = None,
     sort_by: str = Query(
         default="published_desc",
-        description="排序：published_desc|published_asc|created_desc|created_asc|title_asc|title_desc|id_asc|id_desc|relevance",
+        description="排序：published_*|created_*|title_*|id_*|author_*|topic_*|category_*|arxiv_*|status_*|relevance",
     ),
     search_field: str = Query(
         default="all",

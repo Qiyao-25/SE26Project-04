@@ -95,6 +95,14 @@ async function searchMockPapers({
   else if (sortBy === 'title_desc') items = [...items].sort((a, b) => b.title.localeCompare(a.title));
   else if (sortBy === 'id_asc') items = [...items].sort((a, b) => Number(a.paperId) - Number(b.paperId));
   else if (sortBy === 'id_desc') items = [...items].sort((a, b) => Number(b.paperId) - Number(a.paperId));
+  else if (sortBy === 'author_asc') items = [...items].sort((a, b) => String(a.authors?.[0] || '').localeCompare(String(b.authors?.[0] || '')));
+  else if (sortBy === 'author_desc') items = [...items].sort((a, b) => String(b.authors?.[0] || '').localeCompare(String(a.authors?.[0] || '')));
+  else if (sortBy === 'topic_asc' || sortBy === 'category_asc') items = [...items].sort((a, b) => String(a.primaryCategory || '').localeCompare(String(b.primaryCategory || '')));
+  else if (sortBy === 'topic_desc' || sortBy === 'category_desc') items = [...items].sort((a, b) => String(b.primaryCategory || '').localeCompare(String(a.primaryCategory || '')));
+  else if (sortBy === 'arxiv_asc') items = [...items].sort((a, b) => String(a.arxivId || '').localeCompare(String(b.arxivId || '')));
+  else if (sortBy === 'arxiv_desc') items = [...items].sort((a, b) => String(b.arxivId || '').localeCompare(String(a.arxivId || '')));
+  else if (sortBy === 'status_asc') items = [...items].sort((a, b) => String(a.parseStatus || '').localeCompare(String(b.parseStatus || '')));
+  else if (sortBy === 'status_desc') items = [...items].sort((a, b) => String(b.parseStatus || '').localeCompare(String(a.parseStatus || '')));
   else if (sortBy === 'created_asc') items = [...items].sort((a, b) => String(a.createdAt || a.publishedAt).localeCompare(String(b.createdAt || b.publishedAt)));
   else if (sortBy === 'created_desc') items = [...items].sort((a, b) => String(b.createdAt || b.publishedAt).localeCompare(String(a.createdAt || a.publishedAt)));
   else if (sortBy === 'published_asc') items = [...items].sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)));
