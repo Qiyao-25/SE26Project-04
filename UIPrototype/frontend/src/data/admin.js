@@ -31,7 +31,7 @@ export const ADMIN_ACTIVITY = [
 export const ADMIN_TODOS = [
   { text: '3 篇论文校验未通过', action: 'quality' },
   { text: '2 个任务处理超时', action: 'tasks' },
-  { text: '问答Agent 处于异常状态', action: 'fleet' }
+  { text: '查看多 Agent 流水线就绪状态', action: 'overview' }
 ];
 
 export const ADMIN_USERS = [

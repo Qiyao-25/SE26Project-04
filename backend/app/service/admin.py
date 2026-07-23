@@ -19,11 +19,21 @@ def admin_overview(session: Session, settings: Settings) -> dict:
         },
         "task_counts": task_counts,
         "agents": [
-            {"id": "parse", "name": "解析 Agent", "ready": settings.parse_agent_ready, "status": "可用" if settings.parse_agent_ready else "降级模式"},
-            {"id": "qa", "name": "问答 Agent", "ready": settings.qa_agent_ready, "status": "可用" if settings.qa_agent_ready else "未配置"},
-            {"id": "search", "name": "检索 Agent", "ready": settings.search_agent_ready, "status": "可用" if settings.search_agent_ready else "规则检索"},
-            {"id": "graph", "name": "图谱 Agent", "ready": settings.graph_agent_ready, "status": "可用" if settings.graph_agent_ready else "启发式图谱"},
-            {"id": "assist", "name": "阅读辅助 Agent", "ready": settings.assist_agent_ready, "status": "可用" if settings.assist_agent_ready else "模板回退"},
+            {"id": "crawl", "name": "抓取调度", "ready": True, "status": "订阅同步 / 定时入库", "role": "ingest"},
+            {"id": "parse", "name": "摘要 Agent", "ready": settings.parse_agent_ready, "status": "可用" if settings.parse_agent_ready else "降级模式", "role": "summarize"},
+            {"id": "validate", "name": "校验 Agent", "ready": True, "status": "规则校验 Wiki 完整性", "role": "validate"},
+            {"id": "graph", "name": "图谱 Agent", "ready": settings.graph_agent_ready, "status": "可用" if settings.graph_agent_ready else "启发式图谱", "role": "graph"},
+            {"id": "qa", "name": "问答 Agent", "ready": settings.qa_agent_ready, "status": "可用" if settings.qa_agent_ready else "未配置", "role": "qa"},
+            {"id": "search", "name": "检索 Agent", "ready": settings.search_agent_ready, "status": "可用" if settings.search_agent_ready else "规则检索", "role": "search"},
+            {"id": "assist", "name": "阅读 Agent", "ready": settings.assist_agent_ready, "status": "可用" if settings.assist_agent_ready else "模板回退", "role": "assist"},
+            {"id": "compare", "name": "对比 Agent", "ready": settings.assist_agent_ready, "status": "可用" if settings.assist_agent_ready else "模板回退", "role": "compare"},
+        ],
+        "pipeline": [
+            {"stage": "fetch", "agent": "抓取/正文提取", "description": "拉取 PDF/HTML 或摘要"},
+            {"stage": "summarize", "agent": "摘要 Agent", "description": "生成 summary / concepts / methods"},
+            {"stage": "validate", "agent": "校验 Agent", "description": "完整性与不确定字段标记"},
+            {"stage": "graph", "agent": "图谱 Agent", "description": "主题/概念关联与脉络"},
+            {"stage": "persist", "agent": "持久化", "description": "写入 Wiki 结构化结果与文本块"},
         ],
     }
 

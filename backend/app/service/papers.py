@@ -38,6 +38,15 @@ def parse_status(paper: Paper) -> str:
     }.get(paper.ingest_status, "pending")
 
 
+def topic_from_category(primary_category: str | None) -> str | None:
+    if not primary_category:
+        return None
+    value = primary_category.strip()
+    if "." in value:
+        return value.split(".", 1)[0]
+    return value
+
+
 def to_item(paper: Paper) -> PaperItem:
     authors = [link.author.display_name for link in sorted(paper.authors, key=lambda link: link.author_order)]
     return PaperItem(
@@ -47,7 +56,9 @@ def to_item(paper: Paper) -> PaperItem:
         authors=authors,
         abstract=paper.abstract,
         published_at=paper.published_at,
+        created_at=getattr(paper, "created_at", None),
         primary_category=paper.primary_category,
+        topic=topic_from_category(paper.primary_category),
         pdf_url=paper.pdf_url,
         source_url=paper.source_url,
         ingest_status=paper.ingest_status,
@@ -60,8 +71,16 @@ def to_item(paper: Paper) -> PaperItem:
 def search_papers(session: Session, **filters) -> PaperPage:
     page = filters["page"]
     page_size = filters["page_size"]
+    sort_by = filters.get("sort_by") or "published_desc"
     papers, total = list_papers(session, **filters)
-    return PaperPage(items=[to_item(paper) for paper in papers], total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0)
+    return PaperPage(
+        items=[to_item(paper) for paper in papers],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=ceil(total / page_size) if total else 0,
+        sort_by=sort_by,
+    )
 
 
 def delete_paper(session: Session, paper_id: int) -> PaperItem:
@@ -113,6 +132,9 @@ def smart_search_papers(
         published_to=None,
         page=page,
         page_size=page_size,
+        topic=None,
+        sort_by="relevance",
+        search_field="all",
     )
     if total == 0 and category_filter and not category:
         papers, total = list_papers(

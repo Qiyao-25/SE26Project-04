@@ -22,17 +22,16 @@ import { formatDateTime } from '../../utils/datetime';
 
 const { Text } = Typography;
 
-const healthColor = { ok: 'success', warn: 'warning', err: 'error' };
-
 function OverviewTab({ onGo, overview, activities = [] }) {
   const metrics = overview?.metrics || {};
-  const agents = (overview?.agents || []).map((agent) => ({
-    ...agent,
-    health: agent.ready ? 'ok' : 'warn',
-    task: agent.status,
-    latency: '—',
-    cpu: '—'
-  }));
+  const agents = overview?.agents || [];
+  const pipeline = overview?.pipeline || [
+    { stage: 'fetch', agent: '抓取/正文提取', description: '拉取 PDF/HTML 或摘要' },
+    { stage: 'summarize', agent: '摘要 Agent', description: '生成 summary / concepts / methods' },
+    { stage: 'validate', agent: '校验 Agent', description: '完整性与不确定字段标记' },
+    { stage: 'graph', agent: '图谱 Agent', description: '主题/概念关联与脉络' },
+    { stage: 'persist', agent: '持久化', description: '写入 Wiki 与文本块' },
+  ];
   return (
     <>
       <Row gutter={[12, 12]}>
@@ -48,19 +47,41 @@ function OverviewTab({ onGo, overview, activities = [] }) {
           </Col>
         ))}
       </Row>
+      <Card title="多 Agent 解析流水线" size="small" style={{ marginTop: 16 }}>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="抓取 → 摘要 → 校验 → 图谱 → 持久化；问答/检索/阅读/对比 Agent 按需调用，协同完成论文处理与知识服务。"
+        />
+        <List
+          size="small"
+          grid={{ gutter: 12, xs: 1, sm: 2, md: 3, lg: 5 }}
+          dataSource={pipeline}
+          renderItem={(step, index) => (
+            <List.Item>
+              <Card size="small">
+                <Text type="secondary">{index + 1}. {step.stage}</Text>
+                <div><Text strong>{step.agent}</Text></div>
+                <Text type="secondary" style={{ fontSize: 12 }}>{step.description}</Text>
+              </Card>
+            </List.Item>
+          )}
+        />
+      </Card>
       <Row gutter={16} style={{ marginTop: 16 }}>
         <Col xs={24} lg={14}>
-          <Card title="系统健康状态 · Agent" size="small">
+          <Card title="Agent 就绪状态" size="small">
             <List
               dataSource={agents}
               renderItem={(a) => (
                 <List.Item>
                   <List.Item.Meta
-                    avatar={<Tag color={healthColor[a.health]}>{a.health === 'ok' ? '正常' : a.health === 'warn' ? '警告' : '异常'}</Tag>}
+                    avatar={<Tag color={a.ready ? 'success' : 'warning'}>{a.ready ? '就绪' : '降级'}</Tag>}
                     title={a.name}
-                    description={`${a.status} · ${a.task}`}
+                    description={a.status}
                   />
-                  <Text type="secondary" style={{ fontSize: 11 }}>延迟 {a.latency} · CPU {a.cpu}</Text>
+                  <Text type="secondary" style={{ fontSize: 11 }}>{a.role || a.id}</Text>
                 </List.Item>
               )}
             />
@@ -81,53 +102,6 @@ function OverviewTab({ onGo, overview, activities = [] }) {
           <List.Item actions={[<Text type="secondary" key="t">{formatDateTime(a.time)}</Text>]}>{a.detail}</List.Item>
         )} />
       </Card>
-    </>
-  );
-}
-
-function FleetTab({ agents = [] }) {
-  const [selected, setSelected] = useState(null);
-  const agent = agents.find((a) => a.id === selected);
-
-  return (
-    <>
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message="此处展示 Agent 配置就绪状态（LLM/开关），不是实时 CPU/延迟监控；latency/cpu 未采集属正常。"
-      />
-      <Row gutter={16}>
-        <Col xs={24} lg={14}>
-          <Table
-            size="small"
-            rowKey="id"
-            dataSource={agents}
-            onRow={(r) => ({ onClick: () => setSelected(r.id), style: { cursor: 'pointer' } })}
-            columns={[
-              { title: 'Agent', dataIndex: 'name', render: (n, r) => <><Tag color={healthColor[r.health]} />{n}</> },
-              { title: '状态', dataIndex: 'status' },
-              { title: '当前任务', dataIndex: 'task', ellipsis: true },
-              { title: '最后活跃', dataIndex: 'lastActive' },
-            ]}
-            pagination={false}
-          />
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card title="Agent 详细指标 · 24h" size="small">
-            {agent ? (
-              <List size="small" dataSource={[
-                ['状态', agent.status],
-                ['当前任务', agent.task || '—'],
-                ['配置状态', agent.ready ? '已配置' : '降级模式'],
-                ['监控指标', '后端暂未采集']
-              ]} renderItem={([k, v]) => <List.Item><Text type="secondary">{k}</Text><Text strong>{v}</Text></List.Item>} />
-            ) : (
-              <Text type="secondary">点击左侧 Agent 查看指标</Text>
-            )}
-          </Card>
-        </Col>
-      </Row>
     </>
   );
 }
@@ -421,7 +395,7 @@ export default function AdminPage() {
     setTasks((nextTasks || []).map((task) => ({
       id: task.id,
       title: task.title,
-      agent: '解析 Agent',
+      agent: task.stage ? `流水线 · ${task.stage}` : '解析流水线',
       status: task.status === 'queued' ? 'pending' : task.status === 'running' ? 'processing' : task.status === 'succeeded' ? 'done' : 'failed',
       progress: task.progress,
       start: formatDateTime(task.started_at),
@@ -438,7 +412,6 @@ export default function AdminPage() {
 
   const items = [
     { key: 'overview', label: '系统概览', children: <OverviewTab onGo={setTab} overview={overview} activities={audit} /> },
-    { key: 'fleet', label: 'Agent舰队', children: <FleetTab agents={(overview?.agents || []).map((agent) => ({ ...agent, health: agent.ready ? 'ok' : 'warn', task: agent.status, latency: '—', cpu: '—' }))} /> },
     { key: 'tasks', label: '任务队列', children: <TasksTab tasks={tasks || []} /> },
     { key: 'quality', label: '质量异常', children: <QualityTab quality={quality} onRefresh={refreshAdminData} /> },
     { key: 'users', label: '用户管理', children: <UsersTab users={users} onStatusChange={handleUserStatusChange} onDelete={handleUserDelete} /> },

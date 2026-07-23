@@ -52,12 +52,33 @@ def papers(
     keyword: str | None = Query(default=None, max_length=200),
     author: str | None = Query(default=None, max_length=200),
     category: str | None = Query(default=None, max_length=128),
+    topic: str | None = Query(default=None, max_length=64, description="主题大类，如 cs / stat / math"),
     published_from: datetime | None = None,
     published_to: datetime | None = None,
+    sort_by: str = Query(
+        default="published_desc",
+        description="排序：published_desc|published_asc|created_desc|created_asc|title_asc|title_desc|id_asc|id_desc|relevance",
+    ),
+    search_field: str = Query(
+        default="all",
+        description="Wiki/字段检索：all|title|author|keyword|direction|concept",
+    ),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=12, ge=1, le=100),
 ):
-    data = search_papers(db, keyword=keyword, author=author, category=category, published_from=published_from, published_to=published_to, page=page, page_size=page_size)
+    data = search_papers(
+        db,
+        keyword=keyword,
+        author=author,
+        category=category,
+        topic=topic,
+        published_from=published_from,
+        published_to=published_to,
+        sort_by=sort_by,
+        search_field=search_field,
+        page=page,
+        page_size=page_size,
+    )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

@@ -1,4 +1,8 @@
-"""Background parse runner: fetch text → Summarize Agent → persist Wiki + chunks."""
+"""Background parse runner: multi-agent pipeline.
+
+Stages: fetch → SummarizeAgent → ContentValidationAgent → GraphAgent → persist.
+Online agents (QA / Search / Assist / Compare) are invoked on demand.
+"""
 
 from __future__ import annotations
 

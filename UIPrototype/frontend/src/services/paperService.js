@@ -29,12 +29,14 @@ export function toPaperListItem(paper) {
     title: paper.title,
     authors: normalizeAuthors(paper.authors),
     primaryCategory: paper.primaryCategory || paper.primary_category || paper.tag || '未分类',
+    topic: paper.topic || '',
     arxivId: paper.arxivId || paper.arxiv_id || paper.arxiv || '',
     publishedAt: paper.publishedAt || paper.published_at || paper.date || '',
+    createdAt: paper.createdAt || paper.created_at || '',
     summary: paper.summary || paper.abstract || '',
     keywords: paper.keywords || [],
-    researchDirection: paper.researchDirection || paper.direction || '',
-    conceptTags: paper.conceptTags || [],
+    researchDirection: paper.researchDirection || paper.direction || paper.primary_category || paper.primaryCategory || '',
+    conceptTags: paper.conceptTags || paper.concept_tags || [],
     parseStatus: paper.parseStatus || paper.parse_status || 'pending',
     chunkCount: paper.chunkCount ?? paper.chunk_count ?? 0,
     qaReady: Boolean(paper.qaReady ?? paper.qa_ready),
@@ -63,18 +65,52 @@ export function createCompatibleDetail(paper, { forcePending = false } = {}) {
   };
 }
 
-async function searchMockPapers({ query = '', searchType = 'keyword', categories = [], sortBy = 'relevance', page = 1, pageSize = 12 } = {}) {
+async function searchMockPapers({
+  query = '',
+  author = '',
+  searchType = 'keyword',
+  categories = [],
+  category = '',
+  topic = '',
+  sortBy = 'published_desc',
+  page = 1,
+  pageSize = 12,
+} = {}) {
   const startedAt = performance.now();
   await delay();
   const normalizedQuery = query.trim().toLowerCase();
+  const resolvedCategory = category || categories[0] || '';
   let items = PAPER_LIST.map(toPaperListItem).filter((paper) => {
-    if (categories.length && !categories.includes(paper.primaryCategory)) return false;
+    if (topic) {
+      const paperTopic = (paper.topic || paper.primaryCategory || '').split('.')[0];
+      if (paperTopic !== topic && !(paper.primaryCategory || '').startsWith(`${topic}.`)) return false;
+    }
+    if (resolvedCategory && paper.primaryCategory !== resolvedCategory) return false;
+    if (author && !(paper.authors || []).some((name) => String(name).toLowerCase().includes(author.toLowerCase()))) return false;
     if (!normalizedQuery) return true;
-    return [paper.title, paper.summary, paper.primaryCategory, paper.arxivId, paper.researchDirection, ...paper.authors, ...paper.keywords, ...paper.conceptTags].join(' ').toLowerCase().includes(normalizedQuery);
+    const blob = [paper.title, paper.summary, paper.primaryCategory, paper.arxivId, paper.researchDirection, ...paper.authors, ...paper.keywords, ...paper.conceptTags].join(' ').toLowerCase();
+    return blob.includes(normalizedQuery);
   });
-  if (sortBy === 'date') items = [...items].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  if (sortBy === 'title_asc') items = [...items].sort((a, b) => a.title.localeCompare(b.title));
+  else if (sortBy === 'title_desc') items = [...items].sort((a, b) => b.title.localeCompare(a.title));
+  else if (sortBy === 'id_asc') items = [...items].sort((a, b) => Number(a.paperId) - Number(b.paperId));
+  else if (sortBy === 'id_desc') items = [...items].sort((a, b) => Number(b.paperId) - Number(a.paperId));
+  else if (sortBy === 'created_asc') items = [...items].sort((a, b) => String(a.createdAt || a.publishedAt).localeCompare(String(b.createdAt || b.publishedAt)));
+  else if (sortBy === 'created_desc') items = [...items].sort((a, b) => String(b.createdAt || b.publishedAt).localeCompare(String(a.createdAt || a.publishedAt)));
+  else if (sortBy === 'published_asc') items = [...items].sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)));
+  else items = [...items].sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
   const start = (page - 1) * pageSize;
-  return { searchId: `mock-search-${Date.now()}`, query, searchType, sortBy, total: items.length, page, pageSize, searchTimeMs: Math.max(1, Math.round(performance.now() - startedAt)), items: items.slice(start, start + pageSize) };
+  return {
+    searchId: `mock-search-${Date.now()}`,
+    query,
+    searchType,
+    sortBy,
+    total: items.length,
+    page,
+    pageSize,
+    searchTimeMs: Math.max(1, Math.round(performance.now() - startedAt)),
+    items: items.slice(start, start + pageSize),
+  };
 }
 
 async function getMockPaperDetail(paperId) {
@@ -112,9 +148,45 @@ async function getMockPaperSummary(paperId) {
 
 export async function searchPapers(params = {}) {
   if (USE_MOCK) return searchMockPapers(params);
-  const { query = '', categories = [], page = 1, pageSize = 12 } = params;
-  const data = await apiClient.get('/papers', { params: { keyword: query || undefined, category: categories[0] || undefined, page, page_size: pageSize } });
-  return { searchId: `search-${Date.now()}`, query, searchType: 'keyword', sortBy: 'relevance', total: data.total, page: data.page, pageSize: data.page_size, searchTimeMs: 0, items: data.items.map(toPaperListItem) };
+  const {
+    query = '',
+    author = '',
+    categories = [],
+    category = '',
+    topic = '',
+    publishedFrom,
+    publishedTo,
+    sortBy = 'published_desc',
+    searchField = 'all',
+    page = 1,
+    pageSize = 12,
+  } = params;
+  const resolvedCategory = category || categories[0] || undefined;
+  const data = await apiClient.get('/papers', {
+    params: {
+      keyword: query || undefined,
+      author: author || undefined,
+      category: resolvedCategory || undefined,
+      topic: topic || undefined,
+      published_from: publishedFrom || undefined,
+      published_to: publishedTo || undefined,
+      sort_by: sortBy || undefined,
+      search_field: searchField || undefined,
+      page,
+      page_size: pageSize,
+    },
+  });
+  return {
+    searchId: `search-${Date.now()}`,
+    query,
+    searchType: searchField || 'keyword',
+    sortBy: data.sort_by || sortBy,
+    total: data.total,
+    page: data.page,
+    pageSize: data.page_size,
+    searchTimeMs: 0,
+    items: data.items.map(toPaperListItem),
+  };
 }
 
 export async function deletePaper(paperId) {
@@ -125,18 +197,36 @@ export async function deletePaper(paperId) {
   return apiClient.delete(`/papers/${paperId}`);
 }
 
-export async function searchPaperWiki(query, { pageSize = 20 } = {}) {
+export async function searchPaperWiki(query, { mode = 'all', pageSize = 20 } = {}) {
   if (USE_MOCK) return [];
-  const data = await apiClient.get('/papers', {
-    params: { keyword: query?.trim() || undefined, page: 1, page_size: pageSize }
-  });
+  const trimmed = query?.trim() || '';
+  if (!trimmed) return [];
+  const field = ['title', 'author', 'keyword', 'direction', 'concept'].includes(mode) ? mode : 'all';
+  const params = {
+    page: 1,
+    page_size: pageSize,
+    search_field: field,
+    sort_by: 'relevance',
+  };
+  if (field === 'author') {
+    params.author = trimmed;
+  } else if (field === 'direction') {
+    // 研究方向优先按类别精确匹配，否则走字段检索
+    params.category = trimmed.includes('.') ? trimmed : undefined;
+    params.keyword = trimmed;
+    params.topic = trimmed.includes('.') ? undefined : trimmed;
+  } else {
+    params.keyword = trimmed;
+  }
+  const data = await apiClient.get('/papers', { params });
   return (data.items || []).map((paper) => ({
     id: String(paper.paper_id),
     paper: {
       title: paper.title,
       authors: normalizeAuthors(paper.authors).join(', '),
-      tag: paper.primary_category || '未分类'
-    }
+      tag: paper.primary_category || '未分类',
+      direction: paper.topic || paper.primary_category || '',
+    },
   }));
 }
 

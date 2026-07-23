@@ -1,10 +1,42 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Text, cast, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.model import Author, Paper, PaperAuthor
+from app.model import Author, Paper, PaperAuthor, StructuredResult
 from app.schema.papers import PaperUpsert
+
+# arXiv 学科大类（主题）前缀 → 对应 primary_category 匹配规则
+TOPIC_PREFIXES = {
+    "cs": "cs.",
+    "stat": "stat.",
+    "math": "math.",
+    "eess": "eess.",
+    "physics": "physics.",
+    "cond-mat": "cond-mat.",
+    "quant-ph": "quant-ph",
+    "hep-th": "hep-th",
+    "astro-ph": "astro-ph.",
+    "gr-qc": "gr-qc",
+    "nlin": "nlin.",
+    "q-bio": "q-bio.",
+    "q-fin": "q-fin.",
+    "econ": "econ.",
+}
+
+SORT_OPTIONS = {
+    "published_desc",
+    "published_asc",
+    "created_desc",
+    "created_asc",
+    "title_asc",
+    "title_desc",
+    "id_asc",
+    "id_desc",
+    "relevance",
+}
+
+SEARCH_FIELDS = {"all", "title", "author", "keyword", "direction", "concept"}
 
 
 def normalize_author_name(value: str) -> str:
@@ -53,6 +85,54 @@ def upsert_paper(session: Session, payload: PaperUpsert) -> tuple[Paper, bool]:
     return paper, created
 
 
+def _order_clause(sort_by: str):
+    if sort_by == "published_asc":
+        return (Paper.published_at.asc().nullslast(), Paper.id.asc())
+    if sort_by == "created_desc":
+        return (Paper.created_at.desc().nullslast(), Paper.id.desc())
+    if sort_by == "created_asc":
+        return (Paper.created_at.asc().nullslast(), Paper.id.asc())
+    if sort_by == "title_asc":
+        return (func.lower(Paper.title).asc(), Paper.id.asc())
+    if sort_by == "title_desc":
+        return (func.lower(Paper.title).desc(), Paper.id.desc())
+    if sort_by == "id_asc":
+        return (Paper.id.asc(),)
+    if sort_by == "id_desc":
+        return (Paper.id.desc(),)
+    # published_desc / relevance fallback
+    return (Paper.published_at.desc().nullslast(), Paper.id.desc())
+
+
+def _topic_filter(topic: str):
+    raw = topic.strip()
+    if not raw:
+        return None
+    key = raw.casefold()
+    prefix = TOPIC_PREFIXES.get(key)
+    if prefix:
+        if prefix.endswith("."):
+            return or_(Paper.primary_category == key, Paper.primary_category.ilike(f"{prefix}%"))
+        return or_(Paper.primary_category == prefix, Paper.primary_category.ilike(f"{prefix}.%"))
+    # free-form: exact category or prefix group
+    if "." in raw:
+        return Paper.primary_category == raw
+    return or_(Paper.primary_category == raw, Paper.primary_category.ilike(f"{raw}.%"))
+
+
+def _structured_text_exists(pattern: str, result_types: list[str]):
+    json_text = cast(StructuredResult.content_json, Text)
+    return exists(
+        select(1)
+        .where(
+            StructuredResult.paper_id == Paper.id,
+            StructuredResult.result_type.in_(result_types),
+            json_text.ilike(pattern),
+        )
+        .correlate(Paper)
+    )
+
+
 def list_papers(
     session: Session,
     *,
@@ -64,27 +144,62 @@ def list_papers(
     page: int,
     page_size: int,
     keywords: list[str] | None = None,
+    topic: str | None = None,
+    sort_by: str = "published_desc",
+    search_field: str = "all",
 ) -> tuple[list[Paper], int]:
     filters = [Paper.deleted_at.is_(None)]
+    sort_by = sort_by if sort_by in SORT_OPTIONS else "published_desc"
+    search_field = search_field if search_field in SEARCH_FIELDS else "all"
+
     keyword_terms = [item.strip() for item in (keywords or []) if item and item.strip()]
     if not keyword_terms and keyword and keyword.strip():
         keyword_terms = [keyword.strip()]
-    if keyword_terms:
+
+    # Author can come from dedicated param or from author search_field
+    author_query = author.strip() if author and author.strip() else None
+    if search_field == "author" and keyword_terms and not author_query:
+        author_query = keyword_terms[0]
+        keyword_terms = []
+
+    if keyword_terms and search_field != "author":
         term_filters = []
         for term in keyword_terms[:12]:
             pattern = f"%{term}%"
-            term_filters.extend([
-                Paper.title.ilike(pattern),
-                Paper.abstract.ilike(pattern),
-                Paper.arxiv_id.ilike(pattern),
-                Paper.primary_category.ilike(pattern),
-            ])
-        filters.append(or_(*term_filters))
-    if author:
-        author_pattern = f"%{author.strip()}%"
+            if search_field == "title":
+                term_filters.append(Paper.title.ilike(pattern))
+            elif search_field == "direction":
+                term_filters.extend([
+                    Paper.primary_category.ilike(pattern),
+                    Paper.title.ilike(pattern),
+                ])
+            elif search_field == "concept":
+                term_filters.append(_structured_text_exists(pattern, ["concepts", "wiki_triple", "summary"]))
+            elif search_field == "keyword":
+                term_filters.extend([
+                    Paper.title.ilike(pattern),
+                    Paper.abstract.ilike(pattern),
+                    _structured_text_exists(pattern, ["concepts", "wiki_triple", "summary", "methods"]),
+                ])
+            else:  # all
+                term_filters.extend([
+                    Paper.title.ilike(pattern),
+                    Paper.abstract.ilike(pattern),
+                    Paper.arxiv_id.ilike(pattern),
+                    Paper.primary_category.ilike(pattern),
+                    _structured_text_exists(pattern, ["concepts", "wiki_triple"]),
+                ])
+        if term_filters:
+            filters.append(or_(*term_filters))
+
+    if author_query:
+        author_pattern = f"%{author_query}%"
         filters.append(Paper.authors.any(PaperAuthor.author.has(Author.display_name.ilike(author_pattern))))
     if category:
-        filters.append(Paper.primary_category == category)
+        filters.append(Paper.primary_category == category.strip())
+    topic_clause = _topic_filter(topic) if topic else None
+    if topic_clause is not None:
+        filters.append(topic_clause)
     if published_from:
         filters.append(Paper.published_at >= published_from)
     if published_to:
@@ -92,7 +207,11 @@ def list_papers(
 
     count_stmt = select(func.count(Paper.id)).where(*filters)
     total = session.scalar(count_stmt) or 0
-    if keyword_terms:
+
+    use_relevance = sort_by == "relevance" and bool(keyword_terms)
+    order = _order_clause("published_desc" if use_relevance else sort_by)
+
+    if use_relevance:
         # Fetch a window large enough for the requested page after relevance re-ranking.
         need = page * page_size
         fetch_size = min(max(need + page_size * 2, page_size * 5), 500)
@@ -100,7 +219,7 @@ def list_papers(
             select(Paper)
             .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
             .where(*filters)
-            .order_by(Paper.published_at.desc().nullslast(), Paper.id.desc())
+            .order_by(*order)
             .limit(fetch_size)
         )
         papers = list(session.scalars(stmt).unique())
@@ -111,11 +230,12 @@ def list_papers(
         # Do not pad the last page: return only remaining items (e.g. 8 of 12).
         end = min(start + page_size, total, len(papers))
         return papers[start:end], total
+
     stmt = (
         select(Paper)
         .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
         .where(*filters)
-        .order_by(Paper.published_at.desc().nullslast(), Paper.id.desc())
+        .order_by(*order)
         .offset((page - 1) * page_size)
         .limit(page_size)
     )

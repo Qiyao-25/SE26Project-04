@@ -38,7 +38,9 @@ class PaperItem(BaseModel):
     authors: list[str]
     abstract: str | None
     published_at: datetime | None
+    created_at: datetime | None = None
     primary_category: str | None
+    topic: str | None = None
     pdf_url: str | None
     source_url: str | None
     ingest_status: str
@@ -55,6 +57,7 @@ class PaperPage(BaseModel):
     page: int
     page_size: int
     pages: int
+    sort_by: str | None = None
 
 
 class BatchUpsertResponse(BaseModel):

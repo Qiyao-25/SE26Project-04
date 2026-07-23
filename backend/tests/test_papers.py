@@ -158,3 +158,87 @@ def test_soft_delete_paper_hides_from_detail() -> None:
             assert exc.code == "PAPER_NOT_FOUND"
         else:
             raise AssertionError("expected PAPER_NOT_FOUND after soft delete")
+
+
+def test_list_papers_filters_topic_author_and_sort() -> None:
+    from app.repository.papers import list_papers
+    from app.service.papers import search_papers
+
+    with make_session() as session:
+        batch_upsert_papers(
+            session,
+            [
+                PaperUpsert(
+                    arxiv_id="1111.11111",
+                    title="Alpha NLP Paper",
+                    authors=[AuthorInput(name="Alice")],
+                    abstract="language model",
+                    primary_category="cs.CL",
+                    published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                ),
+                PaperUpsert(
+                    arxiv_id="2222.22222",
+                    title="Beta Vision Paper",
+                    authors=[AuthorInput(name="Bob")],
+                    abstract="computer vision",
+                    primary_category="cs.CV",
+                    published_at=datetime(2021, 1, 1, tzinfo=timezone.utc),
+                ),
+                PaperUpsert(
+                    arxiv_id="3333.33333",
+                    title="Gamma Stats Paper",
+                    authors=[AuthorInput(name="Carol")],
+                    abstract="statistics",
+                    primary_category="stat.ML",
+                    published_at=datetime(2022, 1, 1, tzinfo=timezone.utc),
+                ),
+            ],
+        )
+
+        by_topic, total = list_papers(
+            session,
+            keyword=None,
+            author=None,
+            category=None,
+            topic="cs",
+            published_from=None,
+            published_to=None,
+            page=1,
+            page_size=20,
+            sort_by="title_asc",
+        )
+        assert total == 2
+        assert [p.title for p in by_topic] == ["Alpha NLP Paper", "Beta Vision Paper"]
+
+        by_author, author_total = list_papers(
+            session,
+            keyword=None,
+            author="Bob",
+            category=None,
+            topic=None,
+            published_from=None,
+            published_to=None,
+            page=1,
+            page_size=20,
+            sort_by="id_asc",
+            search_field="author",
+        )
+        assert author_total == 1
+        assert by_author[0].title == "Beta Vision Paper"
+
+        page = search_papers(
+            session,
+            keyword="Vision",
+            author=None,
+            category=None,
+            topic=None,
+            published_from=None,
+            published_to=None,
+            page=1,
+            page_size=10,
+            sort_by="relevance",
+            search_field="title",
+        )
+        assert page.total == 1
+        assert page.items[0].topic == "cs"
+        assert page.items[0].created_at is not None

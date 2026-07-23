@@ -81,6 +81,22 @@ export const ARXIV_CATEGORIES = [
   { value: 'econ.TH', label: 'econ.TH · 理论经济学' },
 ];
 
+/** arXiv 主题大类（用于论文库主题筛选） */
+export const ARXIV_TOPIC_GROUPS = [
+  { value: 'cs', label: '计算机科学 (cs)' },
+  { value: 'stat', label: '统计学 (stat)' },
+  { value: 'math', label: '数学 (math)' },
+  { value: 'eess', label: '电气工程与系统 (eess)' },
+  { value: 'physics', label: '物理学 (physics)' },
+  { value: 'cond-mat', label: '凝聚态 (cond-mat)' },
+  { value: 'quant-ph', label: '量子物理 (quant-ph)' },
+  { value: 'astro-ph', label: '天体物理 (astro-ph)' },
+  { value: 'q-bio', label: '定量生物学 (q-bio)' },
+  { value: 'q-fin', label: '定量金融 (q-fin)' },
+  { value: 'econ', label: '经济学 (econ)' },
+  { value: 'nlin', label: '非线性科学 (nlin)' },
+];
+
 export const ARXIV_CATEGORY_LABEL_MAP = Object.fromEntries(
   ARXIV_CATEGORIES.map((item) => [item.value, item.label]),
 );
