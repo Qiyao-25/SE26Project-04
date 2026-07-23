@@ -184,6 +184,9 @@ def smart_search_papers(
     published_from, published_to = _year_bounds(plan.year_from, plan.year_to)
     title_hits = find_title_candidates(session, query, limit=max(page_size * 2, 24))
     strong_titles = [p for p in title_hits if title_similarity(query, p.title or "") >= 0.78]
+    # Full-title paste: accept slightly lower similarity once candidates were title-scoped.
+    if title_mode and not strong_titles and title_hits:
+        strong_titles = [p for p in title_hits if title_similarity(query, p.title or "") >= 0.70]
 
     if title_mode and strong_titles:
         ranked = list(strong_titles)

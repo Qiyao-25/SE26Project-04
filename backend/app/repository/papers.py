@@ -317,6 +317,12 @@ def list_papers(
     return list(session.scalars(stmt).unique()), total
 
 
+TITLE_TOKEN_STOPWORDS = {
+    "a", "an", "the", "and", "or", "of", "in", "on", "for", "to", "with", "via", "by",
+    "from", "into", "over", "under", "using", "based", "toward", "towards", "within",
+}
+
+
 def _normalize_title(value: str | None) -> str:
     text = (value or "").casefold()
     text = re.sub(r"[^\w\u4e00-\u9fff]+", " ", text, flags=re.UNICODE)
@@ -353,10 +359,52 @@ def title_similarity(query: str, title: str) -> float:
     q_tokens = set(nq.split())
     t_tokens = set(nt.split())
     if q_tokens and t_tokens:
-        overlap = len(q_tokens & t_tokens) / max(len(q_tokens), 1)
-        if overlap >= 0.7:
-            ratio = max(ratio, 0.7 + 0.25 * overlap)
+        # Coverage of query tokens in title (important for full-title paste)
+        coverage = len(q_tokens & t_tokens) / max(len(q_tokens), 1)
+        if coverage >= 0.85:
+            ratio = max(ratio, 0.82 + 0.15 * coverage)
+        elif coverage >= 0.7:
+            ratio = max(ratio, 0.7 + 0.25 * coverage)
     return ratio
+
+
+def _title_query_prefixes(query: str) -> list[str]:
+    """Long contiguous fragments for precise title ILIKE (word-boundary safe)."""
+    q = " ".join((query or "").split())
+    if not q:
+        return []
+    prefixes: list[str] = []
+    for length in (min(len(q), 96), 72, 56, 40):
+        frag = q[:length]
+        if length < len(q):
+            # Avoid cutting mid-word when possible
+            cut = frag.rsplit(" ", 1)[0]
+            if len(cut) >= 12:
+                frag = cut
+        frag = frag.strip(" :,-")
+        if len(frag) >= 12 and frag.casefold() not in {p.casefold() for p in prefixes}:
+            prefixes.append(frag)
+    return prefixes
+
+
+def _distinctive_title_tokens(query: str) -> list[str]:
+    tokens = [
+        token
+        for token in _normalize_title(query).split()
+        if len(token) >= 4 and token not in TITLE_TOKEN_STOPWORDS
+    ]
+    # Prefer longer / more specific tokens first
+    tokens.sort(key=lambda item: (-len(item), item))
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for token in tokens:
+        if token in seen:
+            continue
+        seen.add(token)
+        deduped.append(token)
+        if len(deduped) >= 8:
+            break
+    return deduped
 
 
 def compact_search_keywords(keywords: list[str] | None, query: str | None = None) -> list[str]:
@@ -469,26 +517,38 @@ def find_title_candidates(session: Session, query: str, *, limit: int = 40) -> l
     q = (query or "").strip()
     if not q:
         return []
-    tokens = [t for t in _normalize_title(q).split() if len(t) >= 3][:8]
-    filters = [Paper.deleted_at.is_(None)]
+
+    prefixes = _title_query_prefixes(q)
+    tokens = _distinctive_title_tokens(q)
+    clause_groups: list = []
+
+    # High-precision: long contiguous title prefix (fixes full-title paste misses).
+    for frag in prefixes[:3]:
+        clause_groups.append(Paper.title.ilike(f"%{frag}%"))
+
+    # Medium-precision: require several distinctive tokens together (AND).
+    if len(tokens) >= 2:
+        core = tokens[: min(3, len(tokens))]
+        clause_groups.append(and_(*[Paper.title.ilike(f"%{token}%") for token in core]))
+
+    # Low-precision fallback: OR among longest distinctive tokens only (no stopwords).
     if tokens:
-        term_filters = [Paper.title.ilike(f"%{token}%") for token in tokens]
-        # Also try a long contiguous fragment of the raw query.
-        frag = q.strip()[:80]
-        if len(frag) >= 12:
-            term_filters.append(Paper.title.ilike(f"%{frag}%"))
-        filters.append(or_(*term_filters))
+        clause_groups.append(or_(*[Paper.title.ilike(f"%{token}%") for token in tokens[:5]]))
+    elif prefixes:
+        pass
     else:
-        filters.append(Paper.title.ilike(f"%{q[:80]}%"))
+        clause_groups.append(Paper.title.ilike(f"%{q[:80]}%"))
+
+    filters = [Paper.deleted_at.is_(None), or_(*clause_groups)]
     stmt = (
         select(Paper)
         .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
         .where(*filters)
-        .limit(min(max(limit * 3, 60), 300))
+        .limit(min(max(limit * 5, 80), 400))
     )
     papers = list(session.scalars(stmt).unique())
     ranked = sorted(papers, key=lambda p: (title_similarity(q, p.title or ""), -p.id), reverse=True)
-    strong = [p for p in ranked if title_similarity(q, p.title or "") >= 0.72]
+    strong = [p for p in ranked if title_similarity(q, p.title or "") >= 0.70]
     return (strong or ranked)[:limit]
 
 

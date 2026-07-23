@@ -144,6 +144,57 @@ def test_smart_search_matches_english_author_from_chinese_query() -> None:
     assert result.search_session_id
 
 
+def test_full_title_paste_hits_exact_paper() -> None:
+    engine = create_engine_for(Settings(environment="test", database_url="sqlite:///:memory:"))
+    Base.metadata.create_all(engine)
+    full_title = (
+        "Overlaying Governance: A Compositional Authorization Framework "
+        "for Delegation and Scope in Agentic AI"
+    )
+
+    with Session(engine) as session:
+        # Noise papers that share common title words (framework / for / and / scope).
+        noise = [
+            PaperUpsert(
+                arxiv_id=f"noise-{index}",
+                title=f"A Framework for Scope and Delegation Study {index}",
+                abstract="Generic framework paper about delegation and scope.",
+            )
+            for index in range(1, 40)
+        ]
+        batch_upsert_papers(
+            session,
+            [
+                *noise,
+                PaperUpsert(
+                    arxiv_id="overlay-1",
+                    title=full_title,
+                    abstract="Authorization framework for agentic AI governance.",
+                ),
+            ],
+        )
+
+        full = smart_search_papers(
+            session,
+            query=full_title,
+            page=1,
+            page_size=12,
+            settings=_settings(),
+        )
+        short = smart_search_papers(
+            session,
+            query="Overlaying Governance",
+            page=1,
+            page_size=12,
+            settings=_settings(),
+        )
+
+    assert full.total >= 1
+    assert full.items[0].arxiv_id == "overlay-1"
+    assert short.total >= 1
+    assert short.items[0].arxiv_id == "overlay-1"
+
+
 def test_smart_search_uses_database_papers_without_llm() -> None:
     engine = create_engine_for(Settings(environment="test", database_url="sqlite:///:memory:"))
     Base.metadata.create_all(engine)
