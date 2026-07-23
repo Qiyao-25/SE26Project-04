@@ -13,6 +13,8 @@ from app.agents.graph_agent import GraphAgent
 from app.model import Paper, StructuredResult
 from app.repository.chunks import search_chunks
 from app.repository.papers import (
+    compact_search_keywords,
+    filter_relevant_papers,
     find_title_candidates,
     get_paper,
     list_papers,
@@ -143,64 +145,54 @@ def smart_search_papers(
         papers = strong_titles[start:start + page_size]
         category_filter = category
     else:
-        search_field = "title" if title_mode else "all"
-        keywords = plan.keywords or [query]
-        # For title mode keep the full query as primary keyword for ranking.
-        if title_mode and query not in keywords:
-            keywords = [query, *keywords]
-        papers, total = list_papers(
-            session,
-            keyword=plan.rewritten_query or query,
-            keywords=keywords,
-            author=None,
-            category=category_filter,
-            published_from=None,
-            published_to=None,
-            page=page,
-            page_size=page_size,
-            topic=None,
-            sort_by="relevance",
-            search_field=search_field,
-        )
-        if total == 0 and category_filter and not category:
-            papers, total = list_papers(
-                session,
-                keyword=plan.rewritten_query or query,
-                keywords=keywords,
-                author=None,
-                category=None,
-                published_from=None,
-                published_to=None,
-                page=page,
-                page_size=page_size,
-                topic=None,
-                sort_by="relevance",
-                search_field=search_field,
-            )
-            category_filter = None
-        if total == 0:
-            papers, total = list_papers(
+        # Metadata-only: topic / title / author / arxiv id (代码) / abstract — never wiki/parse 出处.
+        search_field = "title" if title_mode else "metadata"
+        raw_keywords = list(plan.keywords or [])
+        if title_mode:
+            raw_keywords = [query, *raw_keywords]
+        keywords = compact_search_keywords(raw_keywords, query=plan.rewritten_query or query)
+        if not keywords:
+            keywords = compact_search_keywords([query])
+
+        def _fetch(kw: list[str], cat: str | None, field: str) -> list:
+            fetch_size = min(max(page_size * 20, 80), 200)
+            rows, _ = list_papers(
                 session,
                 keyword=query,
-                keywords=None,
+                keywords=kw,
                 author=None,
-                category=None,
+                category=cat,
                 published_from=None,
                 published_to=None,
-                page=page,
-                page_size=page_size,
+                page=1,
+                page_size=fetch_size,
                 topic=None,
                 sort_by="relevance",
-                search_field="title" if title_mode else "all",
+                search_field=field,
             )
+            return filter_relevant_papers(rows, kw or [query], query=query)
+
+        ranked = _fetch(keywords, category_filter, search_field)
+        if not ranked and category_filter and not category:
+            ranked = _fetch(keywords, None, search_field)
             category_filter = None
-        # Merge any strong title hits to the front of page 1 (dedupe by id).
-        if page == 1 and strong_titles:
-            seen = {p.id for p in papers}
-            merged = [p for p in strong_titles if p.id not in seen]
-            if merged:
-                papers = (merged + papers)[:page_size]
-                total = max(total, len(strong_titles))
+        if not ranked:
+            # Loosen: fewer tokens, still metadata-only.
+            short_kw = keywords[:2] if len(keywords) > 1 else keywords or [query]
+            ranked = _fetch(short_kw, None, search_field)
+            category_filter = None
+        if not ranked and not title_mode:
+            ranked = _fetch(compact_search_keywords([query]) or [query], None, "metadata")
+            category_filter = None
+
+        if strong_titles:
+            strong_ids = {p.id for p in strong_titles}
+            rest = [p for p in ranked if p.id not in strong_ids]
+            ranked = list(strong_titles) + rest
+
+        total = len(ranked)
+        start = (page - 1) * page_size
+        papers = ranked[start:start + page_size]
 
     items = [to_item(paper) for paper in papers]
     if include_answer:

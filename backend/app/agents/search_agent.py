@@ -22,11 +22,12 @@ REWRITE_PROMPT = """你是 PaperMate 的论文检索 Agent。
   "intent": "一句话说明用户想找什么"
 }
 规则：
-1. keywords 3-8 个，包含中英文同义表达（如 注意力/attention、Transformer）。
-2. 不要编造具体 arXiv ID，除非用户明确给出。
-3. category_hints 可选，使用 arXiv 分类如 cs.CL、cs.LG、cs.CV。
-4. 若用户输入看起来像完整论文标题，rewritten_query 应尽量保留原标题用语，keywords 以标题核心词为主，category_hints 可为空。
-5. 同一意图应输出稳定、可复现的 keywords（按重要性排序），不要随意换词。
+1. keywords 2-5 个，只保留高区分度核心词（专有名词、方法名、任务名）；中英同义各保留最常用的一种即可。
+2. 不要加入泛化词（paper/method/model/learning/study/研究/方法/模型等），不要为了扩召回而堆砌弱相关词。
+3. 不要编造具体 arXiv ID，除非用户明确给出。
+4. category_hints 可选且宜少，使用 arXiv 分类如 cs.CL、cs.LG、cs.CV；不确定时留空。
+5. 若用户输入看起来像完整论文标题，rewritten_query 应尽量保留原标题用语，keywords 以标题核心词为主，category_hints 可为空。
+6. 同一意图应输出稳定、可复现的 keywords（按重要性排序），不要随意换词。
 """
 
 
@@ -111,8 +112,8 @@ class SearchAgent:
                 keywords.append(token)
         return SearchPlan(
             rewritten_query=rewritten,
-            keywords=_dedupe(keywords)[:10],
-            category_hints=_as_str_list(data.get("category_hints"))[:5],
+            keywords=_dedupe(keywords)[:5],
+            category_hints=_as_str_list(data.get("category_hints"))[:3],
             intent=str(data.get("intent") or "").strip(),
             source="llm",
         )
@@ -175,13 +176,27 @@ class SearchAgent:
         return SearchAnswer(answer=answer, highlights=plan.keywords[:5], source="template")
 
 
+_HEURISTIC_STOP = {
+    "a", "an", "the", "and", "or", "of", "in", "on", "for", "to", "with", "via", "by",
+    "from", "using", "based", "paper", "study", "method", "model", "models", "learning",
+    "data", "approach", "towards", "toward", "一种", "基于", "通过", "研究", "方法", "模型", "论文",
+}
+
+
 def _heuristic_keywords(query: str) -> list[str]:
-    tokens = re.findall(r"[A-Za-z][A-Za-z0-9\-]{1,}|[\u4e00-\u9fff]{2,}", query or "")
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9\-]{2,}|[\u4e00-\u9fff]{2,}", query or "")
     expanded = list(expand_query_tokens(query))
-    merged = _dedupe(tokens + [token for token in expanded if re.search(r"[A-Za-z]", token) or len(token) >= 2])
-    if query.strip() and query.strip() not in merged:
+    merged = _dedupe(
+        [
+            token
+            for token in tokens + [t for t in expanded if re.search(r"[A-Za-z]", t) or len(t) >= 2]
+            if token.casefold() not in _HEURISTIC_STOP
+        ]
+    )
+    # Prefer token list over dumping the full multi-word query (OR/AND noise).
+    if len(merged) < 2 and query.strip() and query.strip() not in merged:
         merged.insert(0, query.strip())
-    return merged[:10]
+    return merged[:5]
 
 
 def _as_str_list(value: Any) -> list[str]:

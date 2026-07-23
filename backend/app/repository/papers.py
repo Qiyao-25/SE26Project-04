@@ -2,7 +2,7 @@ import re
 from difflib import SequenceMatcher
 from datetime import datetime, timezone
 
-from sqlalchemy import Text, cast, exists, func, or_, select
+from sqlalchemy import Text, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.model import Author, Paper, PaperAuthor, StructuredResult
@@ -48,7 +48,15 @@ SORT_OPTIONS = {
     "relevance",
 }
 
-SEARCH_FIELDS = {"all", "title", "author", "keyword", "direction", "concept"}
+SEARCH_FIELDS = {"all", "title", "author", "keyword", "direction", "concept", "metadata"}
+
+# Smart-search / metadata ranking ignores these weak tokens.
+SEARCH_STOPWORDS = {
+    "a", "an", "the", "and", "or", "of", "in", "on", "for", "to", "with", "via", "by",
+    "from", "into", "over", "under", "using", "based", "paper", "study", "method",
+    "model", "models", "learning", "data", "approach", "towards", "toward", "via",
+    "一种", "基于", "通过", "研究", "方法", "模型", "论文", "学习", "数据",
+}
 
 
 def normalize_author_name(value: str) -> str:
@@ -221,22 +229,42 @@ def list_papers(
                     Paper.title.ilike(pattern),
                 ])
             elif search_field == "concept":
+                # Wiki concept mode only — not used by smart search.
                 term_filters.append(_structured_text_exists(pattern, ["concepts", "wiki_triple", "summary"]))
             elif search_field == "keyword":
                 term_filters.extend([
                     Paper.title.ilike(pattern),
                     Paper.abstract.ilike(pattern),
-                    _structured_text_exists(pattern, ["concepts", "wiki_triple", "summary", "methods"]),
                 ])
-            else:  # all
+            elif search_field == "metadata":
+                # Smart search: AND core terms across topic/title/author/arxiv/abstract only.
+                # (Built after the loop — see below.)
+                pass
+            else:  # all — library keyword box; still metadata-only (no parse/wiki 出处)
                 term_filters.extend([
                     Paper.title.ilike(pattern),
                     Paper.abstract.ilike(pattern),
                     Paper.arxiv_id.ilike(pattern),
                     Paper.primary_category.ilike(pattern),
-                    _structured_text_exists(pattern, ["concepts", "wiki_triple"]),
+                    Paper.authors.any(PaperAuthor.author.has(Author.display_name.ilike(pattern))),
                 ])
-        if term_filters:
+        if search_field == "metadata" and keyword_terms:
+            per_term: list = []
+            for term in keyword_terms[:4]:
+                pattern = f"%{term}%"
+                per_term.append(
+                    or_(
+                        Paper.title.ilike(pattern),
+                        Paper.abstract.ilike(pattern),
+                        Paper.arxiv_id.ilike(pattern),
+                        Paper.primary_category.ilike(pattern),
+                        Paper.authors.any(PaperAuthor.author.has(Author.display_name.ilike(pattern))),
+                    )
+                )
+            # Require every core term (up to 3) to match somewhere → fewer weak hits.
+            core = per_term[:3] if len(per_term) >= 2 else per_term
+            filters.append(and_(*core) if len(core) > 1 else core[0])
+        elif term_filters:
             filters.append(or_(*term_filters))
 
     if author_query:
@@ -331,20 +359,109 @@ def title_similarity(query: str, title: str) -> float:
     return ratio
 
 
-def _rank_papers(papers: list[Paper], keywords: list[str], query: str | None = None) -> list[Paper]:
-    lowered = [keyword.casefold() for keyword in keywords if keyword]
-    nq = _normalize_title(query) if query else ""
+def compact_search_keywords(keywords: list[str] | None, query: str | None = None) -> list[str]:
+    """Keep stronger tokens only — reduces weak OR/AND matches in smart search."""
+    raw = [item.strip() for item in (keywords or []) if item and str(item).strip()]
+    if query and query.strip():
+        # Prefer splitting a multi-word query into tokens rather than AND-ing the whole phrase.
+        parts = re.findall(r"[A-Za-z][A-Za-z0-9\-]{2,}|[\u4e00-\u9fff]{2,}", query.strip())
+        if len(parts) >= 2:
+            for part in parts:
+                if part not in raw:
+                    raw.append(part)
+        elif query.strip() not in raw:
+            raw.insert(0, query.strip())
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for term in raw:
+        # Skip long multi-word phrases when we already collect tokens (AND would over-constrain).
+        if " " in term and len(term.split()) >= 3:
+            continue
+        key = term.casefold()
+        if key in seen:
+            continue
+        if key in SEARCH_STOPWORDS:
+            continue
+        has_cjk = bool(re.search(r"[\u4e00-\u9fff]", term))
+        if has_cjk and len(re.findall(r"[\u4e00-\u9fff]", term)) < 2:
+            continue
+        if not has_cjk and len(term) < 3 and not re.match(r"^\d{4}\.\d{4,}$", term):
+            continue
+        seen.add(key)
+        cleaned.append(term)
+        if len(cleaned) >= 5:
+            break
+    return cleaned or ([query.strip()] if query and query.strip() else [])
 
-    def score(paper: Paper) -> tuple[float, int, int, int]:
-        title = paper.title or ""
-        blob = " ".join([title, paper.abstract or "", paper.arxiv_id or "", paper.primary_category or ""]).casefold()
-        hits = sum(1 for keyword in lowered if keyword in blob)
-        title_hits = sum(1 for keyword in lowered if keyword in title.casefold())
-        sim = title_similarity(query, title) if query else 0.0
-        # Primary: title similarity (stable title lookup); then keyword hits; tie-break by id.
-        return (sim, title_hits * 3 + hits, 0, -int(paper.id or 0))
+
+def paper_metadata_score(paper: Paper, keywords: list[str], query: str | None = None) -> float:
+    """Higher is better. Category-only hits score low and can be filtered out."""
+    lowered = [k.casefold() for k in keywords if k]
+    title = (paper.title or "").casefold()
+    abstract = (paper.abstract or "").casefold()
+    arxiv = (paper.arxiv_id or "").casefold()
+    category = (paper.primary_category or "").casefold()
+    authors = " ".join(
+        link.author.display_name for link in sorted(paper.authors, key=lambda link: link.author_order)
+    ).casefold()
+
+    sim = title_similarity(query, paper.title or "") if query else 0.0
+    score = sim * 40.0
+    title_hits = 0
+    abstract_hits = 0
+    author_hits = 0
+    code_hits = 0
+    topic_hits = 0
+    for keyword in lowered:
+        if keyword in title:
+            title_hits += 1
+            score += 8.0
+        if keyword in abstract:
+            abstract_hits += 1
+            score += 3.0
+        if keyword in authors:
+            author_hits += 1
+            score += 6.0
+        if keyword in arxiv:
+            code_hits += 1
+            score += 10.0
+        # Topic/category: only count reasonably specific tokens
+        if keyword in category and (len(keyword) >= 4 or "." in keyword):
+            topic_hits += 1
+            score += 2.0
+
+    # Drop category-only / abstract-only weak noise unless title is near-match.
+    substantive = title_hits + abstract_hits + author_hits + code_hits
+    if sim < 0.72 and substantive == 0:
+        return 0.0
+    if sim < 0.72 and title_hits + author_hits + code_hits == 0 and abstract_hits < 2:
+        # Single abstract token match is usually weak-related.
+        return min(score, 2.9)
+    _ = topic_hits  # counted in score when specific enough
+    return score
+
+
+def _rank_papers(papers: list[Paper], keywords: list[str], query: str | None = None) -> list[Paper]:
+    def score(paper: Paper) -> tuple[float, int]:
+        return (paper_metadata_score(paper, keywords, query), -int(paper.id or 0))
 
     return sorted(papers, key=score, reverse=True)
+
+
+def filter_relevant_papers(
+    papers: list[Paper],
+    keywords: list[str],
+    query: str | None = None,
+    *,
+    min_score: float = 5.0,
+) -> list[Paper]:
+    ranked = _rank_papers(papers, keywords, query=query)
+    kept = [paper for paper in ranked if paper_metadata_score(paper, keywords, query) >= min_score]
+    if query:
+        for paper in ranked:
+            if title_similarity(query, paper.title or "") >= 0.78 and paper not in kept:
+                kept.append(paper)
+    return kept
 
 
 def find_title_candidates(session: Session, query: str, *, limit: int = 40) -> list[Paper]:
