@@ -11,10 +11,19 @@ import {
   Spin,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   message
 } from 'antd';
-import { ArrowLeftOutlined, FilePdfOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  ExpandOutlined,
+  FilePdfOutlined,
+  LinkOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  ReloadOutlined
+} from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
@@ -68,6 +77,8 @@ export default function PaperDetailPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [graphRefreshing, setGraphRefreshing] = useState(false);
   const [mainTab, setMainTab] = useState('content');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [pdfFullscreen, setPdfFullscreen] = useState(false);
   const historyRecordedFor = useRef(null);
 
   const [previewPaper, setPreviewPaper] = useState(null);
@@ -101,6 +112,24 @@ export default function PaperDetailPage() {
   useEffect(() => {
     if (!comparePaperB) setComparePreviewActive(false);
   }, [comparePaperB, setComparePreviewActive]);
+
+  useEffect(() => {
+    setPdfFullscreen(false);
+  }, [paperId, comparePreviewActive, comparePaperB]);
+
+  useEffect(() => {
+    if (!pdfFullscreen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setPdfFullscreen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [pdfFullscreen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -315,19 +344,22 @@ export default function PaperDetailPage() {
               <iframe
                 title={`${shownPaper.title} PDF`}
                 src={shownContent.pdfUrl}
-                style={{
-                  width: '100%',
-                  height: '72vh',
-                  minHeight: 560,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  background: '#ffffff'
-                }}
+                className="paper-pdf-frame"
               />
 
               <Space wrap style={{ marginTop: 12 }}>
                 <Button
                   type="primary"
+                  icon={<ExpandOutlined />}
+                  onClick={() => {
+                    setMainTab('content');
+                    setPdfFullscreen(true);
+                  }}
+                >
+                  全屏阅读 PDF
+                </Button>
+
+                <Button
                   icon={<FilePdfOutlined />}
                   href={shownContent.pdfUrl}
                   target="_blank"
@@ -546,7 +578,7 @@ export default function PaperDetailPage() {
   ];
 
   return (
-    <div className="page-paper-detail">
+    <div className={`page-paper-detail${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <Card
         size="small"
         className="section-card"
@@ -558,16 +590,35 @@ export default function PaperDetailPage() {
             <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper}>
               退出论文
             </Button>
+            <Tooltip title={sidebarCollapsed ? '展开论文详情侧栏' : '收起论文详情侧栏'}>
+              <Button
+                icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={() => setSidebarCollapsed((value) => !value)}
+              >
+                {sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+              </Button>
+            </Tooltip>
+            {shownContent?.pdfUrl ? (
+              <Button
+                icon={<ExpandOutlined />}
+                onClick={() => {
+                  setMainTab('content');
+                  setPdfFullscreen(true);
+                }}
+              >
+                全屏阅读 PDF
+              </Button>
+            ) : null}
             <Text type="secondary">可切换学习空间 / 设置等；再点工作空间仍回到本篇。退出后恢复检索首页</Text>
           </Space>
-          <Text ellipsis style={{ maxWidth: 420 }} strong>
+          <Text ellipsis style={{ maxWidth: 360 }} strong>
             {paper.title}
           </Text>
         </Space>
       </Card>
 
       <Row gutter={16} align="stretch">
-        <Col xs={24} lg={15}>
+        <Col xs={24} lg={sidebarCollapsed ? 24 : 15}>
           <Card className="section-card paper-main-card">
             {viewingOther ? (
               <Alert
@@ -600,10 +651,56 @@ export default function PaperDetailPage() {
             )}
           </Card>
         </Col>
-        <Col xs={24} lg={9}>
-          <PaperSidebar paperId={paperId} paper={paper} />
-        </Col>
+        {!sidebarCollapsed ? (
+          <Col xs={24} lg={9} className="paper-sidebar-col">
+            <PaperSidebar paperId={paperId} paper={paper} />
+          </Col>
+        ) : (
+          <div className="paper-sidebar-reopen">
+            <Tooltip title="展开侧栏" placement="left">
+              <Button
+                type="primary"
+                shape="circle"
+                size="large"
+                icon={<MenuUnfoldOutlined />}
+                aria-label="展开论文详情侧栏"
+                onClick={() => setSidebarCollapsed(false)}
+              />
+            </Tooltip>
+          </div>
+        )}
       </Row>
+
+      {pdfFullscreen && shownContent?.pdfUrl ? (
+        <div className="pdf-fullscreen-overlay" role="dialog" aria-modal="true" aria-label="全屏阅读 PDF">
+          <div className="pdf-fullscreen-toolbar">
+            <div className="pdf-fullscreen-title">
+              <FilePdfOutlined />
+              <Text ellipsis style={{ maxWidth: 'min(62vw, 720px)', color: '#f8fafc' }} strong>
+                {shownPaper.title}
+              </Text>
+            </div>
+            <Space wrap>
+              <Button
+                icon={<FilePdfOutlined />}
+                href={shownContent.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                新窗口打开
+              </Button>
+              <Button type="primary" onClick={() => setPdfFullscreen(false)}>
+                退出全屏（Esc）
+              </Button>
+            </Space>
+          </div>
+          <iframe
+            title={`${shownPaper.title} 全屏 PDF`}
+            src={shownContent.pdfUrl}
+            className="pdf-fullscreen-frame"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
