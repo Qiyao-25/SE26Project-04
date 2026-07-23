@@ -492,6 +492,20 @@ def find_title_candidates(session: Session, query: str, *, limit: int = 40) -> l
     return (strong or ranked)[:limit]
 
 
+def get_papers_by_ids(session: Session, paper_ids: list[int]) -> list[Paper]:
+    """Load papers by id and preserve the given order."""
+    ids = [int(item) for item in paper_ids if item is not None]
+    if not ids:
+        return []
+    stmt = (
+        select(Paper)
+        .options(joinedload(Paper.authors).joinedload(PaperAuthor.author))
+        .where(Paper.id.in_(ids), Paper.deleted_at.is_(None))
+    )
+    found = {paper.id: paper for paper in session.scalars(stmt).unique()}
+    return [found[paper_id] for paper_id in ids if paper_id in found]
+
+
 def get_paper(session: Session, paper_id: int) -> Paper | None:
     stmt = (
         select(Paper)

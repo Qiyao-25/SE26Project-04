@@ -222,6 +222,71 @@ _AUTHOR_QUERY_RE = re.compile(
     re.IGNORECASE,
 )
 _ARXIV_RE = re.compile(r"(?:arxiv\s*[:：]?\s*)?(\d{4}\.\d{4,5})(?:v\d+)?", re.IGNORECASE)
+_YEAR_RANGE_RE = re.compile(
+    r"(?P<y1>20\d{2}|19\d{2})\s*[-~到至]\s*(?P<y2>20\d{2}|19\d{2})"
+    r"|(?:after|since|从|自)?\s*(?P<from>20\d{2}|19\d{2})\s*(?:年)?\s*(?:后|以后|以来| onwards)?"
+    r"|(?:before|until|在)?\s*(?P<to>20\d{2}|19\d{2})\s*(?:年)?\s*(?:前|以前)"
+    r"|(?P<year>20\d{2}|19\d{2})\s*年",
+    re.IGNORECASE,
+)
+_EXCLUDE_PATTERNS = (
+    (re.compile(r"(不要|排除|except|without)\s*(综述|survey|review)", re.I), ["survey", "review", "综述"]),
+    (re.compile(r"(不要|排除)\s*(短文|poster)", re.I), ["poster"]),
+)
+
+# Curated term lexicon (canonical + aliases). confidence=curated.
+TERM_LEXICON: list[dict] = [
+    {
+        "canonical": "retrieval augmented generation",
+        "aliases": ["RAG", "检索增强生成", "retrieval-augmented generation"],
+        "category_hints": ["cs.CL", "cs.IR"],
+    },
+    {
+        "canonical": "large language model",
+        "aliases": ["LLM", "大语言模型", "大型语言模型", "LLMs"],
+        "category_hints": ["cs.CL", "cs.LG"],
+    },
+    {
+        "canonical": "low-rank adaptation",
+        "aliases": ["LoRA", "低秩适配", "低秩微调"],
+        "category_hints": ["cs.LG", "cs.CL"],
+    },
+    {
+        "canonical": "parameter-efficient fine-tuning",
+        "aliases": ["PEFT", "参数高效微调"],
+        "category_hints": ["cs.LG"],
+    },
+    {
+        "canonical": "self-attention",
+        "aliases": ["自注意力", "self attention", "自注意机制"],
+        "category_hints": ["cs.CL", "cs.LG"],
+    },
+    {
+        "canonical": "transformer",
+        "aliases": ["Transformer", "变换器"],
+        "category_hints": ["cs.CL", "cs.LG"],
+    },
+    {
+        "canonical": "vision-language model",
+        "aliases": ["VLM", "视觉语言模型", "多模态大模型"],
+        "category_hints": ["cs.CV", "cs.CL"],
+    },
+    {
+        "canonical": "code generation",
+        "aliases": ["程序合成", "代码生成", "program synthesis"],
+        "category_hints": ["cs.SE", "cs.PL"],
+    },
+    {
+        "canonical": "graph neural network",
+        "aliases": ["GNN", "图神经网络"],
+        "category_hints": ["cs.LG"],
+    },
+    {
+        "canonical": "reinforcement learning from human feedback",
+        "aliases": ["RLHF", "人类反馈强化学习"],
+        "category_hints": ["cs.LG", "cs.CL"],
+    },
+]
 
 
 def extract_arxiv_id(query: str) -> str | None:
@@ -240,6 +305,117 @@ def strip_query_fillers(query: str) -> str:
     return " ".join(text.split()).strip() or (query or "").strip()
 
 
+def extract_year_range(query: str) -> tuple[int | None, int | None]:
+    text = query or ""
+    match = _YEAR_RANGE_RE.search(text)
+    if not match:
+        # 「近几年」→ last 3 years
+        if re.search(r"近几年|近三年|近年来|recent years", text, re.I):
+            from datetime import datetime
+
+            year = datetime.now().year
+            return year - 2, year
+        return None, None
+    if match.groupdict().get("y1") and match.groupdict().get("y2"):
+        a, b = int(match.group("y1")), int(match.group("y2"))
+        return min(a, b), max(a, b)
+    if match.groupdict().get("from"):
+        y = int(match.group("from"))
+        if re.search(r"后|以后|以来|after|since", text, re.I):
+            return y, None
+        return y, y
+    if match.groupdict().get("to"):
+        return None, int(match.group("to"))
+    if match.groupdict().get("year"):
+        y = int(match.group("year"))
+        if re.search(rf"{y}\s*年\s*(后|以后|以来)|after\s*{y}|since\s*{y}", text, re.I):
+            return y, None
+        if re.search(rf"{y}\s*年\s*(前|以前)|before\s*{y}", text, re.I):
+            return None, y
+        return y, y
+    return None, None
+
+
+def extract_exclude_terms(query: str) -> list[str]:
+    terms: list[str] = []
+    text = query or ""
+    for pattern, values in _EXCLUDE_PATTERNS:
+        if pattern.search(text):
+            terms.extend(values)
+    return _dedupe(terms)
+
+
+def expand_term_aliases(query: str) -> tuple[list[str], list[str], list[str]]:
+    """Return (canonical_terms, aliases, category_hints) from curated lexicon."""
+    text = (query or "").casefold()
+    raw = query or ""
+    canonical: list[str] = []
+    aliases: list[str] = []
+    categories: list[str] = []
+    for entry in TERM_LEXICON:
+        keys = [entry["canonical"], *entry.get("aliases", [])]
+        if any(str(key).casefold() in text or str(key) in raw for key in keys):
+            canonical.append(entry["canonical"])
+            aliases.extend(entry.get("aliases", []))
+            categories.extend(entry.get("category_hints", []))
+    return _dedupe(canonical), _dedupe(aliases), _dedupe(categories)
+
+
+def resolve_author_hints(query: str) -> tuple[list[str], bool, list[str]]:
+    """
+    Resolve authors conservatively.
+    Returns (hints_for_search, verified, warnings).
+    Only KNOWN_AUTHOR_ALIASES / explicit English names are verified.
+    Pinyin guesses are returned as soft hints with AUTHOR_TRANSLITERATION_UNVERIFIED.
+    """
+    text = query or ""
+    raw_names: list[str] = []
+    match = _AUTHOR_QUERY_RE.search(text)
+    if match:
+        for key in ("name", "name2", "name3", "name4"):
+            value = (match.groupdict().get(key) or "").strip()
+            if value:
+                raw_names.append(value)
+                break
+    for zh in KNOWN_AUTHOR_ALIASES:
+        if zh in text and zh not in raw_names:
+            raw_names.append(zh)
+
+    hints: list[str] = []
+    warnings: list[str] = []
+    verified = False
+    for name in raw_names:
+        if name in KNOWN_AUTHOR_ALIASES:
+            hints.extend(KNOWN_AUTHOR_ALIASES[name])
+            verified = True
+            continue
+        if re.fullmatch(r"[A-Za-z][A-Za-z.\-\s]+", name):
+            hints.extend(romanize_chinese_person_name(name) or [name])
+            verified = True
+            continue
+        # Chinese without curated alias: soft pinyin only
+        variants = romanize_chinese_person_name(name)
+        if variants:
+            hints.extend(variants)
+            warnings.append("AUTHOR_TRANSLITERATION_UNVERIFIED")
+        else:
+            hints.append(name)
+            warnings.append("AUTHOR_TRANSLITERATION_UNVERIFIED")
+    return _dedupe(hints), verified, _dedupe(warnings)
+
+
+def extract_author_candidates(query: str) -> list[str]:
+    hints, _, _ = resolve_author_hints(query)
+    return hints
+
+
+def paper_matches_excludes(paper, exclude_terms: list[str]) -> bool:
+    if not exclude_terms:
+        return False
+    blob = f"{paper.title or ''} {paper.abstract or ''}".casefold()
+    return any(term.casefold() in blob for term in exclude_terms if term)
+
+
 def romanize_chinese_person_name(name: str) -> list[str]:
     """Return English author variants: Given Family, Family Given, Family."""
     raw = (name or "").strip()
@@ -256,7 +432,6 @@ def romanize_chinese_person_name(name: str) -> list[str]:
             variants.append(parts[-1])
         return _dedupe(variants)
 
-    # Known alias substring (e.g. query still contains 沈备军)
     for zh, aliases in KNOWN_AUTHOR_ALIASES.items():
         if zh in raw:
             return list(aliases)
@@ -279,33 +454,11 @@ def romanize_chinese_person_name(name: str) -> list[str]:
             return []
         given_parts.append(py)
     given_en = "".join(given_parts).title().replace(" ", "")
-    # Title-case each syllable chunk already concatenated → Beijun
     if given_en and given_en[0].islower():
         given_en = given_en[0].upper() + given_en[1:]
     family_given = f"{surname} {given_en}"
     given_family = f"{given_en} {surname}"
     return _dedupe([given_family, family_given, surname, f"{given_en[0]}. {surname}" if given_en else surname])
-
-
-def extract_author_candidates(query: str) -> list[str]:
-    """Chinese/English author mentions from natural-language search queries."""
-    text = query or ""
-    names: list[str] = []
-    match = _AUTHOR_QUERY_RE.search(text)
-    if match:
-        for key in ("name", "name2", "name3", "name4"):
-            value = (match.groupdict().get(key) or "").strip()
-            if value:
-                names.append(value)
-                break
-    # Bare known scholar name
-    for zh in KNOWN_AUTHOR_ALIASES:
-        if zh in text and zh not in names:
-            names.append(zh)
-    expanded: list[str] = []
-    for name in names:
-        expanded.extend(romanize_chinese_person_name(name) or [name])
-    return _dedupe(expanded)
 
 
 def expand_chinese_topics(query: str) -> tuple[list[str], list[str]]:
@@ -328,7 +481,6 @@ def infer_search_mode(query: str, *, author_hints: list[str] | None = None) -> s
     authors = author_hints if author_hints is not None else extract_author_candidates(query)
     topic_kw, _ = expand_chinese_topics(query)
     has_author = bool(authors)
-    # Topic leftovers after stripping author phrasing
     leftover = strip_query_fillers(query)
     for hint in authors:
         leftover = leftover.replace(hint, "")
@@ -337,7 +489,6 @@ def infer_search_mode(query: str, *, author_hints: list[str] | None = None) -> s
     leftover = re.sub(r"[的了吗呢啊呀\s]+", "", leftover)
     has_topic = bool(topic_kw) or bool(re.search(r"[A-Za-z]{3,}|[\u4e00-\u9fff]{2,}", leftover))
     if has_author and has_topic and leftover:
-        # "沈备军老师关于代码生成的论文"
         if topic_kw or re.search(r"(关于|有关|方向|领域|[A-Za-z]{3,})", query or ""):
             return "mixed"
     if has_author and not topic_kw and (
@@ -364,10 +515,16 @@ def _dedupe(values: list[str]) -> list[str]:
 
 __all__ = [
     "KNOWN_AUTHOR_ALIASES",
+    "TERM_LEXICON",
     "extract_arxiv_id",
     "strip_query_fillers",
     "romanize_chinese_person_name",
     "extract_author_candidates",
+    "resolve_author_hints",
     "expand_chinese_topics",
+    "expand_term_aliases",
+    "extract_year_range",
+    "extract_exclude_terms",
+    "paper_matches_excludes",
     "infer_search_mode",
 ]

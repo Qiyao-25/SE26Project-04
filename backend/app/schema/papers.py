@@ -273,6 +273,7 @@ class SmartSearchRequest(BaseModel):
     category_hints: list[str] | None = None
     author_hints: list[str] | None = None
     search_mode: str | None = Field(default=None, max_length=32)
+    search_session_id: str | None = Field(default=None, max_length=64)
     include_answer: bool = True
 
 
@@ -285,6 +286,8 @@ class SmartSearchResponse(BaseModel):
     category_hints: list[str] = Field(default_factory=list)
     author_hints: list[str] = Field(default_factory=list)
     search_mode: str = "topic"
+    warnings: list[str] = Field(default_factory=list)
+    search_session_id: str | None = None
     answer: str
     highlights: list[str] = Field(default_factory=list)
     plan_source: str = "heuristic"

@@ -248,6 +248,7 @@ export async function smartSearchPapers({
   categoryHints,
   authorHints,
   searchMode,
+  searchSessionId,
   includeAnswer = true,
 } = {}) {
   if (USE_MOCK) {
@@ -260,6 +261,8 @@ export async function smartSearchPapers({
       categoryHints: categoryHints || [],
       authorHints: authorHints || [],
       searchMode: searchMode || 'topic',
+      warnings: [],
+      searchSessionId: searchSessionId || `mock-ss-${Date.now()}`,
       intent: '',
       answer: includeAnswer
         ? (data.total > 0 ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。` : `（Mock）未找到与“${query}”匹配的论文。`)
@@ -274,11 +277,12 @@ export async function smartSearchPapers({
     page,
     page_size: pageSize,
     category: category || undefined,
-    rewritten_query: rewrittenQuery || undefined,
-    keywords: keywords?.length ? keywords : undefined,
-    category_hints: categoryHints?.length ? categoryHints : undefined,
-    author_hints: authorHints?.length ? authorHints : undefined,
-    search_mode: searchMode || undefined,
+    rewritten_query: page > 1 ? undefined : (rewrittenQuery || undefined),
+    keywords: page > 1 ? undefined : (keywords?.length ? keywords : undefined),
+    category_hints: page > 1 ? undefined : (categoryHints?.length ? categoryHints : undefined),
+    author_hints: page > 1 ? undefined : (authorHints?.length ? authorHints : undefined),
+    search_mode: page > 1 ? undefined : (searchMode || undefined),
+    search_session_id: searchSessionId || undefined,
     include_answer: includeAnswer,
   });
   return {
@@ -290,6 +294,8 @@ export async function smartSearchPapers({
     categoryHints: data.category_hints || data.categoryHints || categoryHints || [],
     authorHints: data.author_hints || data.authorHints || authorHints || [],
     searchMode: data.search_mode || data.searchMode || searchMode || 'topic',
+    warnings: data.warnings || [],
+    searchSessionId: data.search_session_id || data.searchSessionId || searchSessionId || null,
     intent: data.intent || '',
     answer: data.answer || '',
     highlights: data.highlights || [],

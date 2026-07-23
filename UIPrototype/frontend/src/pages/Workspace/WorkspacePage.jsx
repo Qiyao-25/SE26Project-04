@@ -110,7 +110,7 @@ export default function WorkspacePage() {
   useEffect(() => { profileRef.current = profilePapers; }, [profilePapers]);
   useEffect(() => { subscriptionRef.current = subscriptionPapers; }, [subscriptionPapers]);
 
-  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot, rewrittenQuery, keywords, category, categoryHints, authorHints, searchMode } = {}) => {
+  const applySearchResult = useCallback((data, { query, page, answerText, messagesSnapshot, rewrittenQuery, keywords, category, categoryHints, authorHints, searchMode, searchSessionId } = {}) => {
     const nextPage = page || data.page || 1;
     const nextTotal = data.total || 0;
     const nextItems = slicePageItems(data.items || [], nextPage, data.pageSize || searchPageSize, nextTotal);
@@ -125,6 +125,7 @@ export default function WorkspacePage() {
     const nextCategoryHints = categoryHints || data.categoryHints || [];
     const nextAuthorHints = authorHints || data.authorHints || [];
     const nextSearchMode = searchMode || data.searchMode || 'topic';
+    const nextSessionId = searchSessionId || data.searchSessionId || null;
     setResults(nextItems);
     setResultTotal(nextTotal);
     setSearchPage(nextPage);
@@ -147,6 +148,7 @@ export default function WorkspacePage() {
       categoryHints: nextCategoryHints,
       authorHints: nextAuthorHints,
       searchMode: nextSearchMode,
+      searchSessionId: nextSessionId,
       answer: nextAnswer,
       messages: messagesSnapshot || (sameQuery ? previous?.messages : undefined)
     });
@@ -304,11 +306,12 @@ export default function WorkspacePage() {
       const data = await smartSearchPapers({ query, page, pageSize: searchPageSize });
       const keywordHint = data.keywords?.length ? `（匹配词：${data.keywords.slice(0, 5).join('、')}）` : '';
       const authorHint = data.authorHints?.length ? `\n作者改写：${data.authorHints.slice(0, 3).join(' / ')}` : '';
+      const warnHint = data.warnings?.length ? `\n提示：${data.warnings.slice(0, 2).join('；')}` : '';
       const planHint = data.rewrittenQuery && data.rewrittenQuery !== query
         ? `\n检索改写：${data.rewrittenQuery}`
         : '';
       const answerText = data.answer || (data.total > 0
-        ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}${authorHint}${planHint}`
+        ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}${authorHint}${planHint}${warnHint}`
         : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
       // Smart search has no chunk quotes — do not render empty「出处」blocks.
       const withAssistant = appendUser
@@ -376,12 +379,8 @@ export default function WorkspacePage() {
         query: lastSearchQuery,
         page,
         pageSize: searchPageSize,
-        rewrittenQuery: cache?.rewrittenQuery,
-        keywords: cache?.keywords,
+        searchSessionId: cache?.searchSessionId,
         category: cache?.category || undefined,
-        categoryHints: cache?.categoryHints,
-        authorHints: cache?.authorHints,
-        searchMode: cache?.searchMode,
         includeAnswer: false,
       });
       const previous = readSearchCache() || {};
@@ -409,6 +408,7 @@ export default function WorkspacePage() {
         categoryHints: previous.categoryHints?.length ? previous.categoryHints : data.categoryHints,
         authorHints: previous.authorHints?.length ? previous.authorHints : data.authorHints,
         searchMode: previous.searchMode || data.searchMode,
+        searchSessionId: previous.searchSessionId || data.searchSessionId,
       });
     } catch (error) {
       message.error(error.message || '翻页失败');

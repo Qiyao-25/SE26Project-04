@@ -17,6 +17,7 @@ from app.repository.papers import (
     filter_relevant_papers,
     find_title_candidates,
     get_paper,
+    get_papers_by_ids,
     list_papers,
     looks_like_title_query,
     soft_delete_paper,
@@ -24,6 +25,8 @@ from app.repository.papers import (
     upsert_paper,
 )
 from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
+from app.service.search_query_normalize import paper_matches_excludes
+from app.service.search_session_store import create_search_session, get_search_session
 
 class PaperServiceError(Exception):
     def __init__(self, code: str, message: str, status_code: int):
@@ -100,6 +103,12 @@ def delete_paper(session: Session, paper_id: int) -> PaperItem:
     return to_item(paper)
 
 
+def _year_bounds(year_from: int | None, year_to: int | None) -> tuple[datetime | None, datetime | None]:
+    published_from = datetime(year_from, 1, 1, tzinfo=timezone.utc) if year_from else None
+    published_to = datetime(year_to, 12, 31, 23, 59, 59, tzinfo=timezone.utc) if year_to else None
+    return published_from, published_to
+
+
 def smart_search_papers(
     session: Session,
     *,
@@ -112,6 +121,7 @@ def smart_search_papers(
     category_hints: list[str] | None = None,
     author_hints: list[str] | None = None,
     search_mode: str | None = None,
+    search_session_id: str | None = None,
     include_answer: bool = True,
     settings=None,
 ) -> SmartSearchResponse:
@@ -121,8 +131,42 @@ def smart_search_papers(
     settings = settings or get_settings()
     agent = SearchAgent(settings)
     title_mode = looks_like_title_query(query)
-    reused_plan = bool(rewritten_query or keywords or author_hints)
-    if reused_plan:
+
+    # Prefer server session for pagination (do not re-plan / do not trust client keywords).
+    cached = get_search_session(search_session_id)
+    if cached and page > 1:
+        plan = SearchPlan.from_dict(cached.plan)
+        category_filter = category if category is not None else cached.category
+        total = len(cached.paper_ids)
+        start = (page - 1) * page_size
+        page_ids = cached.paper_ids[start:start + page_size]
+        papers = get_papers_by_ids(session, page_ids)
+        items = [to_item(paper) for paper in papers]
+        return SmartSearchResponse(
+            query=cached.query or query,
+            rewritten_query=plan.rewritten_query or query,
+            keywords=plan.keywords,
+            intent=plan.intent,
+            category=category_filter,
+            category_hints=list(plan.category_hints or []),
+            author_hints=list(plan.author_hints or []),
+            search_mode=plan.search_mode or "topic",
+            warnings=list(plan.warnings or []),
+            search_session_id=cached.session_id,
+            answer="",
+            highlights=[],
+            plan_source=plan.source or "reused",
+            answer_source="skipped",
+            citations=[],
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            pages=ceil(total / page_size) if total else 0,
+        )
+
+    if rewritten_query or keywords or author_hints:
+        # Legacy client reuse — still accepted, but prefer search_session_id.
         plan = SearchPlan(
             rewritten_query=(rewritten_query or query).strip() or query,
             keywords=[item for item in (keywords or []) if item] or [query],
@@ -132,41 +176,38 @@ def smart_search_papers(
             intent="",
             source="reused",
         )
-        # Reuse the exact filter from the first page; do not re-derive from hints.
         category_filter = category
     else:
         plan = agent.plan(query)
-        # Title-like queries: do not apply LLM category hints (keeps recall stable).
         category_filter = category if title_mode else (category or (plan.category_hints[0] if plan.category_hints else None))
 
-    # Prefer near-exact title matches so slight title variants still hit.
+    published_from, published_to = _year_bounds(plan.year_from, plan.year_to)
     title_hits = find_title_candidates(session, query, limit=max(page_size * 2, 24))
     strong_titles = [p for p in title_hits if title_similarity(query, p.title or "") >= 0.78]
 
     if title_mode and strong_titles:
-        total = len(strong_titles)
-        start = (page - 1) * page_size
-        papers = strong_titles[start:start + page_size]
+        ranked = list(strong_titles)
         category_filter = category
     else:
         mode = plan.search_mode or "topic"
         author_filter = (plan.author_hints or [None])[0]
-        # Metadata-only: topic / title / author / arxiv id / abstract — never wiki/parse 出处.
         if mode == "author" and author_filter:
             search_field = "author"
             raw_keywords = list(plan.author_hints or [author_filter])
         elif mode == "arxiv":
             search_field = "metadata"
-            raw_keywords = list(plan.keywords or [plan.rewritten_query or query])
+            raw_keywords = list(plan.arxiv_ids or plan.keywords or [plan.rewritten_query or query])
         elif title_mode:
             search_field = "title"
             raw_keywords = [query, *(plan.keywords or [])]
         else:
             search_field = "metadata"
             raw_keywords = list(plan.keywords or [])
-            # Prefer English topic tokens; author names go through author= filter when mixed.
             if mode == "mixed" and plan.author_hints:
                 raw_keywords = [k for k in raw_keywords if k not in plan.author_hints] or list(plan.keywords or [])
+            # Prefer canonical aliases as soft keywords without OR explosion
+            if plan.aliases:
+                raw_keywords = list(dict.fromkeys([*raw_keywords, *plan.aliases[:3]]))
 
         keywords = compact_search_keywords(raw_keywords, query=None if mode in {"author", "arxiv"} else (plan.rewritten_query or query))
         if not keywords:
@@ -180,8 +221,8 @@ def smart_search_papers(
                 keywords=None if field == "author" else kw,
                 author=author,
                 category=cat,
-                published_from=None,
-                published_to=None,
+                published_from=published_from,
+                published_to=published_to,
                 page=1,
                 page_size=fetch_size,
                 topic=None,
@@ -197,13 +238,10 @@ def smart_search_papers(
             for hint in plan.author_hints[:4]:
                 ranked = _fetch([hint], None, "author", author=hint)
                 if ranked:
-                    author_filter = hint
                     break
             if not ranked:
-                # Fallback: metadata search with English author tokens only.
                 ranked = _fetch(plan.author_hints[:3], None, "metadata")
         elif mode == "mixed" and plan.author_hints:
-            # Author constrained + topic keywords.
             for hint in plan.author_hints[:3]:
                 topic_kw = [k for k in keywords if k.casefold() not in {h.casefold() for h in plan.author_hints}] or keywords
                 fetch_size = min(max(page_size * 20, 80), 200)
@@ -213,8 +251,8 @@ def smart_search_papers(
                     keywords=topic_kw[:3] or None,
                     author=hint,
                     category=category_filter,
-                    published_from=None,
-                    published_to=None,
+                    published_from=published_from,
+                    published_to=published_to,
                     page=1,
                     page_size=fetch_size,
                     topic=None,
@@ -223,7 +261,6 @@ def smart_search_papers(
                 )
                 ranked = filter_relevant_papers(rows, topic_kw or plan.author_hints, query=query)
                 if ranked:
-                    author_filter = hint
                     break
             if not ranked:
                 ranked = _fetch(plan.author_hints[:2], None, "author", author=plan.author_hints[0])
@@ -246,47 +283,50 @@ def smart_search_papers(
             rest = [p for p in ranked if p.id not in strong_ids]
             ranked = list(strong_titles) + rest
 
-        total = len(ranked)
-        start = (page - 1) * page_size
-        papers = ranked[start:start + page_size]
+    if plan.exclude_terms:
+        ranked = [paper for paper in ranked if not paper_matches_excludes(paper, plan.exclude_terms)]
 
+    # Cap session snapshot for pagination stability
+    ranked = ranked[:500]
+    total = len(ranked)
+    start = (page - 1) * page_size
+    papers = ranked[start:start + page_size]
     items = [to_item(paper) for paper in papers]
+
+    search_session = create_search_session(
+        query=query,
+        plan=plan.to_dict(),
+        paper_ids=[int(paper.id) for paper in ranked if paper.id is not None],
+        category=category_filter,
+    )
+
     if include_answer:
-        if strong_titles:
-            paper_payload = [
-                {
-                    "paper_id": paper.id,
-                    "title": paper.title,
-                    "authors": [
-                        link.author.display_name
-                        for link in sorted(paper.authors, key=lambda link: link.author_order)
-                    ],
-                    "primary_category": paper.primary_category,
-                    "abstract": paper.abstract,
-                    "arxiv_id": paper.arxiv_id,
-                }
-                for paper in strong_titles[:8]
-            ]
-        else:
-            paper_payload = [
-                {
-                    "paper_id": item.paper_id,
-                    "title": item.title,
-                    "authors": item.authors,
-                    "primary_category": item.primary_category,
-                    "abstract": item.abstract,
-                    "arxiv_id": item.arxiv_id,
-                }
-                for item in items[:8]
-            ]
+        paper_payload = [
+            {
+                "paper_id": item.paper_id,
+                "title": item.title,
+                "authors": item.authors,
+                "primary_category": item.primary_category,
+                "abstract": item.abstract,
+                "arxiv_id": item.arxiv_id,
+            }
+            for item in items[:8]
+        ]
         answer = agent.answer(query=query, plan=plan, papers=paper_payload, total=total)
         answer_text = answer.answer
         highlights = answer.highlights
         answer_source = answer.source
+        citations = [
+            {"paperId": str(pid)}
+            for pid in answer.cited_paper_ids
+            if any(str(item.paper_id) == str(pid) for item in items)
+        ]
     else:
         answer_text = ""
         highlights = []
         answer_source = "skipped"
+        citations = []
+
     return SmartSearchResponse(
         query=query,
         rewritten_query=plan.rewritten_query or query,
@@ -296,11 +336,13 @@ def smart_search_papers(
         category_hints=list(plan.category_hints or []),
         author_hints=list(plan.author_hints or []),
         search_mode=plan.search_mode or "topic",
+        warnings=list(plan.warnings or []),
+        search_session_id=search_session.session_id,
         answer=answer_text,
         highlights=highlights,
         plan_source=plan.source,
         answer_source=answer_source,
-        citations=[],
+        citations=citations,
         items=items,
         total=total,
         page=page,

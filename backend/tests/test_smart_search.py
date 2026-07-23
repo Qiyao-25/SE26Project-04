@@ -5,8 +5,10 @@ from app.model import Base
 from app.schema.papers import AuthorInput, PaperUpsert
 from app.service.papers import batch_upsert_papers, smart_search_papers
 from app.service.search_query_normalize import (
-    extract_author_candidates,
-    infer_search_mode,
+    expand_term_aliases,
+    extract_exclude_terms,
+    extract_year_range,
+    resolve_author_hints,
     romanize_chinese_person_name,
 )
 from sqlalchemy.orm import Session
@@ -30,13 +32,27 @@ def _settings(**kwargs) -> Settings:
 def test_romanize_shen_beijun() -> None:
     variants = romanize_chinese_person_name("沈备军")
     assert "Beijun Shen" in variants
-    assert "Shen" in variants
 
 
-def test_extract_author_from_natural_chinese_query() -> None:
-    authors = extract_author_candidates("找一下沈备军老师的论文")
-    assert authors[0] == "Beijun Shen"
-    assert infer_search_mode("找一下沈备军老师的论文") == "author"
+def test_resolve_known_author_verified() -> None:
+    hints, verified, warnings = resolve_author_hints("找一下沈备军老师的论文")
+    assert "Beijun Shen" in hints
+    assert verified is True
+    assert "AUTHOR_TRANSLITERATION_UNVERIFIED" not in warnings
+
+
+def test_term_lexicon_rag() -> None:
+    canonical, aliases, cats = expand_term_aliases("检索增强生成和 RAG")
+    assert "retrieval augmented generation" in canonical
+    assert any(item.upper() == "RAG" or item == "RAG" for item in aliases)
+    assert cats
+
+
+def test_exclude_and_year_parsing() -> None:
+    assert "survey" in extract_exclude_terms("不要综述的 LoRA 论文")
+    year_from, year_to = extract_year_range("近几年多模态进展")
+    assert year_from is not None and year_to is not None
+    assert year_to - year_from <= 3
 
 
 def test_search_agent_heuristic_author_plan() -> None:
@@ -44,7 +60,48 @@ def test_search_agent_heuristic_author_plan() -> None:
     plan = agent.plan("找一下沈备军老师的论文")
     assert plan.search_mode == "author"
     assert "Beijun Shen" in plan.author_hints
-    assert plan.rewritten_query == "Beijun Shen"
+    assert plan.author_verified is True
+
+
+def test_smart_search_session_pagination() -> None:
+    engine = create_engine_for(Settings(environment="test", database_url="sqlite:///:memory:"))
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        batch_upsert_papers(
+            session,
+            [
+                PaperUpsert(
+                    arxiv_id=f"att-{index}",
+                    title=f"Transformer Attention Study {index}",
+                    abstract="A study of self-attention and Transformer representations.",
+                )
+                for index in range(1, 6)
+            ],
+        )
+        first = smart_search_papers(
+            session,
+            query="attention transformer",
+            page=1,
+            page_size=2,
+            settings=_settings(),
+        )
+        assert first.search_session_id
+        assert first.total >= 2
+        second = smart_search_papers(
+            session,
+            query="attention transformer",
+            page=2,
+            page_size=2,
+            search_session_id=first.search_session_id,
+            include_answer=False,
+            settings=_settings(),
+        )
+        assert second.total == first.total
+        assert second.plan_source in {"reused", "heuristic", "llm"}
+        first_ids = {item.paper_id for item in first.items}
+        second_ids = {item.paper_id for item in second.items}
+        assert first_ids.isdisjoint(second_ids)
 
 
 def test_smart_search_matches_english_author_from_chinese_query() -> None:
@@ -84,6 +141,7 @@ def test_smart_search_matches_english_author_from_chinese_query() -> None:
     assert "Beijun Shen" in result.author_hints
     assert result.total >= 1
     assert result.items[0].arxiv_id == "shen-1"
+    assert result.search_session_id
 
 
 def test_smart_search_uses_database_papers_without_llm() -> None:
