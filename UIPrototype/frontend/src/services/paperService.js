@@ -246,6 +246,8 @@ export async function smartSearchPapers({
   rewrittenQuery,
   keywords,
   categoryHints,
+  authorHints,
+  searchMode,
   includeAnswer = true,
 } = {}) {
   if (USE_MOCK) {
@@ -256,6 +258,8 @@ export async function smartSearchPapers({
       keywords: keywords?.length ? keywords : (query ? [query] : []),
       category: category || null,
       categoryHints: categoryHints || [],
+      authorHints: authorHints || [],
+      searchMode: searchMode || 'topic',
       intent: '',
       answer: includeAnswer
         ? (data.total > 0 ? `（Mock）检索完成，共找到 ${data.total} 篇与“${query}”相关的论文。` : `（Mock）未找到与“${query}”匹配的论文。`)
@@ -273,6 +277,8 @@ export async function smartSearchPapers({
     rewritten_query: rewrittenQuery || undefined,
     keywords: keywords?.length ? keywords : undefined,
     category_hints: categoryHints?.length ? categoryHints : undefined,
+    author_hints: authorHints?.length ? authorHints : undefined,
+    search_mode: searchMode || undefined,
     include_answer: includeAnswer,
   });
   return {
@@ -282,6 +288,8 @@ export async function smartSearchPapers({
     keywords: data.keywords || keywords || [],
     category: data.category || category || null,
     categoryHints: data.category_hints || data.categoryHints || categoryHints || [],
+    authorHints: data.author_hints || data.authorHints || authorHints || [],
+    searchMode: data.search_mode || data.searchMode || searchMode || 'topic',
     intent: data.intent || '',
     answer: data.answer || '',
     highlights: data.highlights || [],

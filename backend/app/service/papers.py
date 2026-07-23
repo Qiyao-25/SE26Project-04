@@ -110,6 +110,8 @@ def smart_search_papers(
     rewritten_query: str | None = None,
     keywords: list[str] | None = None,
     category_hints: list[str] | None = None,
+    author_hints: list[str] | None = None,
+    search_mode: str | None = None,
     include_answer: bool = True,
     settings=None,
 ) -> SmartSearchResponse:
@@ -119,12 +121,14 @@ def smart_search_papers(
     settings = settings or get_settings()
     agent = SearchAgent(settings)
     title_mode = looks_like_title_query(query)
-    reused_plan = bool(rewritten_query or keywords)
+    reused_plan = bool(rewritten_query or keywords or author_hints)
     if reused_plan:
         plan = SearchPlan(
             rewritten_query=(rewritten_query or query).strip() or query,
             keywords=[item for item in (keywords or []) if item] or [query],
+            author_hints=[item for item in (author_hints or []) if item],
             category_hints=[item for item in (category_hints or []) if item],
+            search_mode=(search_mode or ("author" if author_hints else "topic")),
             intent="",
             source="reused",
         )
@@ -145,45 +149,97 @@ def smart_search_papers(
         papers = strong_titles[start:start + page_size]
         category_filter = category
     else:
-        # Metadata-only: topic / title / author / arxiv id (代码) / abstract — never wiki/parse 出处.
-        search_field = "title" if title_mode else "metadata"
-        raw_keywords = list(plan.keywords or [])
-        if title_mode:
-            raw_keywords = [query, *raw_keywords]
-        keywords = compact_search_keywords(raw_keywords, query=plan.rewritten_query or query)
-        if not keywords:
-            keywords = compact_search_keywords([query])
+        mode = plan.search_mode or "topic"
+        author_filter = (plan.author_hints or [None])[0]
+        # Metadata-only: topic / title / author / arxiv id / abstract — never wiki/parse 出处.
+        if mode == "author" and author_filter:
+            search_field = "author"
+            raw_keywords = list(plan.author_hints or [author_filter])
+        elif mode == "arxiv":
+            search_field = "metadata"
+            raw_keywords = list(plan.keywords or [plan.rewritten_query or query])
+        elif title_mode:
+            search_field = "title"
+            raw_keywords = [query, *(plan.keywords or [])]
+        else:
+            search_field = "metadata"
+            raw_keywords = list(plan.keywords or [])
+            # Prefer English topic tokens; author names go through author= filter when mixed.
+            if mode == "mixed" and plan.author_hints:
+                raw_keywords = [k for k in raw_keywords if k not in plan.author_hints] or list(plan.keywords or [])
 
-        def _fetch(kw: list[str], cat: str | None, field: str) -> list:
+        keywords = compact_search_keywords(raw_keywords, query=None if mode in {"author", "arxiv"} else (plan.rewritten_query or query))
+        if not keywords:
+            keywords = compact_search_keywords(plan.author_hints or [query])
+
+        def _fetch(kw: list[str], cat: str | None, field: str, *, author: str | None = None) -> list:
             fetch_size = min(max(page_size * 20, 80), 200)
             rows, _ = list_papers(
                 session,
-                keyword=query,
-                keywords=kw,
-                author=None,
+                keyword=query if field != "author" else None,
+                keywords=None if field == "author" else kw,
+                author=author,
                 category=cat,
                 published_from=None,
                 published_to=None,
                 page=1,
                 page_size=fetch_size,
                 topic=None,
-                sort_by="relevance",
+                sort_by="relevance" if field != "author" else "published_desc",
                 search_field=field,
             )
+            if field == "author":
+                return list(rows)
             return filter_relevant_papers(rows, kw or [query], query=query)
 
-        ranked = _fetch(keywords, category_filter, search_field)
-        if not ranked and category_filter and not category:
-            ranked = _fetch(keywords, None, search_field)
-            category_filter = None
-        if not ranked:
-            # Loosen: fewer tokens, still metadata-only.
-            short_kw = keywords[:2] if len(keywords) > 1 else keywords or [query]
-            ranked = _fetch(short_kw, None, search_field)
-            category_filter = None
-        if not ranked and not title_mode:
-            ranked = _fetch(compact_search_keywords([query]) or [query], None, "metadata")
-            category_filter = None
+        ranked: list = []
+        if mode == "author" and plan.author_hints:
+            for hint in plan.author_hints[:4]:
+                ranked = _fetch([hint], None, "author", author=hint)
+                if ranked:
+                    author_filter = hint
+                    break
+            if not ranked:
+                # Fallback: metadata search with English author tokens only.
+                ranked = _fetch(plan.author_hints[:3], None, "metadata")
+        elif mode == "mixed" and plan.author_hints:
+            # Author constrained + topic keywords.
+            for hint in plan.author_hints[:3]:
+                topic_kw = [k for k in keywords if k.casefold() not in {h.casefold() for h in plan.author_hints}] or keywords
+                fetch_size = min(max(page_size * 20, 80), 200)
+                rows, _ = list_papers(
+                    session,
+                    keyword=plan.rewritten_query or query,
+                    keywords=topic_kw[:3] or None,
+                    author=hint,
+                    category=category_filter,
+                    published_from=None,
+                    published_to=None,
+                    page=1,
+                    page_size=fetch_size,
+                    topic=None,
+                    sort_by="relevance",
+                    search_field="metadata",
+                )
+                ranked = filter_relevant_papers(rows, topic_kw or plan.author_hints, query=query)
+                if ranked:
+                    author_filter = hint
+                    break
+            if not ranked:
+                ranked = _fetch(plan.author_hints[:2], None, "author", author=plan.author_hints[0])
+                category_filter = None
+        else:
+            ranked = _fetch(keywords, category_filter, search_field, author=None)
+            if not ranked and category_filter and not category:
+                ranked = _fetch(keywords, None, search_field)
+                category_filter = None
+            if not ranked:
+                short_kw = keywords[:2] if len(keywords) > 1 else keywords or [query]
+                ranked = _fetch(short_kw, None, search_field)
+                category_filter = None
+            if not ranked and not title_mode:
+                ranked = _fetch(compact_search_keywords([query]) or [query], None, "metadata")
+                category_filter = None
 
         if strong_titles:
             strong_ids = {p.id for p in strong_titles}
@@ -238,6 +294,8 @@ def smart_search_papers(
         intent=plan.intent,
         category=category_filter,
         category_hints=list(plan.category_hints or []),
+        author_hints=list(plan.author_hints or []),
+        search_mode=plan.search_mode or "topic",
         answer=answer_text,
         highlights=highlights,
         plan_source=plan.source,
