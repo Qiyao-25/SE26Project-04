@@ -3,15 +3,12 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Empty,
   List,
-  Row,
   Space,
   Spin,
   Tabs,
   Tag,
-  Tooltip,
   Typography,
   message
 } from 'antd';
@@ -20,7 +17,6 @@ import {
   ExpandOutlined,
   FilePdfOutlined,
   LinkOutlined,
-  MenuFoldOutlined,
   MenuUnfoldOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
@@ -590,14 +586,6 @@ export default function PaperDetailPage() {
             <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper}>
               退出论文
             </Button>
-            <Tooltip title={sidebarCollapsed ? '展开论文详情侧栏' : '收起论文详情侧栏'}>
-              <Button
-                icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setSidebarCollapsed((value) => !value)}
-              >
-                {sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
-              </Button>
-            </Tooltip>
             {shownContent?.pdfUrl ? (
               <Button
                 icon={<ExpandOutlined />}
@@ -617,8 +605,8 @@ export default function PaperDetailPage() {
         </Space>
       </Card>
 
-      <Row gutter={16} align="stretch">
-        <Col xs={24} lg={sidebarCollapsed ? 24 : 15}>
+      <div className={`paper-detail-split${sidebarCollapsed ? ' is-collapsed' : ''}`}>
+        <div className="paper-detail-main">
           <Card className="section-card paper-main-card">
             {viewingOther ? (
               <Alert
@@ -650,26 +638,30 @@ export default function PaperDetailPage() {
               <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
             )}
           </Card>
-        </Col>
-        {!sidebarCollapsed ? (
-          <Col xs={24} lg={9} className="paper-sidebar-col">
-            <PaperSidebar paperId={paperId} paper={paper} />
-          </Col>
+        </div>
+
+        {sidebarCollapsed ? (
+          <aside className="paper-sidebar-rail" aria-label="已收起的论文侧栏">
+            <Button
+              type="primary"
+              className="paper-sidebar-expand-btn"
+              icon={<MenuUnfoldOutlined />}
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="展开论文详情侧栏"
+            >
+              展开侧栏
+            </Button>
+          </aside>
         ) : (
-          <div className="paper-sidebar-reopen">
-            <Tooltip title="展开侧栏" placement="left">
-              <Button
-                type="primary"
-                shape="circle"
-                size="large"
-                icon={<MenuUnfoldOutlined />}
-                aria-label="展开论文详情侧栏"
-                onClick={() => setSidebarCollapsed(false)}
-              />
-            </Tooltip>
+          <div className="paper-detail-sidebar">
+            <PaperSidebar
+              paperId={paperId}
+              paper={paper}
+              onCollapse={() => setSidebarCollapsed(true)}
+            />
           </div>
         )}
-      </Row>
+      </div>
 
       {pdfFullscreen && shownContent?.pdfUrl ? (
         <div className="pdf-fullscreen-overlay" role="dialog" aria-modal="true" aria-label="全屏阅读 PDF">

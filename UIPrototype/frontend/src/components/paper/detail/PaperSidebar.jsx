@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Tabs, message } from 'antd';
+import { Button, Card, Tabs, message } from 'antd';
+import { MenuFoldOutlined } from '@ant-design/icons';
 import { askPaper } from '../../../services/qaService';
 import SidebarAllPanel from './sidebar/SidebarAllPanel';
 import SidebarInfoPanel from './sidebar/SidebarInfoPanel';
@@ -18,7 +19,7 @@ function createWelcomeMessage(paperTitle) {
   };
 }
 
-export default function PaperSidebar({ paperId, paper }) {
+export default function PaperSidebar({ paperId, paper, onCollapse }) {
   const [activeKey, setActiveKey] = useState('all');
   const [conversationId, setConversationId] = useState(null);
   const [qaStatus, setQaStatus] = useState('idle');
@@ -166,7 +167,22 @@ export default function PaperSidebar({ paperId, paper }) {
   ];
 
   return (
-    <Card className="section-card paper-sidebar-card">
+    <Card
+      className="section-card paper-sidebar-card"
+      size="small"
+      title="论文侧栏"
+      extra={onCollapse ? (
+        <Button
+          type="text"
+          size="small"
+          icon={<MenuFoldOutlined />}
+          onClick={onCollapse}
+          aria-label="收起论文详情侧栏"
+        >
+          收起侧栏
+        </Button>
+      ) : null}
+    >
       <Tabs
         activeKey={activeKey}
         onChange={setActiveKey}
