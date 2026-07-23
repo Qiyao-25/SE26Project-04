@@ -20,6 +20,7 @@ from app.api.subscriptions import router as subscriptions_router
 from app.api.tasks import router as tasks_router
 from app.core.config import Settings, get_settings, validate_production_settings
 from app.core.database import create_engine_for
+from app.core.runtime import mark_process_started
 from app.schema.common import ApiResponse
 from app.service.crawl_scheduler import run_crawl_scheduler
 from app.service.parse_scheduler import run_parse_scheduler
@@ -27,6 +28,8 @@ from app.service.parse_scheduler import run_parse_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    started = mark_process_started()
+    app.state.process_started_at = started
     stop_event = asyncio.Event()
     crawl_task = asyncio.create_task(run_crawl_scheduler(app, stop_event))
     parse_task = asyncio.create_task(run_parse_scheduler(app, stop_event))

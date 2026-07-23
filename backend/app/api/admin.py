@@ -29,7 +29,12 @@ def db_session(request: Request):
 
 @router.get("/overview", response_model=ApiResponse[dict], summary="读取管理员概览")
 def overview(request: Request, _admin: AuthUser = Depends(require_admin), db: Session = Depends(db_session)):
-    return ApiResponse(data=admin_overview(db, request.app.state.settings), request_id=request.state.request_id)
+    data = admin_overview(
+        db,
+        request.app.state.settings,
+        started_at=getattr(request.app.state, "process_started_at", None),
+    )
+    return ApiResponse(data=data, request_id=request.state.request_id)
 
 
 @router.get("/tasks", response_model=ApiResponse[list[dict]], summary="读取真实解析任务")

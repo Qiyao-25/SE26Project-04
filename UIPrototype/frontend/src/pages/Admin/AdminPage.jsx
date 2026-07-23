@@ -40,7 +40,7 @@ function OverviewTab({ onGo, overview, activities = [] }) {
           { title: '用户数', value: metrics.users ?? 0, suffix: '已注册' },
           { title: '可问答论文', value: metrics.qa_ready ?? 0, suffix: 'qa_ready' },
           { title: '解析任务数', value: metrics.tasks ?? 0, suffix: '全部状态' },
-          { title: '系统运行时长', value: '—', suffix: '当前进程' }
+          { title: '系统运行时长', value: metrics.uptime || '—', suffix: '当前进程' }
         ].map((m) => (
           <Col xs={12} sm={8} lg={4} key={m.title} flex="1" style={{ minWidth: 140 }}>
             <Card size="small"><Statistic title={m.title} value={m.value} suffix={<Text type="secondary" style={{ fontSize: 11 }}>{m.suffix}</Text>} /></Card>

@@ -2,21 +2,27 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.runtime import format_uptime, process_started_at, uptime_seconds
 from app.model import ParseTask, Paper, User, UserAction, UserProfile
 from app.service.tasks import MAX_ATTEMPTS
 
 
-def admin_overview(session: Session, settings: Settings) -> dict:
+def admin_overview(session: Session, settings: Settings, *, started_at=None) -> dict:
     task_counts = {
         status: session.scalar(select(func.count(ParseTask.id)).where(ParseTask.status == status)) or 0
         for status in ("queued", "running", "succeeded", "failed", "timed_out")
     }
+    start = started_at or process_started_at()
+    seconds = uptime_seconds(start)
     return {
         "metrics": {
             "papers": session.scalar(select(func.count(Paper.id)).where(Paper.deleted_at.is_(None))) or 0,
             "users": session.scalar(select(func.count(User.id)).where(User.is_active.is_(True))) or 0,
             "qa_ready": session.scalar(select(func.count(Paper.id)).where(Paper.ingest_status == "qa_ready")) or 0,
             "tasks": sum(task_counts.values()),
+            "uptime_seconds": seconds,
+            "uptime": format_uptime(seconds),
+            "started_at": start.isoformat() if start is not None else None,
         },
         "task_counts": task_counts,
         "agents": [
