@@ -477,7 +477,7 @@ export default function LearningPage() {
                   />
                 </div>
               </>
-            ) : <Empty description="解析论文后会自动生成概念词典" />}
+            ) : <Empty description="收藏、阅读或批注已解析论文后，会从解析出的概念自动汇总词典" />}
           </>
         )
     },
