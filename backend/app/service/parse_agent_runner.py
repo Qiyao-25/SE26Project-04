@@ -17,13 +17,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.agents.llm_client import LlmError
 from app.agents.summarize_agent import SummarizeAgent, build_fallback_summary
-from app.agents.graph_agent import GraphAgent
+from app.agents.graph_agent import GraphAgent, PaperGraph
 from app.core.config import Settings, get_settings
 from app.model import PaperContent, ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
 from app.service.content_validator import ContentValidationAgent
 from app.service.papers import get_related_paper_payloads
-from app.service.tasks import save_parse_result
+from app.service.tasks import MAX_ATTEMPTS, save_parse_result
 
 logger = logging.getLogger("papermate.parse_agent")
 
@@ -34,8 +34,8 @@ def run_parse_agent_job(engine, task_id: int, settings: Settings | None = None) 
     session = SessionLocal()
     try:
         _execute(session, task_id, settings)
-    except Exception:  # noqa: BLE001
-        logger.exception("parse_agent_job_crashed task_id=%s", task_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("parse_agent_job_crashed task_id=%s err=%s", task_id, exc)
         try:
             session.rollback()
             _fail(session, task_id, "WORKER_ERROR")
@@ -59,9 +59,17 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
     _mark_running(session, task, paper, stage="fetch")
     body_text, page_count, source, storage_path = _extract_paper_text(paper, settings)
     if storage_path:
-        _persist_paper_content(session, paper, storage_path)
-    if not body_text.strip() and not (paper.abstract or "").strip():
-        _fail(session, task_id, "PARSE_FAILED")
+        try:
+            _persist_paper_content(session, paper, storage_path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("persist_paper_content_failed paper_id=%s err=%s", paper.id, exc)
+
+    # PDF 与 HTML 均抽不出正文：软删论文，不再重试。
+    if source == "abstract_fallback":
+        _fail(session, task_id, "CONTENT_EMPTY", soft_delete=True)
+        return
+    if not (body_text or "").strip():
+        _fail(session, task_id, "PARSE_FAILED", soft_delete=True)
         return
 
     _mark_running(session, task, paper, stage="summarize")
@@ -81,6 +89,14 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
                 body_text=body_text or paper.abstract or "",
                 arxiv_id=paper.arxiv_id or str(paper.id),
             )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("summarize_agent_crash_fallback task_id=%s err=%s", task_id, exc)
+            wiki = build_fallback_summary(
+                title=paper.title or "",
+                abstract=paper.abstract or "",
+                body_text=body_text or paper.abstract or "",
+                arxiv_id=paper.arxiv_id or str(paper.id),
+            )
     else:
         logger.info("summarize_agent_disabled task_id=%s using local fallback", task_id)
         wiki = build_fallback_summary(
@@ -92,39 +108,67 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
 
     _mark_running(session, task, paper, stage="validate")
     body_chars = len((body_text or paper.abstract or "").strip())
-    report = ContentValidationAgent().validate_wiki(
-        summary=wiki.summary,
-        concepts=wiki.concepts,
-        methods=wiki.methods,
-        experiments=wiki.experiments,
-        limitations=wiki.limitations,
-        page_count=page_count,
-        body_chars=body_chars,
-        existing_flags=wiki.validation_flags,
-        source=wiki.source,
-    )
-    wiki.validation_flags = report.flags
+    try:
+        report = ContentValidationAgent().validate_wiki(
+            summary=wiki.summary,
+            concepts=wiki.concepts,
+            methods=wiki.methods,
+            experiments=wiki.experiments,
+            limitations=wiki.limitations,
+            page_count=page_count,
+            body_chars=body_chars,
+            existing_flags=wiki.validation_flags,
+            source=wiki.source,
+        )
+        wiki.validation_flags = report.flags
+        uncertain_fields = report.uncertain_fields
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("validate_agent_fallback task_id=%s err=%s", task_id, exc)
+        uncertain_fields = []
 
     _mark_running(session, task, paper, stage="graph")
-    related = get_related_paper_payloads(session, paper)
-    graph = GraphAgent(settings).run(
-        paper_id=paper.id,
-        title=paper.title or "",
-        abstract=paper.abstract or "",
-        arxiv_id=paper.arxiv_id or str(paper.id),
-        primary_category=paper.primary_category or "",
-        published_at=paper.published_at.isoformat() if paper.published_at else "",
-        concepts=wiki.concepts,
-        methods=wiki.methods,
-        experiments=wiki.experiments,
-        limitations=wiki.limitations,
-        related_papers=related,
-    )
+    try:
+        related = get_related_paper_payloads(session, paper)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("related_papers_fallback task_id=%s err=%s", task_id, exc)
+        related = []
+    try:
+        graph = GraphAgent(settings).run(
+            paper_id=paper.id,
+            title=paper.title or "",
+            abstract=paper.abstract or "",
+            arxiv_id=paper.arxiv_id or str(paper.id),
+            primary_category=paper.primary_category or "",
+            published_at=paper.published_at.isoformat() if paper.published_at else "",
+            concepts=wiki.concepts,
+            methods=wiki.methods,
+            experiments=wiki.experiments,
+            limitations=wiki.limitations,
+            related_papers=related,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("graph_agent_fallback task_id=%s err=%s", task_id, exc)
+        graph = PaperGraph(
+            nodes=[{
+                "id": f"paper-{paper.id}",
+                "type": "paper",
+                "label": (paper.title or paper.arxiv_id or f"Paper {paper.id}")[:120],
+                "paperId": paper.id,
+                "paper_id": paper.id,
+                "arxiv_id": paper.arxiv_id or "",
+                "role": "current",
+                "lane": "current",
+            }],
+            edges=[],
+            lineage=[],
+            narrative="",
+            source="fallback",
+        )
 
     _mark_running(session, task, paper, stage="persist")
     chunks = _text_to_chunks(body_text or paper.abstract or "", max_chunks=80)
     result_rows = [
-        *wiki.to_structured_rows(page_count=page_count, uncertain_fields=report.uncertain_fields),
+        *wiki.to_structured_rows(page_count=page_count, uncertain_fields=uncertain_fields),
         *graph.to_structured_rows(),
     ]
     results = [
@@ -169,6 +213,8 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         source,
         graph.source,
     )
+
+
 def _mark_running(session: Session, task: ParseTask, paper: Paper, *, stage: str) -> None:
     from datetime import datetime, timezone
 
@@ -181,7 +227,8 @@ def _mark_running(session: Session, task: ParseTask, paper: Paper, *, stage: str
     session.commit()
 
 
-def _fail(session: Session, task_id: int, error_code: str) -> None:
+def _fail(session: Session, task_id: int, error_code: str, *, soft_delete: bool | None = None) -> None:
+    """Mark task failed. soft_delete=True 强制删论文；None 时在 attempt 用尽后软删。"""
     from datetime import datetime, timezone
 
     task = session.get(ParseTask, task_id)
@@ -192,8 +239,18 @@ def _fail(session: Session, task_id: int, error_code: str) -> None:
     task.error_code = error_code[:64]
     task.finished_at = datetime.now(timezone.utc)
     paper = session.get(Paper, task.paper_id)
+    delete_paper = soft_delete if soft_delete is not None else (task.attempt >= MAX_ATTEMPTS)
     if paper is not None:
         paper.ingest_status = "failed"
+        if delete_paper and paper.deleted_at is None:
+            paper.deleted_at = datetime.now(timezone.utc)
+            logger.info(
+                "parse_auto_deleted paper_id=%s arxiv_id=%s reason=%s attempt=%s",
+                paper.id,
+                paper.arxiv_id,
+                error_code,
+                task.attempt,
+            )
     session.commit()
 
 

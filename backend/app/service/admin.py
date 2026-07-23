@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.model import ParseTask, Paper, User, UserAction, UserProfile
+from app.service.tasks import MAX_ATTEMPTS
 
 
 def admin_overview(session: Session, settings: Settings) -> dict:
@@ -125,7 +126,7 @@ def admin_quality(session: Session, limit: int = 50) -> dict:
             "type": task.stage or "parse",
             "status": task.status,
             "attempt": task.attempt,
-            "retryable": task.status in {"failed", "timed_out"} and task.attempt < 3,
+            "retryable": task.status in {"failed", "timed_out"} and task.attempt < MAX_ATTEMPTS,
             "time": task.finished_at or task.requested_at,
         })
     total = session.scalar(select(func.count(ParseTask.id))) or 0

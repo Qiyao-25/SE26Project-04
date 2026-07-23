@@ -215,7 +215,7 @@ function QualityTab({ quality, onRefresh }) {
           )}
         >
           <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-            汇总解析失败 / 超时任务。可重试失败任务，或删除任务 / 删除论文。
+            汇总解析失败 / 超时任务。PDF/HTML 均空会自动软删；崩溃类失败最多自动重试 1 次，仍失败则软删。可手动重试或删除。
           </Text>
           <List dataSource={exceptions} locale={{ emptyText: '暂无质量异常' }} renderItem={(e) => (
             <List.Item actions={[

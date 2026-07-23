@@ -120,6 +120,32 @@ def test_failed_task_can_be_retried_once() -> None:
         retried = retry_task(session, task.task_id)
         assert retried.status == "queued"
         assert retried.attempt == 2
+        update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
+        update_task(session, task.task_id, TaskUpdate(status="failed", error_code="WORKER_ERROR", stage="failed"))
+        try:
+            retry_task(session, task.task_id)
+        except ValueError as exc:
+            assert str(exc) == "TASK_RETRY_EXHAUSTED"
+        else:
+            raise AssertionError("expected TASK_RETRY_EXHAUSTED after one retry")
+
+
+def test_content_empty_soft_deletes_paper() -> None:
+    from app.model import Paper
+    from app.service.parse_agent_runner import _fail
+
+    with make_session() as session:
+        paper_id = batch_upsert_papers(
+            session,
+            [PaperUpsert(arxiv_id="empty-paper", title="Empty Body Paper", abstract="only abstract")],
+        ).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "empty-content-task")
+        update_task(session, task.task_id, TaskUpdate(status="running", stage="fetch"))
+        _fail(session, task.task_id, "CONTENT_EMPTY", soft_delete=True)
+        paper = session.get(Paper, paper_id)
+        assert paper is not None
+        assert paper.deleted_at is not None
+        assert get_task(session, task.task_id).error_code == "CONTENT_EMPTY"
 
 
 def test_stale_running_task_is_recovered() -> None:

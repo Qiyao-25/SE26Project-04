@@ -15,7 +15,8 @@ from app.schema.papers import (
 
 
 TASK_STATUSES = {"queued", "running", "succeeded", "failed", "timed_out"}
-MAX_ATTEMPTS = 3
+# 首次失败后允许再试 1 次；第二次仍失败则由解析 runner 软删论文。
+MAX_ATTEMPTS = 2
 ALLOWED_TRANSITIONS = {
     "queued": {"running"},
     "running": {"running", "failed", "timed_out"},
@@ -311,6 +312,8 @@ def recover_stale_tasks(session: Session, stale_after_seconds: int = 900) -> lis
         paper = session.get(Paper, task.paper_id)
         if paper is not None:
             paper.ingest_status = "failed"
+            if task.attempt >= MAX_ATTEMPTS and paper.deleted_at is None:
+                paper.deleted_at = _now()
     if tasks:
         session.commit()
     return [to_task(task) for task in tasks]
