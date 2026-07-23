@@ -305,17 +305,14 @@ export default function WorkspacePage() {
       const answerText = data.answer || (data.total > 0
         ? `检索完成，共找到 ${data.total} 篇相关论文。${keywordHint}${planHint}`
         : `未找到与“${query}”匹配的论文，请尝试缩短关键词或更换研究方向。`);
-      const citations = (data.citations || data.items?.slice(0, 5) || []).map((item, index) => ({
-        paperId: String(item.paperId || item.paper_id || ''),
-        title: item.title || `相关论文 ${index + 1}`,
-      })).filter((item) => item.paperId);
+      // Smart search has no chunk quotes — do not render empty「出处」blocks.
       const withAssistant = appendUser
         ? [...nextMessages, {
           messageId: `workspace-assistant-${Date.now()}`,
           role: 'assistant',
           content: answerText,
           status: 'success',
-          citations
+          citations: []
         }]
         : nextMessages;
       applySearchResult(data, {

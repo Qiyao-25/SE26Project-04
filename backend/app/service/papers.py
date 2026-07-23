@@ -227,16 +227,10 @@ def smart_search_papers(
         answer_text = answer.answer
         highlights = answer.highlights
         answer_source = answer.source
-        citations = [
-            {"paperId": str(row["paper_id"]), "title": row.get("title") or ""}
-            for row in paper_payload
-            if row.get("paper_id")
-        ][:5]
     else:
         answer_text = ""
         highlights = []
         answer_source = "skipped"
-        citations = []
     return SmartSearchResponse(
         query=query,
         rewritten_query=plan.rewritten_query or query,
@@ -248,7 +242,7 @@ def smart_search_papers(
         highlights=highlights,
         plan_source=plan.source,
         answer_source=answer_source,
-        citations=citations,
+        citations=[],
         items=items,
         total=total,
         page=page,

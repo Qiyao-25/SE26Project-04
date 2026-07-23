@@ -12,7 +12,9 @@ export default function ChatPanel({ messages, minHeight = 120 }) {
       {messages.map((messageItem, index) => {
         const content = messageItem.content ?? messageItem.text ?? '';
         const bubbleRole = getBubbleRole(messageItem.role);
-        const citations = messageItem.citations || [];
+        const citations = (messageItem.citations || []).filter(
+          (citation) => (citation.quote || citation.sectionTitle || citation.pageNumber)
+        );
         const isFallback = messageItem.answerMode === 'extractive_fallback';
 
         return (
@@ -43,10 +45,14 @@ export default function ChatPanel({ messages, minHeight = 120 }) {
                   出处 {citationIndex + 1}：{citation.sectionTitle || '论文原文'}
                   {citation.pageNumber ? ` · 第 ${citation.pageNumber} 页` : ''}
                 </Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  “{citation.quote}”
-                </Text>
+                {citation.quote ? (
+                  <>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      “{citation.quote}”
+                    </Text>
+                  </>
+                ) : null}
               </div>
             ))}
 
