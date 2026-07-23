@@ -22,7 +22,7 @@ apiClient.interceptors.response.use(
     }
     if (error.code === 'ECONNABORTED') {
       const url = String(error.config?.url || '');
-      if (url.includes('/subscriptions/sync') || url.includes('/debug/crawl')) {
+      if (url.includes('/subscriptions/sync') || url.includes('/debug/crawl') || url.includes('/papers/fetch-one')) {
         return Promise.reject(
           new Error('同步超时：arXiv 响应较慢或被限流。请改用「分类」订阅重试，或稍后再试')
         );

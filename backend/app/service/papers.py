@@ -24,7 +24,24 @@ from app.repository.papers import (
     title_similarity,
     upsert_paper,
 )
-from app.schema.papers import BatchUpsertResponse, ChunkSearchRequest, GraphEdge, GraphNode, LineageItem, PaperGraphData, PaperItem, PaperPage, PaperUpsert, QaResponse, ReadingAssistData, ReadingAssistSection, SmartSearchResponse, WikiData
+from app.schema.papers import (
+    AuthorInput,
+    BatchUpsertResponse,
+    ChunkSearchRequest,
+    FetchOnePaperResponse,
+    GraphEdge,
+    GraphNode,
+    LineageItem,
+    PaperGraphData,
+    PaperItem,
+    PaperPage,
+    PaperUpsert,
+    QaResponse,
+    ReadingAssistData,
+    ReadingAssistSection,
+    SmartSearchResponse,
+    WikiData,
+)
 from app.service.search_query_normalize import paper_matches_excludes
 from app.service.search_session_store import create_search_session, get_search_session
 
@@ -371,6 +388,128 @@ def batch_upsert_papers(session: Session, payloads: list[PaperUpsert]) -> BatchU
         session.rollback()
         raise PaperServiceError("PAPER_CONFLICT", "论文或作者的业务标识已存在", 409) from exc
     return BatchUpsertResponse(items=[to_item(paper) for paper in papers], created=created, updated=updated)
+
+
+def _author_inputs_from_names(raw_authors: list[str] | None) -> list[AuthorInput]:
+    authors: list[AuthorInput] = []
+    for raw in raw_authors or []:
+        name = " ".join(str(raw or "").split()).strip()
+        if not name:
+            continue
+        if len(name) > 255:
+            name = name[:255].rstrip()
+        try:
+            authors.append(AuthorInput(name=name))
+        except Exception:  # noqa: BLE001
+            continue
+        if len(authors) >= 20:
+            break
+    return authors
+
+
+def _parse_arxiv_published(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def fetch_one_paper(
+    session: Session,
+    *,
+    query: str,
+    parse: bool = True,
+    settings=None,
+) -> FetchOnePaperResponse:
+    """Fetch a single paper from arXiv by id/URL/title and upsert into the library."""
+    from app.service.arxiv_client import ArxivClient
+
+    text = " ".join((query or "").split()).strip()
+    if not text:
+        raise PaperServiceError("VALIDATION_ERROR", "请输入 arXiv 编号或论文标题", 400)
+
+    cfg = settings or get_settings()
+    client = ArxivClient(
+        api_base=getattr(cfg, "arxiv_api_base", "https://export.arxiv.org/api/query"),
+        rss_base=getattr(cfg, "arxiv_rss_base", "https://rss.arxiv.org/rss"),
+        timeout_s=float(getattr(cfg, "arxiv_timeout_s", 60.0)),
+        min_interval_s=float(getattr(cfg, "arxiv_min_interval_s", 5.0)),
+        max_retries=int(getattr(cfg, "arxiv_max_retries", 4)),
+        rate_limit_wait_s=float(getattr(cfg, "arxiv_rate_limit_wait_s", 45.0)),
+    )
+
+    try:
+        hits = client.resolve_query(text, max_results=5)
+    except Exception as exc:  # noqa: BLE001
+        raise PaperServiceError("ARXIV_FETCH_FAILED", f"arXiv 抓取失败：{exc}", 502) from exc
+
+    if not hits:
+        raise PaperServiceError("PAPER_NOT_FOUND", "未在 arXiv 找到匹配论文，请检查编号或标题", 404)
+
+    import re
+
+    id_like = bool(
+        re.search(r"(?:arxiv\.org/(?:abs|pdf)/|arxiv:)?(\d{4}\.\d{4,5})(?:v\d+)?", text, flags=re.I)
+        or re.fullmatch(r"[\w\-]+/\d{7}", text)
+    )
+    matched_by = "arxiv_id" if id_like else "title"
+    meta = hits[0]
+    if matched_by == "title" and len(hits) > 1:
+        meta = max(hits, key=lambda item: title_similarity(text, item.title or ""))
+        if title_similarity(text, meta.title or "") < 0.55:
+            raise PaperServiceError("PAPER_NOT_FOUND", "标题匹配度过低，请改用更完整的标题或 arXiv 编号", 404)
+
+    payload = PaperUpsert(
+        arxiv_id=meta.arxiv_id,
+        title=meta.title or meta.arxiv_id,
+        authors=_author_inputs_from_names(meta.authors),
+        abstract=meta.abstract,
+        published_at=_parse_arxiv_published(meta.published),
+        primary_category=(meta.categories[0] if meta.categories else None),
+        pdf_url=meta.pdf_url,
+        source_url=meta.abs_url,
+        ingest_status="metadata_only",
+    )
+    result = batch_upsert_papers(session, [payload])
+    item = result.items[0]
+    created = result.created > 0
+    message = (
+        f"已{'新建' if created else '更新'}论文：{item.title}"
+        if matched_by == "arxiv_id"
+        else f"已按标题{'入库' if created else '更新'}：{item.title}"
+    )
+
+    task = None
+    task_id: int | None = None
+    if parse:
+        from app.service.tasks import create_task
+
+        try:
+            task, _ = create_task(
+                session,
+                item.paper_id,
+                "full_parse",
+                f"fetch-one-{item.paper_id}-{item.arxiv_id}",
+                force=False,
+            )
+            task_id = task.task_id
+            if task.status == "queued":
+                message += "；已排队解析"
+        except ValueError:
+            task = None
+            task_id = None
+
+    return FetchOnePaperResponse(
+        query=text,
+        matched_by=matched_by,
+        created=created,
+        message=message,
+        item=item,
+        task_id=task_id,
+        task=task,
+    )
 
 
 def get_paper_detail(session: Session, paper_id: int) -> PaperItem:

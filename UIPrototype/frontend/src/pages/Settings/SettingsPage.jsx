@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -30,6 +31,7 @@ import { updateAccount } from '../../services/authService';
 import { getLearningProfile, updateLearningProfile } from '../../services/learningService';
 import { syncSubscriptions } from '../../services/recommendationService';
 import { getAdminCrawlSettings, updateAdminCrawlSettings } from '../../services/adminService';
+import { fetchOnePaper } from '../../services/paperService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { ARXIV_CATEGORIES, ARXIV_CATEGORY_LABEL_MAP } from '../../data/arxivCategories';
 import {
@@ -87,6 +89,7 @@ function loadSessionSubscriptions() {
 export default function SettingsPage() {
   const { userId, email, applyAuthResponse, isAdmin } = useApp();
   const { t, language, setLanguage } = useI18n();
+  const navigate = useNavigate();
 
   const [crawlForm] = Form.useForm();
   const [accountForm] = Form.useForm();
@@ -104,6 +107,9 @@ export default function SettingsPage() {
   const [accountSaving, setAccountSaving] = useState(false);
   const [lastSyncMessage, setLastSyncMessage] = useState('');
   const [crawlAdminSaving, setCrawlAdminSaving] = useState(false);
+  const [fetchOneQuery, setFetchOneQuery] = useState('');
+  const [fetchingOne, setFetchingOne] = useState(false);
+  const [lastFetchedPaperId, setLastFetchedPaperId] = useState(null);
 
   useEffect(() => subscribeSubscriptionSync(setSyncing), []);
 
@@ -236,6 +242,27 @@ export default function SettingsPage() {
       message.success(result.message || '订阅同步完成');
     } catch (error) {
       message.error(error.message || '同步失败');
+    }
+  };
+
+  const handleFetchOne = async () => {
+    const query = fetchOneQuery.trim();
+    if (!query) {
+      message.warning(t('settings.sync.fetchOneEmpty'));
+      return;
+    }
+    setFetchingOne(true);
+    setLastFetchedPaperId(null);
+    try {
+      const result = await fetchOnePaper(query, { parse: true });
+      setLastSyncMessage(result.message || '抓取完成');
+      setLastFetchedPaperId(result.item?.paperId || null);
+      message.success(result.message || t('settings.sync.fetchOneAction'));
+      setFetchOneQuery('');
+    } catch (error) {
+      message.error(error.message || '抓取失败');
+    } finally {
+      setFetchingOne(false);
     }
   };
 
@@ -549,6 +576,34 @@ export default function SettingsPage() {
                   </Typography.Paragraph>
                 ) : null}
               </Form>
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                <Typography.Text strong>{t('settings.sync.fetchOne')}</Typography.Text>
+                <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 10 }}>
+                  {t('settings.sync.fetchOneExtra')}
+                </Typography.Paragraph>
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input
+                    value={fetchOneQuery}
+                    onChange={(event) => setFetchOneQuery(event.target.value)}
+                    onPressEnter={handleFetchOne}
+                    placeholder={t('settings.sync.fetchOnePlaceholder')}
+                    allowClear
+                    disabled={fetchingOne}
+                  />
+                  <Button type="primary" loading={fetchingOne} onClick={handleFetchOne}>
+                    {t('settings.sync.fetchOneAction')}
+                  </Button>
+                </Space.Compact>
+                {lastFetchedPaperId ? (
+                  <Button
+                    type="link"
+                    style={{ paddingInline: 0, marginTop: 8 }}
+                    onClick={() => navigate(`/paper/${lastFetchedPaperId}`)}
+                  >
+                    {t('settings.sync.fetchOneOpen')}
+                  </Button>
+                ) : null}
+              </div>
             </Card>
             {isAdmin ? (
               <Card title={t('settings.crawlAdmin.title')} size="small" style={{ marginTop: 16 }}>

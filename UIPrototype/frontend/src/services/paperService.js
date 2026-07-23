@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { USE_MOCK } from './runtimeConfig';
+import { API_TIMEOUT_MS, USE_MOCK } from './runtimeConfig';
 import { PAPERS, PAPER_LIST } from '../data/papers';
 import detailMock from '../mocks/paper-detail.json';
 import contentMock from '../mocks/paper-content.json';
@@ -236,6 +236,45 @@ export async function searchPaperWiki(query, { mode = 'all', pageSize = 20 } = {
       direction: paper.topic || paper.primary_category || '',
     },
   }));
+}
+
+export async function fetchOnePaper(query, { parse = true } = {}) {
+  const text = String(query || '').trim();
+  if (!text) {
+    throw new Error('请输入 arXiv 编号或论文标题');
+  }
+  if (USE_MOCK) {
+    await delay(300);
+    return {
+      query: text,
+      matchedBy: 'title',
+      created: true,
+      message: `（Mock）已抓取：${text}`,
+      item: toPaperListItem({
+        paper_id: `mock-fetch-${Date.now()}`,
+        title: text,
+        arxiv_id: '0000.00000',
+        authors: ['Mock Author'],
+        abstract: 'Mock fetched paper',
+        primary_category: 'cs.CL',
+        parse_status: parse ? 'queued' : 'pending',
+      }),
+      taskId: parse ? `mock-task-${Date.now()}` : null,
+    };
+  }
+  const data = await apiClient.post(
+    '/papers/fetch-one',
+    { query: text, parse },
+    { timeout: Math.max(API_TIMEOUT_MS, 120000) },
+  );
+  return {
+    query: data.query || text,
+    matchedBy: data.matched_by || data.matchedBy || 'title',
+    created: Boolean(data.created),
+    message: data.message || '抓取完成',
+    item: toPaperListItem(data.item || {}),
+    taskId: data.task_id ?? data.taskId ?? data.task?.task_id ?? null,
+  };
 }
 
 export async function smartSearchPapers({

@@ -9,10 +9,10 @@ from app.agents.llm_client import LlmError
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
-from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, ParseRequest, PaperCompareRequest, PaperCompareResponse, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
+from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, FetchOnePaperRequest, FetchOnePaperResponse, ParseRequest, PaperCompareRequest, PaperCompareResponse, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
-from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
+from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, fetch_one_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
@@ -99,6 +99,30 @@ def smart_search(payload: SmartSearchRequest, request: Request, _user: AuthUser 
         include_answer=payload.include_answer,
         settings=request.app.state.settings,
     )
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/fetch-one", response_model=ApiResponse[FetchOnePaperResponse], summary="按 arXiv 编号或标题抓取单篇论文入库")
+def fetch_one(
+    payload: FetchOnePaperRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
+):
+    try:
+        data = fetch_one_paper(
+            db,
+            query=payload.query.strip(),
+            parse=payload.parse,
+            settings=request.app.state.settings,
+        )
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+
+    task = data.task
+    if task is not None and task.status == "queued" and task.started_at is None:
+        background_tasks.add_task(run_parse_agent_job, request.app.state.engine, task.task_id, request.app.state.settings)
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 

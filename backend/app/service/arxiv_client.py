@@ -124,6 +124,50 @@ class ArxivClient:
                 paper.categories = [cat, *paper.categories]
         return papers[:max_results]
 
+    def fetch_by_id(self, arxiv_id: str) -> ArxivPaperMeta | None:
+        aid = _arxiv_id_from_text(arxiv_id)
+        if not aid:
+            return None
+        params = urllib.parse.urlencode({"id_list": aid})
+        papers = _parse_atom_feed(self._http_get(f"{self.api_base}?{params}"))
+        return papers[0] if papers else None
+
+    def fetch_by_title(self, title: str, *, max_results: int = 5) -> list[ArxivPaperMeta]:
+        cleaned = " ".join((title or "").replace('"', " ").split()).strip()
+        if not cleaned:
+            return []
+        # Prefer exact-ish title phrase; fall back to all-fields search.
+        try:
+            hits = self.search(
+                search_query=f'ti:"{cleaned}"',
+                max_results=max_results,
+                sort_by="relevance",
+            )
+        except Exception:  # noqa: BLE001
+            hits = []
+        if hits:
+            return hits
+        return self.search(
+            search_query=f'all:"{cleaned}"',
+            max_results=max_results,
+            sort_by="relevance",
+        )
+
+    def resolve_query(self, query: str, *, max_results: int = 5) -> list[ArxivPaperMeta]:
+        """Resolve an arXiv id, abs/pdf URL, or title into paper metadata."""
+        text = (query or "").strip()
+        if not text:
+            return []
+        id_match = re.search(
+            r"(?:arxiv\.org/(?:abs|pdf)/|arxiv:)?(\d{4}\.\d{4,5})(?:v\d+)?",
+            text,
+            flags=re.I,
+        )
+        if id_match or re.fullmatch(r"[\w\-]+/\d{7}", text):
+            paper = self.fetch_by_id(text)
+            return [paper] if paper else []
+        return self.fetch_by_title(text, max_results=max_results)
+
 
 def _arxiv_id_from_text(value: str) -> str:
     text = (value or "").strip()

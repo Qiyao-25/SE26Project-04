@@ -300,6 +300,21 @@ class SmartSearchResponse(BaseModel):
     pages: int
 
 
+class FetchOnePaperRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500, description="arXiv 编号、abs/pdf 链接或论文标题")
+    parse: bool = Field(default=True, description="入库后是否自动排队解析")
+
+
+class FetchOnePaperResponse(BaseModel):
+    query: str
+    matched_by: Literal["arxiv_id", "title"]
+    created: bool
+    message: str
+    item: PaperItem
+    task_id: int | None = None
+    task: TaskResponse | None = None
+
+
 class ReadingAssistRequest(BaseModel):
     mode: str = Field(default="研究", max_length=16)
     force: bool = False
