@@ -29,6 +29,8 @@ const LIMITS = {
 const MIN_NODE_W = 150;
 const FONT_MIN = 12;
 const PAPER_SCORE_MIN = 0.28;
+const GAP_X = 24;
+const GAP_Y = 20;
 
 const TRAINING_HINTS = [
   'train', 'optim', 'loss', 'gradient', 'fine-tun', 'finetun', '学习率', '优化', '训练',
@@ -62,22 +64,17 @@ function relationKind(edge) {
   return Number(edge.weight || 0) >= 0.35 ? 'theme' : 'topic';
 }
 
-function isCanvasEdge(edge) {
-  // Topic-related edges stay on canvas as gray dashed — never styled as citations
-  if (relationKind(edge) === 'topic' || edge.type === 'related_to') return true;
-  if (edge.tier === 'secondary' && edge.type === 'implements') return false;
-  if (edge.tier === 'secondary' && Number(edge.weight || 0) < 0.35) return false;
-  return true;
+/** Default canvas: spine + hub radial only. Weak/cross links appear on focus. */
+function isDefaultCanvasEdge(edge) {
+  if (edge.type === 'precedes' || edge.type === 'follows') return true;
+  return ['introduces', 'uses', 'evaluates_on', 'in_domain'].includes(edge.type);
 }
 
 function isPrimaryListEdge(edge) {
   if (relationKind(edge) === 'topic') return false;
-  return isCanvasEdge(edge) || edge.type === 'implements';
+  return isDefaultCanvasEdge(edge) || edge.type === 'implements';
 }
 
-/**
- * Deduplicate, cap counts, keep one best method↔concept link, split weak topic edges off canvas.
- */
 function prepareGraph(rawNodes = [], rawEdges = []) {
   const byType = { paper: [], concept: [], method: [], dataset: [], task: [] };
   const seen = new Map();
@@ -137,7 +134,6 @@ function prepareGraph(rawNodes = [], rawEdges = []) {
     .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
     .map((e) => ({ ...e, kind: relationKind(e) }));
 
-  // Each method keeps only its strongest concept link
   const methodConcept = edges
     .filter((e) => e.type === 'implements')
     .sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0));
@@ -153,16 +149,7 @@ function prepareGraph(rawNodes = [], rawEdges = []) {
     return bestByMethod.get(methodId) === e.id;
   });
 
-  const canvasEdges = filteredEdges.filter(isCanvasEdge);
-  // Promote the single best method-concept link onto canvas as a transfer hint
-  for (const edge of filteredEdges) {
-    if (edge.type === 'implements' && bestByMethod.get(edge.source) === edge.id) {
-      if (!canvasEdges.some((e) => e.id === edge.id)) {
-        canvasEdges.push({ ...edge, tier: 'primary', kind: 'theme' });
-      }
-    }
-  }
-
+  const canvasEdges = filteredEdges.filter(isDefaultCanvasEdge);
   const listEdges = filteredEdges
     .slice()
     .sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0));
@@ -170,14 +157,26 @@ function prepareGraph(rawNodes = [], rawEdges = []) {
   return { nodes, canvasEdges, listEdges, currentId: current?.id || null };
 }
 
+function estimateLabelLines(label, width, isPaper) {
+  const chars = String(label || '').length;
+  const perLine = Math.max(8, Math.floor((width - 20) / 12));
+  const lines = Math.ceil(chars / perLine);
+  return Math.min(isPaper ? 2 : 1, Math.max(1, lines));
+}
+
 function nodeSize(node, mode) {
   if (node.role === 'current') {
-    return { w: mode === 'mobile' ? 168 : 200, h: mode === 'mobile' ? 76 : 88 };
+    const w = mode === 'vertical' ? 176 : 208;
+    const lines = estimateLabelLines(node.label, w, true);
+    return { w, h: 44 + lines * 18 };
   }
   if (node.type === 'paper') {
-    return { w: Math.max(MIN_NODE_W, mode === 'mobile' ? 156 : 172), h: mode === 'mobile' ? 64 : 70 };
+    const w = Math.max(MIN_NODE_W, mode === 'vertical' ? 160 : 168);
+    const lines = estimateLabelLines(node.label, w, true);
+    return { w, h: 40 + lines * 17 };
   }
-  return { w: Math.max(MIN_NODE_W, mode === 'mobile' ? 150 : 156), h: mode === 'mobile' ? 48 : 52 };
+  const w = Math.max(MIN_NODE_W, 152);
+  return { w, h: 44 };
 }
 
 function sortPapersByTime(papers, direction) {
@@ -189,14 +188,92 @@ function sortPapersByTime(papers, direction) {
   });
 }
 
+function boxesOverlap(a, b, gap) {
+  return !(
+    a.x + a.w + gap <= b.x
+    || b.x + b.w + gap <= a.x
+    || a.y + a.h + gap <= b.y
+    || b.y + b.h + gap <= a.y
+  );
+}
+
+/** Push overlapping boxes downward until gaps are clear. */
+function resolveCollisions(positions, boxes, gap = 16) {
+  const ids = [...boxes.keys()].sort((a, b) => {
+    const A = boxes.get(a);
+    const B = boxes.get(b);
+    return A.y - B.y || A.x - B.x;
+  });
+
+  for (let pass = 0; pass < 8; pass += 1) {
+    let moved = false;
+    for (let i = 0; i < ids.length; i += 1) {
+      for (let j = 0; j < i; j += 1) {
+        const id = ids[i];
+        const other = ids[j];
+        const box = boxes.get(id);
+        const prev = boxes.get(other);
+        if (!boxesOverlap(box, prev, gap)) continue;
+        const nextY = prev.y + prev.h + gap;
+        if (nextY > box.y) {
+          const dy = nextY - box.y;
+          boxes.set(id, { ...box, y: nextY });
+          const pos = positions.get(id);
+          positions.set(id, { ...pos, y: nextY, cy: pos.cy + dy });
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+    ids.sort((a, b) => {
+      const A = boxes.get(a);
+      const B = boxes.get(b);
+      return A.y - B.y || A.x - B.x;
+    });
+  }
+}
+
 /**
- * Container-driven metro layout. Same coordinate system for SVG edges and HTML stations.
+ * Place nodes in wrapped rows. Cell width always >= node width + GAP_X (no squeeze).
+ * Returns bottom Y after the block.
  */
-function buildMetroLayout(nodes, canvasEdges, width, mode) {
-  const padX = mode === 'mobile' ? 16 : 28;
-  const padY = mode === 'mobile' ? 56 : 48;
-  const hubGapX = mode === 'mobile' ? 28 : 40;
-  const stationGapY = 18;
+function placeWrappedBlock({
+  nodes,
+  startY,
+  areaX,
+  areaW,
+  mode,
+  place,
+  labelY,
+}) {
+  if (!nodes.length) return startY;
+  let y = startY;
+  if (labelY != null) y = Math.max(y, labelY);
+
+  const sizes = nodes.map((n) => nodeSize(n, mode));
+  const cellW = Math.max(...sizes.map((s) => s.w)) + GAP_X;
+  const perRow = Math.max(1, Math.floor(areaW / cellW));
+
+  for (let start = 0; start < nodes.length; start += perRow) {
+    const row = nodes.slice(start, start + perRow);
+    const rowSizes = row.map((n) => nodeSize(n, mode));
+    const rowH = Math.max(...rowSizes.map((s) => s.h));
+    const rowInnerW = row.reduce((sum, n, i) => sum + nodeSize(n, mode).w + (i ? GAP_X : 0), 0);
+    let x = areaX + Math.max(0, (areaW - rowInnerW) / 2);
+    row.forEach((node) => {
+      const size = nodeSize(node, mode);
+      place(node, x, y + (rowH - size.h) / 2);
+      x += size.w + GAP_X;
+    });
+    y += rowH + GAP_Y;
+  }
+  return y;
+}
+
+function buildMetroLayout(nodes, width, mode) {
+  const padX = mode === 'vertical' ? 16 : 28;
+  const padY = 52;
+  const hubGapX = 32;
 
   const current = nodes.find((n) => n.role === 'current');
   const predecessors = sortPapersByTime(
@@ -220,84 +297,133 @@ function buildMetroLayout(nodes, canvasEdges, width, mode) {
   const boxes = new Map();
   const place = (node, x, y) => {
     const size = nodeSize(node, mode);
-    positions.set(node.id, { x, y, cx: x + size.w / 2, cy: y + size.h / 2, ...size });
-    boxes.set(node.id, { x, y, w: size.w, h: size.h });
+    const safeX = Math.max(padX, x);
+    positions.set(node.id, {
+      x: safeX,
+      y,
+      cx: safeX + size.w / 2,
+      cy: y + size.h / 2,
+      ...size,
+    });
+    boxes.set(node.id, { x: safeX, y, w: size.w, h: size.h });
   };
 
   let contentH = padY;
-  let contentW = Math.max(width, mode === 'mobile' ? 360 : 640);
+  let contentW = Math.max(width, mode === 'vertical' ? 360 : 720);
+  let spineY = 0;
 
-  if (mode === 'mobile') {
-    // Vertical stage map: 前驱 → 当前(换乘) → 主题线分组 → 后续
+  if (mode === 'vertical') {
     let y = padY;
     const colX = padX;
+    const colW = Math.max(MIN_NODE_W, width - padX * 2);
 
-    predecessors.forEach((node) => {
-      place(node, colX, y);
-      y += nodeSize(node, mode).h + stationGapY;
-    });
+    const stage = (title, list, indent = 0) => {
+      if (!list.length) return;
+      y += 8;
+      list.forEach((node) => {
+        place(node, colX + indent, y);
+        y += nodeSize(node, mode).h + GAP_Y;
+      });
+    };
 
+    stage('前驱', predecessors);
     if (current) {
       place(current, colX, y);
-      y += nodeSize(current, mode).h + stationGapY + 8;
+      y += nodeSize(current, mode).h + GAP_Y + 6;
+      spineY = positions.get(current.id)?.cy || y;
     }
-
-    const themeOrder = ['concept', 'method', 'training', 'experiment'];
-    themeOrder.forEach((theme) => {
-      const list = byTheme[theme];
-      if (!list.length) return;
-      list.forEach((node) => {
-        place(node, colX + 12, y);
-        y += nodeSize(node, mode).h + stationGapY;
+    ['concept', 'method', 'training', 'experiment'].forEach((theme) => {
+      if (!byTheme[theme].length) return;
+      y = placeWrappedBlock({
+        nodes: byTheme[theme],
+        startY: y + 4,
+        areaX: colX,
+        areaW: colW,
+        mode,
+        place,
       });
-      y += 10;
+      y += 6;
     });
+    if (topicPapers.length) {
+      y = placeWrappedBlock({
+        nodes: topicPapers,
+        startY: y + 4,
+        areaX: colX,
+        areaW: colW,
+        mode,
+        place,
+      });
+    }
+    stage('后续', successors);
 
-    topicPapers.forEach((node) => {
-      place(node, colX + 12, y);
-      y += nodeSize(node, mode).h + stationGapY;
-    });
-
-    successors.forEach((node) => {
-      place(node, colX, y);
-      y += nodeSize(node, mode).h + stationGapY;
-    });
-
-    contentH = y + padY;
+    resolveCollisions(positions, boxes, 16);
+    contentH = Math.max(...[...boxes.values()].map((b) => b.y + b.h), y) + padY;
     contentW = Math.max(width, padX * 2 + MIN_NODE_W + 24);
   } else {
-    // Desktop / tablet: horizontal timeline spine + parallel theme tracks
-    const hubSize = current ? nodeSize(current, mode) : { w: 200, h: 88 };
+    // Desktop zones:
+    // [above themes] / [left pred | hub | right succ] / [below themes] / [topic spur]
+    const hubSize = current ? nodeSize(current, mode) : { w: 208, h: 80 };
     const leftPapers = predecessors;
     const rightPapers = successors;
 
-    const leftBlockW = leftPapers.reduce((sum, n, i) => sum + nodeSize(n, mode).w + (i ? hubGapX : 0), 0);
-
-    const trackList = [];
-    if (byTheme.concept.length) trackList.push({ key: 'concept', nodes: byTheme.concept });
-    if (byTheme.method.length) trackList.push({ key: 'method', nodes: byTheme.method });
-    trackList.push({ key: 'spine', nodes: [] });
-    if (byTheme.training.length) trackList.push({ key: 'training', nodes: byTheme.training });
-    if (byTheme.experiment.length) trackList.push({ key: 'experiment', nodes: byTheme.experiment });
-
-    const spineIndex = trackList.findIndex((t) => t.key === 'spine');
-    const aboveTracks = trackList.slice(0, spineIndex).reverse();
-    const belowTracks = trackList.slice(spineIndex + 1);
-
-    // Place spine papers centered horizontally
-    const hubX = Math.max(
-      padX + leftBlockW + (leftBlockW ? hubGapX : 0),
-      Math.max(padX, (width - hubSize.w) / 2),
-    );
-    // Provisional spine Y — will expand with theme stacks
-    let spineY = padY + 40;
-    const aboveHeight = aboveTracks.reduce(
-      (sum, track) => sum + track.nodes.reduce((s, n) => s + nodeSize(n, mode).h + stationGapY, 0) + 12,
+    const leftBlockW = leftPapers.reduce(
+      (sum, n, i) => sum + nodeSize(n, mode).w + (i ? hubGapX : 0),
       0,
     );
-    spineY = padY + aboveHeight + hubSize.h / 2;
+    const rightBlockW = rightPapers.reduce(
+      (sum, n, i) => sum + nodeSize(n, mode).w + (i ? hubGapX : 0),
+      0,
+    );
 
-    let x = hubX - (leftBlockW ? hubGapX : 0) - leftBlockW;
+    const spineInnerW = leftBlockW + (leftBlockW ? hubGapX : 0) + hubSize.w
+      + (rightBlockW ? hubGapX : 0) + rightBlockW;
+    const hubX = Math.max(padX + leftBlockW + (leftBlockW ? hubGapX : 0), (width - hubSize.w) / 2);
+    // Ensure left papers fit; expand content width if needed
+    const minSpineLeft = padX;
+    const spineStart = Math.max(minSpineLeft, hubX - (leftBlockW ? hubGapX : 0) - leftBlockW);
+    contentW = Math.max(
+      width,
+      spineStart + spineInnerW + padX,
+      padX * 2 + spineInnerW,
+    );
+
+    const aboveThemes = [
+      byTheme.concept.length ? { key: 'concept', nodes: byTheme.concept } : null,
+      byTheme.method.length ? { key: 'method', nodes: byTheme.method } : null,
+    ].filter(Boolean);
+    const belowThemes = [
+      byTheme.training.length ? { key: 'training', nodes: byTheme.training } : null,
+      byTheme.experiment.length ? { key: 'experiment', nodes: byTheme.experiment } : null,
+    ].filter(Boolean);
+
+    const themeAreaX = padX;
+    const themeAreaW = Math.max(MIN_NODE_W, contentW - padX * 2);
+
+    // Estimate above block height for spine Y
+    const estimateBlockH = (tracks) => tracks.reduce((sum, track) => {
+      const cellW = Math.max(...track.nodes.map((n) => nodeSize(n, mode).w)) + GAP_X;
+      const perRow = Math.max(1, Math.floor(themeAreaW / cellW));
+      const rows = Math.ceil(track.nodes.length / perRow);
+      const rowH = Math.max(...track.nodes.map((n) => nodeSize(n, mode).h));
+      return sum + rows * (rowH + GAP_Y) + 12;
+    }, 0);
+
+    let yCursor = padY + 20;
+    aboveThemes.forEach((track) => {
+      yCursor = placeWrappedBlock({
+        nodes: track.nodes,
+        startY: yCursor,
+        areaX: themeAreaX,
+        areaW: themeAreaW,
+        mode,
+        place,
+      }) + 8;
+    });
+
+    spineY = yCursor + hubSize.h / 2 + 12;
+
+    // Spine zone — papers only, no theme stations
+    let x = spineStart;
     leftPapers.forEach((node) => {
       const size = nodeSize(node, mode);
       place(node, x, spineY - size.h / 2);
@@ -313,61 +439,35 @@ function buildMetroLayout(nodes, canvasEdges, width, mode) {
       x += size.w + hubGapX;
     });
 
-    const hubCx = hubX + hubSize.w / 2;
-    const usableW = Math.max(MIN_NODE_W, width - padX * 2);
+    let belowY = spineY + hubSize.h / 2 + 28;
+    belowThemes.forEach((track) => {
+      belowY = placeWrappedBlock({
+        nodes: track.nodes,
+        startY: belowY,
+        areaX: themeAreaX,
+        areaW: themeAreaW,
+        mode,
+        place,
+      }) + 8;
+    });
 
-    const placeThemeRow = (tracks, direction) => {
-      let cursor = direction === 'up'
-        ? spineY - hubSize.h / 2 - stationGapY - 8
-        : spineY + hubSize.h / 2 + stationGapY + 8;
-
-      tracks.forEach((track) => {
-        const count = track.nodes.length;
-        track.nodes.forEach((node, i) => {
-          const size = nodeSize(node, mode);
-          // Spread along a dedicated track row — fixed vertical pitch, horizontal spread
-          const y = direction === 'up' ? cursor - size.h : cursor;
-          const spread = Math.min(size.w + 20, Math.floor(usableW / Math.max(count, 1)));
-          const rowWidth = spread * count - (spread - size.w);
-          const startX = Math.max(padX, Math.min(width - padX - rowWidth, hubCx - rowWidth / 2));
-          const xPos = startX + i * spread;
-          place(node, xPos, y);
-        });
-        const rowH = Math.max(...track.nodes.map((n) => nodeSize(n, mode).h), 52);
-        cursor = direction === 'up'
-          ? cursor - rowH - stationGapY - 10
-          : cursor + rowH + stationGapY + 10;
-      });
-    };
-
-    placeThemeRow(aboveTracks, 'up');
-    placeThemeRow(belowTracks, 'down');
-
-    // Topic-related papers: lower gray spur — not on the citation spine
     if (topicPapers.length) {
-      let topicY = Math.max(
-        ...[...boxes.values()].map((b) => b.y + b.h),
-        spineY + hubSize.h / 2,
-      ) + 36;
-      let topicX = Math.max(padX, hubX - 20);
-      topicPapers.forEach((node) => {
-        const size = nodeSize(node, mode);
-        if (topicX + size.w > width - padX) {
-          topicX = Math.max(padX, hubX - 20);
-          topicY += size.h + stationGapY;
-        }
-        place(node, topicX, topicY);
-        topicX += size.w + hubGapX;
+      belowY = placeWrappedBlock({
+        nodes: topicPapers,
+        startY: belowY + 8,
+        areaX: themeAreaX,
+        areaW: themeAreaW,
+        mode,
+        place,
       });
     }
 
+    resolveCollisions(positions, boxes, 16);
+
+    // Shift up if anything above pad
     const allBoxes = [...boxes.values()];
-    if (!allBoxes.length) {
-      contentH = padY * 2 + 120;
-      contentW = Math.max(width, 640);
-    } else {
-      const maxX = Math.max(...allBoxes.map((b) => b.x + b.w), hubX + hubSize.w);
-      const minY = Math.min(...allBoxes.map((b) => b.y), spineY);
+    if (allBoxes.length) {
+      const minY = Math.min(...allBoxes.map((b) => b.y));
       if (minY < padY) {
         const dy = padY - minY;
         for (const [id, pos] of positions) {
@@ -375,13 +475,19 @@ function buildMetroLayout(nodes, canvasEdges, width, mode) {
           const box = boxes.get(id);
           boxes.set(id, { ...box, y: box.y + dy });
         }
+        spineY += dy;
       }
-      contentH = Math.max(...[...boxes.values()].map((b) => b.y + b.h)) + padY + 24;
-      contentW = Math.max(width, maxX + padX, 640);
+      const maxX = Math.max(...[...boxes.values()].map((b) => b.x + b.w));
+      contentH = Math.max(...[...boxes.values()].map((b) => b.y + b.h)) + padY + 20;
+      contentW = Math.max(contentW, maxX + padX);
+    } else {
+      contentH = padY * 2 + 120;
     }
+
+    // Silence unused estimate (kept for future tuning)
+    void estimateBlockH;
   }
 
-  // Line tracks metadata for drawing
   const tracksMeta = [];
   if (current && positions.has(current.id)) {
     const hub = positions.get(current.id);
@@ -389,12 +495,13 @@ function buildMetroLayout(nodes, canvasEdges, width, mode) {
       const themed = byTheme[theme].filter((n) => positions.has(n.id));
       if (!themed.length) return;
       const ys = themed.map((n) => positions.get(n.id).cy);
+      const xs = themed.map((n) => positions.get(n.id).cx);
       tracksMeta.push({
         key: theme,
         color: LINES[theme].color,
         y: ys.reduce((a, b) => a + b, 0) / ys.length,
-        x1: Math.min(hub.cx, ...themed.map((n) => positions.get(n.id).cx)) - 40,
-        x2: Math.max(hub.cx, ...themed.map((n) => positions.get(n.id).cx)) + 40,
+        x1: Math.min(hub.cx, ...xs) - 24,
+        x2: Math.max(hub.cx, ...xs) + 24,
       });
     });
   }
@@ -403,26 +510,25 @@ function buildMetroLayout(nodes, canvasEdges, width, mode) {
     positions,
     boxes,
     width: contentW,
-    height: Math.max(contentH, mode === 'mobile' ? 420 : 360),
+    height: Math.max(contentH, mode === 'vertical' ? 420 : 380),
     tracksMeta,
+    spineY,
     mode,
   };
 }
 
-/** Edge anchors on node box borders; smooth cubic that stays outside cards. */
 function edgePath(sourceBox, targetBox) {
   const scx = sourceBox.x + sourceBox.w / 2;
   const scy = sourceBox.y + sourceBox.h / 2;
   const tcx = targetBox.x + targetBox.w / 2;
   const tcy = targetBox.y + targetBox.h / 2;
-
   const dx = tcx - scx;
   const dy = tcy - scy;
+
   let x1;
   let y1;
   let x2;
   let y2;
-
   if (Math.abs(dx) >= Math.abs(dy)) {
     x1 = dx >= 0 ? sourceBox.x + sourceBox.w : sourceBox.x;
     y1 = scy;
@@ -437,7 +543,6 @@ function edgePath(sourceBox, targetBox) {
 
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
-  // Orthogonal-ish cubic: control points keep the stroke from cutting through cards
   if (Math.abs(dx) >= Math.abs(dy)) {
     return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
   }
@@ -487,9 +592,9 @@ function useContainerSize(ref) {
   return size;
 }
 
+/** <960px uses vertical stage map to avoid horizontal squeeze. */
 function layoutMode(width) {
-  if (width < 640) return 'mobile';
-  if (width < 960) return 'medium';
+  if (width < 960) return 'vertical';
   return 'desktop';
 }
 
@@ -505,9 +610,17 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
 
   const layout = useMemo(() => {
     if (!prepared.nodes.length || !containerW) {
-      return { positions: new Map(), boxes: new Map(), width: 640, height: 360, tracksMeta: [], mode };
+      return {
+        positions: new Map(),
+        boxes: new Map(),
+        width: 640,
+        height: 360,
+        tracksMeta: [],
+        spineY: 0,
+        mode,
+      };
     }
-    return buildMetroLayout(prepared.nodes, prepared.canvasEdges, containerW, mode);
+    return buildMetroLayout(prepared.nodes, containerW, mode);
   }, [prepared, containerW, mode]);
 
   const nodeMap = useMemo(
@@ -543,13 +656,12 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
   }, [focusId, nodeMap, prepared.listEdges]);
 
   const visibleCanvasEdges = useMemo(() => {
-    const base = prepared.canvasEdges;
-    if (!focusId) return base;
+    if (!focusId) return prepared.canvasEdges;
     const related = prepared.listEdges.filter(
       (e) => e.source === focusId || e.target === focusId,
     );
-    const ids = new Set(base.map((e) => e.id));
-    const merged = [...base];
+    const ids = new Set(prepared.canvasEdges.map((e) => e.id));
+    const merged = [...prepared.canvasEdges];
     related.forEach((e) => {
       if (!ids.has(e.id)) merged.push(e);
     });
@@ -563,8 +675,8 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
   return (
     <div className="paper-graph-wrap paper-graph-metro">
       <div className="paper-graph-hint">
-        地铁线路图式研究脉络：横轴为前驱 → 当前论文 → 后续；彩色线路表示概念、方法、训练与评测维度。
-        灰色虚线仅为主题相关，不是真实引用。悬浮高亮直接关系；点击其他论文可跳转详情。
+        地铁线路图：默认只显示时序主路径与当前论文到各主题的换乘线；悬停/点击站点可查看弱关系与主题相关连线。
+        节点标题过长会截断，完整信息见悬浮提示。点击其他论文可跳转详情。
       </div>
 
       <div className="paper-graph-legend" aria-label="线路与站点图例">
@@ -596,7 +708,7 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
         className={`paper-graph-canvas paper-graph-canvas-metro is-${mode}`}
         style={{
           width: '100%',
-          height: Math.min(Math.max(layout.height + 8, 320), mode === 'mobile' ? 720 : 820),
+          height: Math.min(Math.max(layout.height + 8, 320), mode === 'vertical' ? 760 : 900),
           fontSize: FONT_MIN,
         }}
         role="group"
@@ -622,7 +734,6 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
             </defs>
             <rect width={layout.width} height={layout.height} fill="url(#metro-grid)" />
 
-            {/* Theme track guides */}
             {layout.tracksMeta.map((track) => {
               const dim =
                 focusId && highlightedLines.size && !highlightedLines.has(track.key);
@@ -634,15 +745,14 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
                   x2={track.x2}
                   y2={track.y}
                   stroke={LINES[track.key]?.color || '#cbd5e1'}
-                  strokeWidth={6}
+                  strokeWidth={5}
                   strokeLinecap="round"
-                  strokeOpacity={dim ? 0.12 : 0.22}
+                  strokeOpacity={dim ? 0.1 : 0.18}
                 />
               );
             })}
 
-            {/* Spine guide + stage captions for desktop */}
-            {mode !== 'mobile' && prepared.currentId && layout.positions.get(prepared.currentId) && (
+            {mode === 'desktop' && prepared.currentId && layout.positions.get(prepared.currentId) && (
               <>
                 <line
                   x1={28}
@@ -650,17 +760,17 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
                   x2={layout.width - 28}
                   y2={layout.positions.get(prepared.currentId).cy}
                   stroke="#cbd5e1"
-                  strokeWidth={5}
+                  strokeWidth={4}
                   strokeLinecap="round"
-                  strokeOpacity={0.35}
+                  strokeOpacity={0.3}
                 />
-                <text x={36} y={24} className="paper-graph-stage-caption" fill="#64748b" fontSize="11" fontWeight="600">
+                <text x={36} y={22} fill="#64748b" fontSize="11" fontWeight="600">
                   前驱工作 → 当前论文 → 后续发展
                 </text>
               </>
             )}
-            {mode === 'mobile' && (
-              <text x={16} y={28} className="paper-graph-stage-caption" fill="#64748b" fontSize="11" fontWeight="600">
+            {mode === 'vertical' && (
+              <text x={16} y={24} fill="#64748b" fontSize="11" fontWeight="600">
                 纵向阶段：前驱 → 当前 → 主题线路 → 后续
               </text>
             )}
@@ -678,9 +788,9 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
                   d={edgePath(source, target)}
                   fill="none"
                   stroke={focused ? '#1d4ed8' : stroke.color}
-                  strokeWidth={focused ? stroke.width + 0.6 : stroke.width}
+                  strokeWidth={focused ? stroke.width + 0.5 : stroke.width}
                   strokeDasharray={stroke.dash || undefined}
-                  strokeOpacity={dimmed ? 0.18 : 0.92}
+                  strokeOpacity={dimmed ? 0.15 : 0.9}
                   strokeLinecap="round"
                 />
               );
@@ -699,6 +809,11 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
             const lineColor =
               (theme && LINES[theme]?.color) ||
               (isCurrent ? '#1e40af' : node.type === 'paper' ? '#334155' : '#64748b');
+            const tip = [
+              node.label,
+              node.description,
+              node.score != null && node.type === 'paper' ? `相关度 ${(Number(node.score) * 100).toFixed(0)}%` : '',
+            ].filter(Boolean).join('\n');
 
             return (
               <button
@@ -725,7 +840,7 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
                   '--node-color': lineColor,
                   fontSize: FONT_MIN,
                 }}
-                title={node.description || node.label}
+                title={tip}
                 onMouseEnter={() => setHoverId(node.id)}
                 onMouseLeave={() => setHoverId(null)}
                 onClick={(event) => {
@@ -753,9 +868,6 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
                           : TYPE_LABELS[node.type] || node.type}
                 </span>
                 <span className="paper-graph-node-label">{node.label}</span>
-                {node.score != null && node.role !== 'current' && node.type === 'paper' && (
-                  <span className="paper-graph-node-meta">相关度 {(Number(node.score) * 100).toFixed(0)}%</span>
-                )}
               </button>
             );
           })}
@@ -764,7 +876,7 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
 
       <div className="paper-graph-edge-list" aria-label="关系列表">
         <div className="paper-graph-edge-list-title">
-          {focusId ? '选中站点的直接关系' : '主路径与高权重关系（弱关系仅在选中时显示）'}
+          {focusId ? '选中站点的直接关系' : '主路径关系（弱关系 / 主题相关请悬停节点查看）'}
         </div>
         {(focusId
           ? prepared.listEdges.filter((e) => e.source === focusId || e.target === focusId)

@@ -1648,14 +1648,14 @@ body {
   font-weight: 600;
   line-height: 1.35;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   word-break: break-word;
 }
 
 .paper-graph-node-metro.is-size-hub .paper-graph-node-label,
 .paper-graph-node-metro.is-size-paper .paper-graph-node-label {
   font-size: 13px;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .paper-graph-node-meta {
