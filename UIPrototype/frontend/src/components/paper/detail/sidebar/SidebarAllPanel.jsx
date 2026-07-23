@@ -1,10 +1,10 @@
-import { Alert, Card, Tag, Typography, Button, Space } from 'antd';
+import { Card, Tag, Typography, Button, Space } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import { useApp } from '../../../../context/AppContext';
 import SidebarNotesPreview from './SidebarNotesPreview';
 import { ChatBox } from '../../../common/ChatBox';
 import FavoriteButton from './FavoriteButton';
-import SidebarAssistPanel from './SidebarAssistPanel';
+import SidebarAssistPreview from './SidebarAssistPreview';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -19,6 +19,22 @@ function getAuthorText(authors, authorsText) {
   }
 
   return authors || '作者信息待补充';
+}
+
+function GoViewButton({ onClick }) {
+  return (
+    <Button
+      type="link"
+      size="small"
+      style={{ padding: 0, height: 'auto' }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick?.();
+      }}
+    >
+      前往查看
+    </Button>
+  );
 }
 
 function InfoBlock({ paper, paperId, compact }) {
@@ -87,34 +103,31 @@ export default function SidebarAllPanel({
     {
       key: 'info',
       title: '论文信息',
-      extra: '查看 →',
+      extra: <GoViewButton onClick={() => onGoTab('info')} />,
       content: <InfoBlock paper={paper} paperId={paperId} compact />
     },
     {
       key: 'assist',
       title: '辅助阅读',
-      extra: <Tag>{persona}模式</Tag>,
-      content: (
-        parsed ? <SidebarAssistPanel paper={paper} paperId={paperId} /> : (
-          <Alert
-            type="info"
-            showIcon
-            message="完成解析后可用"
-            description="论文解析完成后，这里才会生成辅助阅读内容。"
-          />
-        )
+      extra: <GoViewButton onClick={() => onGoTab('assist')} />,
+      content: parsed ? (
+        <SidebarAssistPreview paper={paper} paperId={paperId} />
+      ) : (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          完成解析后可用 · 当前 {persona}模式
+        </Text>
       )
     },
     {
       key: 'notes',
       title: '笔记与评论',
-      extra: '展开 →',
+      extra: <GoViewButton onClick={() => onGoTab('notes')} />,
       content: <SidebarNotesPreview paperId={paperId} />
     },
     {
       key: 'compare',
       title: '对比阅读',
-      extra: '展开 →',
+      extra: <GoViewButton onClick={() => onGoTab('compare')} />,
       content: (
         <Text type="secondary" style={{ fontSize: 12 }}>
           双论文并排对比，快捷切换
@@ -124,7 +137,7 @@ export default function SidebarAllPanel({
     {
       key: 'qa',
       title: '智能问答',
-      extra: '展开 →',
+      extra: <GoViewButton onClick={() => onGoTab('qa')} />,
       content: (
         <ChatBox
           messages={messages}
