@@ -4,7 +4,7 @@ import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, 
 import { READING_HISTORY, PERSONAS, MODE_DESC, PAPERS } from '../../data/papers';
 import { useApp } from '../../context/AppContext';
 import { getPaperDetail } from '../../services/paperService';
-import { getConceptDictionary, getLearningProfile, listActions, updateLearningProfile, deleteAction, deleteActionsByType } from '../../services/learningService';
+import { getConceptDictionary, clearConceptDictionary, getLearningProfile, listActions, updateLearningProfile, deleteAction, deleteActionsByType } from '../../services/learningService';
 import { USE_MOCK } from '../../services/runtimeConfig';
 import { formatDateKey, parseApiDate } from '../../utils/datetime';
 import PaperCard from '../../components/paper/PaperCard';
@@ -144,10 +144,46 @@ export default function LearningPage() {
   const handleClearHistory = async () => {
     try {
       await deleteActionsByType(userId, 'reading_history');
-      message.success('已清空阅读历史');
+      message.success('已清空全部阅读历史');
+      setHistorySearch('');
       setReloadToken((token) => token + 1);
     } catch (requestError) {
       message.error(requestError.message || '清空失败');
+    }
+  };
+
+  const handleClearNotes = async () => {
+    try {
+      await deleteActionsByType(userId, 'note');
+      message.success('已清空全部笔记');
+      setNotesSearch('');
+      setReloadToken((token) => token + 1);
+    } catch (requestError) {
+      message.error(requestError.message || '清空失败');
+    }
+  };
+
+  const handleClearFavorites = async () => {
+    try {
+      await deleteActionsByType(userId, 'favorite');
+      message.success('已清空全部收藏');
+      setReloadToken((token) => token + 1);
+    } catch (requestError) {
+      message.error(requestError.message || '清空失败');
+    }
+  };
+
+  const handleClearDictionary = async () => {
+    try {
+      await clearConceptDictionary(userId);
+      const nextProfile = await getLearningProfile(userId);
+      setProfile(nextProfile);
+      await refreshDictionary();
+      setDictSearch('');
+      setDictPage(1);
+      message.success('已清空词典全部词条');
+    } catch (requestError) {
+      message.error(requestError.message || '清空词典失败');
     }
   };
 
@@ -166,7 +202,7 @@ export default function LearningPage() {
       });
       setProfile(nextProfile);
       await refreshDictionary();
-      message.success(uniqueTerms.length > 1 ? '已清空词典词条' : '已删除词条');
+      message.success('已删除词条');
     } catch (requestError) {
       message.error(requestError.message || '操作失败');
     }
@@ -259,26 +295,54 @@ export default function LearningPage() {
     {
       key: 'favorites',
       label: '收藏夹',
-      children: loading ? <Spin /> : favorites.length ? (
-        <Row gutter={[16, 16]}>
-          {favorites.filter(({ paper }) => paper).map(({ paper, paperId }) => (
-            <Col xs={24} sm={12} lg={8} key={paperId}><PaperCard paper={paper} /></Col>
-          ))}
-        </Row>
-      ) : <Empty description="暂无收藏论文" />
+      children: (
+        <>
+          {!USE_MOCK && (
+            <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'flex-end' }}>
+              <Popconfirm
+                title="确定清空全部收藏？"
+                description="将删除所有已收藏论文，不限当前列表。"
+                onConfirm={handleClearFavorites}
+                disabled={!favorites.length}
+              >
+                <Button danger size="small" disabled={!favorites.length}>清空收藏</Button>
+              </Popconfirm>
+            </Space>
+          )}
+          {loading ? <Spin /> : favorites.length ? (
+            <Row gutter={[16, 16]}>
+              {favorites.filter(({ paper }) => paper).map(({ paper, paperId }) => (
+                <Col xs={24} sm={12} lg={8} key={paperId}><PaperCard paper={paper} /></Col>
+              ))}
+            </Row>
+          ) : <Empty description="暂无收藏论文" />}
+        </>
+      )
     },
     {
       key: 'notes',
       label: '笔记/评论',
       children: (
         <>
-          <Input
-            allowClear
-            placeholder="搜索笔记标题或内容"
-            value={notesSearch}
-            onChange={(event) => setNotesSearch(event.target.value)}
-            style={{ marginBottom: 16, maxWidth: 360 }}
-          />
+          <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+            <Input
+              allowClear
+              placeholder="搜索笔记标题或内容"
+              value={notesSearch}
+              onChange={(event) => setNotesSearch(event.target.value)}
+              style={{ width: 360, maxWidth: '100%' }}
+            />
+            {!USE_MOCK && (
+              <Popconfirm
+                title="确定清空全部笔记？"
+                description="将删除所有笔记与评论，不限当前搜索结果。"
+                onConfirm={handleClearNotes}
+                disabled={!notes.length}
+              >
+                <Button danger size="small" disabled={!notes.length}>清空笔记</Button>
+              </Popconfirm>
+            )}
+          </Space>
           {filteredNotes.length ? (
             <List
               dataSource={filteredNotes}
@@ -327,7 +391,11 @@ export default function LearningPage() {
               />
             </Space>
             {!USE_MOCK && (
-              <Popconfirm title="确定清空全部阅读历史？" onConfirm={handleClearHistory}>
+              <Popconfirm
+                title="确定清空全部阅读历史？"
+                description="将删除今天/昨天/更早的全部记录，不限当前筛选。"
+                onConfirm={handleClearHistory}
+              >
                 <Button danger size="small">清空历史</Button>
               </Popconfirm>
             )}
@@ -370,11 +438,12 @@ export default function LearningPage() {
                 style={{ width: 260 }}
               />
               <Popconfirm
-                title="确定清空当前可见词条？"
-                onConfirm={() => hideDictionaryTerms(filteredDictionary.map((item) => item.term))}
-                disabled={!filteredDictionary.length}
+                title="确定清空词典中的全部词条？"
+                description="将清空所有分页中的词条，不限当前页或搜索结果。"
+                onConfirm={handleClearDictionary}
+                disabled={!dictionary.length}
               >
-                <Button danger size="small" disabled={!filteredDictionary.length}>清空词典</Button>
+                <Button danger size="small" disabled={!dictionary.length}>清空词典</Button>
               </Popconfirm>
             </Space>
             {filteredDictionary.length ? (

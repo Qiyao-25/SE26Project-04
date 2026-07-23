@@ -78,27 +78,28 @@ def patch_profile_preferences(session: Session, user_id: str, patch: dict) -> Us
     return _to_data(profile)
 
 
-def get_dictionary(session: Session, user_id: str, limit: int = 40) -> list[DictionaryEntry]:
-    profile = _get_or_create(session, user_id)
-    hidden = {
-        str(term).casefold().strip()
-        for term in (dict(profile.preferences or {}).get("hidden_dictionary_terms") or [])
-        if str(term).strip()
-    }
+def _collect_dictionary_entries(
+    session: Session,
+    user_id: str,
+    *,
+    hidden: set[str] | None = None,
+    limit: int = 200,
+) -> list[DictionaryEntry]:
+    blocked = hidden if hidden is not None else set()
     action_paper_ids = session.scalars(
         select(UserAction.paper_id)
         .where(UserAction.user_id == user_id, UserAction.action_type.in_(("favorite", "reading_history")))
         .order_by(UserAction.occurred_at.desc())
-        .limit(30)
+        .limit(80)
     ).all()
     paper_ids = list(dict.fromkeys(action_paper_ids))
     stmt = select(Paper).where(Paper.deleted_at.is_(None), Paper.ingest_status == "qa_ready")
     if paper_ids:
         stmt = stmt.where(Paper.id.in_(paper_ids))
-    papers = session.scalars(stmt.order_by(Paper.updated_at.desc()).limit(30)).all()
+    papers = session.scalars(stmt.order_by(Paper.updated_at.desc()).limit(80)).all()
     if not papers and paper_ids:
         papers = session.scalars(
-            select(Paper).where(Paper.id.in_(paper_ids), Paper.deleted_at.is_(None)).limit(30)
+            select(Paper).where(Paper.id.in_(paper_ids), Paper.deleted_at.is_(None)).limit(80)
         ).all()
 
     entries: dict[str, DictionaryEntry] = {}
@@ -113,14 +114,59 @@ def get_dictionary(session: Session, user_id: str, limit: int = 40) -> list[Dict
             if not isinstance(item, dict):
                 continue
             term = str(item.get("name") or "").strip()
-            if not term or term.casefold() in hidden:
+            if not term or term.casefold() in blocked:
                 continue
-            entry = entries.setdefault(term.casefold(), DictionaryEntry(term=term, description=str(item.get("description") or term)))
+            entry = entries.setdefault(
+                term.casefold(),
+                DictionaryEntry(term=term, description=str(item.get("description") or term)),
+            )
             if paper.id not in entry.paper_ids:
                 entry.paper_ids.append(paper.id)
                 entry.paper_titles.append(paper.title)
             if len(entries) >= limit:
-                break
-        if len(entries) >= limit:
-            break
+                return list(entries.values())
     return list(entries.values())[:limit]
+
+
+def get_dictionary(session: Session, user_id: str, limit: int = 200) -> list[DictionaryEntry]:
+    profile = _get_or_create(session, user_id)
+    hidden = {
+        str(term).casefold().strip()
+        for term in (dict(profile.preferences or {}).get("hidden_dictionary_terms") or [])
+        if str(term).strip()
+    }
+    return _collect_dictionary_entries(session, user_id, hidden=hidden, limit=limit)
+
+
+def clear_dictionary(session: Session, user_id: str) -> dict:
+    """Hide every currently available dictionary term for the user (all pages)."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    user_id = user_id.strip()
+    if not user_id:
+        raise ValueError("USER_ID_INVALID")
+    profile = _get_or_create(session, user_id)
+    # Collect with empty hidden so we hide the full active vocabulary, not one page.
+    visible = _collect_dictionary_entries(session, user_id, hidden=set(), limit=500)
+    prefs = dict(profile.preferences or {})
+    existing = [
+        str(term).strip()
+        for term in (prefs.get("hidden_dictionary_terms") or [])
+        if str(term).strip()
+    ]
+    seen = {term.casefold() for term in existing}
+    merged = list(existing)
+    for entry in visible:
+        key = entry.term.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(entry.term)
+    prefs["hidden_dictionary_terms"] = merged
+    profile.preferences = prefs
+    flag_modified(profile, "preferences")
+    profile.updated_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(profile)
+    return {"cleared": len(visible), "hidden_total": len(merged)}
+

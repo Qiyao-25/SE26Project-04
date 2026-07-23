@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import DictionaryEntry, UserProfileData, UserProfileUpdate
-from app.service.profile import get_dictionary, get_profile, update_profile
+from app.service.profile import clear_dictionary, get_dictionary, get_profile, update_profile
 
 
 router = APIRouter(prefix="/api/learning", tags=["learning-profile"])
@@ -32,3 +32,10 @@ def profile_update(user_id: str, payload: UserProfileUpdate, request: Request, c
 def dictionary(request: Request, user_id: str = Query(min_length=1, max_length=128), current_user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     ensure_same_user(user_id, current_user)
     return ApiResponse(data=get_dictionary(db, user_id), request_id=request.state.request_id)
+
+
+@router.delete("/dictionary", response_model=ApiResponse[dict], summary="清空个人概念词典（全部词条）")
+def dictionary_clear(request: Request, user_id: str = Query(min_length=1, max_length=128), current_user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
+    ensure_same_user(user_id, current_user)
+    data = clear_dictionary(db, user_id)
+    return ApiResponse(data=data, request_id=request.state.request_id)

@@ -73,3 +73,8 @@ export async function getConceptDictionary(userId) {
   if (USE_MOCK) return [];
   return apiClient.get('/learning/dictionary', { params: { user_id: userId } });
 }
+
+export async function clearConceptDictionary(userId) {
+  if (USE_MOCK) return { cleared: 0, hidden_total: 0 };
+  return apiClient.delete('/learning/dictionary', { params: { user_id: userId } });
+}
