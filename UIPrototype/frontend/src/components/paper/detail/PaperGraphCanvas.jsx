@@ -26,11 +26,15 @@ const LIMITS = {
   paper: 5,
 };
 
-const MIN_NODE_W = 150;
+const MIN_NODE_W = 160;
+const MAX_ENTITY_W = 280;
+const MAX_PAPER_W = 300;
+const MAX_HUB_W = 340;
 const FONT_MIN = 12;
 const PAPER_SCORE_MIN = 0.28;
-const GAP_X = 24;
-const GAP_Y = 20;
+const GAP_X = 20;
+const GAP_Y = 18;
+const CHAR_PX = 13;
 
 const TRAINING_HINTS = [
   'train', 'optim', 'loss', 'gradient', 'fine-tun', 'finetun', '学习率', '优化', '训练',
@@ -157,26 +161,30 @@ function prepareGraph(rawNodes = [], rawEdges = []) {
   return { nodes, canvasEdges, listEdges, currentId: current?.id || null };
 }
 
-function estimateLabelLines(label, width, isPaper) {
+function estimateLabelLines(label, width, maxLines) {
   const chars = String(label || '').length;
-  const perLine = Math.max(8, Math.floor((width - 20) / 12));
-  const lines = Math.ceil(chars / perLine);
-  return Math.min(isPaper ? 2 : 1, Math.max(1, lines));
+  const perLine = Math.max(6, Math.floor((width - 24) / CHAR_PX));
+  return Math.min(maxLines, Math.max(1, Math.ceil(chars / perLine)));
 }
 
-function nodeSize(node, mode) {
+/** Preferred width from label length; later may expand to fill a distributed slot. */
+function preferredWidth(node, mode) {
+  const label = String(node.label || '');
+  const textW = label.length * CHAR_PX + 36;
   if (node.role === 'current') {
-    const w = mode === 'vertical' ? 176 : 208;
-    const lines = estimateLabelLines(node.label, w, true);
-    return { w, h: 44 + lines * 18 };
+    return Math.min(MAX_HUB_W, Math.max(mode === 'vertical' ? 200 : 220, textW));
   }
   if (node.type === 'paper') {
-    const w = Math.max(MIN_NODE_W, mode === 'vertical' ? 160 : 168);
-    const lines = estimateLabelLines(node.label, w, true);
-    return { w, h: 40 + lines * 17 };
+    return Math.min(MAX_PAPER_W, Math.max(MIN_NODE_W, textW));
   }
-  const w = Math.max(MIN_NODE_W, 152);
-  return { w, h: 44 };
+  return Math.min(MAX_ENTITY_W, Math.max(MIN_NODE_W, textW));
+}
+
+function nodeSize(node, mode, forcedW) {
+  const maxLines = node.role === 'current' || node.type === 'paper' ? 3 : 3;
+  const w = forcedW || preferredWidth(node, mode);
+  const lines = estimateLabelLines(node.label, w, maxLines);
+  return { w, h: 36 + lines * 17 };
 }
 
 function sortPapersByTime(papers, direction) {
@@ -234,46 +242,73 @@ function resolveCollisions(positions, boxes, gap = 16) {
 }
 
 /**
- * Place nodes in wrapped rows. Cell width always >= node width + GAP_X (no squeeze).
- * Returns bottom Y after the block.
+ * Full-width distributed rows: expand cards into equal slots so right side is used.
  */
-function placeWrappedBlock({
+function placeDistributedBlock({
   nodes,
   startY,
   areaX,
   areaW,
   mode,
   place,
-  labelY,
 }) {
   if (!nodes.length) return startY;
   let y = startY;
-  if (labelY != null) y = Math.max(y, labelY);
 
-  const sizes = nodes.map((n) => nodeSize(n, mode));
-  const cellW = Math.max(...sizes.map((s) => s.w)) + GAP_X;
-  const perRow = Math.max(1, Math.floor(areaW / cellW));
+  const minCell = MIN_NODE_W + GAP_X;
+  const perRow = Math.max(1, Math.floor((areaW + GAP_X) / minCell));
 
   for (let start = 0; start < nodes.length; start += perRow) {
     const row = nodes.slice(start, start + perRow);
-    const rowSizes = row.map((n) => nodeSize(n, mode));
-    const rowH = Math.max(...rowSizes.map((s) => s.h));
-    const rowInnerW = row.reduce((sum, n, i) => sum + nodeSize(n, mode).w + (i ? GAP_X : 0), 0);
-    let x = areaX + Math.max(0, (areaW - rowInnerW) / 2);
-    row.forEach((node) => {
-      const size = nodeSize(node, mode);
-      place(node, x, y + (rowH - size.h) / 2);
-      x += size.w + GAP_X;
+    const n = row.length;
+    const slotW = (areaW - (n - 1) * GAP_X) / n;
+    const sizes = row.map((node) => {
+      const preferred = preferredWidth(node, mode);
+      const maxForType = node.role === 'current'
+        ? MAX_HUB_W
+        : node.type === 'paper'
+          ? MAX_PAPER_W
+          : MAX_ENTITY_W;
+      const w = Math.min(maxForType, Math.max(preferred, Math.min(slotW, maxForType)));
+      return nodeSize(node, mode, w);
+    });
+
+    const preferredSum = sizes.reduce((s, sz) => s + sz.w, 0) + (n - 1) * GAP_X;
+    let xs;
+    if (preferredSum <= areaW + 1) {
+      xs = row.map((_, i) => areaX + i * (slotW + GAP_X) + Math.max(0, (slotW - sizes[i].w) / 2));
+    } else {
+      let x = areaX;
+      xs = sizes.map((sz) => {
+        const cur = x;
+        x += sz.w + GAP_X;
+        return cur;
+      });
+    }
+
+    const rowH = Math.max(...sizes.map((s) => s.h));
+    row.forEach((node, i) => {
+      place(node, xs[i], y + (rowH - sizes[i].h) / 2, sizes[i]);
     });
     y += rowH + GAP_Y;
   }
   return y;
 }
 
+function alignRowToSpine(nodeIds, positions, boxes, spineY) {
+  nodeIds.forEach((id) => {
+    const pos = positions.get(id);
+    if (!pos) return;
+    const ny = spineY - pos.h / 2;
+    positions.set(id, { ...pos, y: ny, cy: spineY });
+    boxes.set(id, { x: pos.x, y: ny, w: pos.w, h: pos.h });
+  });
+}
+
 function buildMetroLayout(nodes, width, mode) {
-  const padX = mode === 'vertical' ? 16 : 28;
-  const padY = 52;
-  const hubGapX = 32;
+  const padX = mode === 'vertical' ? 16 : 24;
+  const padY = 48;
+  const hubGapX = 28;
 
   const current = nodes.find((n) => n.role === 'current');
   const predecessors = sortPapersByTime(
@@ -295,9 +330,10 @@ function buildMetroLayout(nodes, width, mode) {
 
   const positions = new Map();
   const boxes = new Map();
-  const place = (node, x, y) => {
-    const size = nodeSize(node, mode);
-    const safeX = Math.max(padX, x);
+  const place = (node, x, y, sizeOverride) => {
+    const size = sizeOverride || nodeSize(node, mode);
+    const maxX = Math.max(padX, width - size.w - padX);
+    const safeX = Math.min(Math.max(padX, x), maxX);
     positions.set(node.id, {
       x: safeX,
       y,
@@ -309,83 +345,58 @@ function buildMetroLayout(nodes, width, mode) {
   };
 
   let contentH = padY;
-  let contentW = Math.max(width, mode === 'vertical' ? 360 : 720);
+  const contentW = Math.max(width, mode === 'vertical' ? 360 : 640);
   let spineY = 0;
+  const themeAreaX = padX;
+  const themeAreaW = Math.max(MIN_NODE_W, contentW - padX * 2);
 
   if (mode === 'vertical') {
     let y = padY;
-    const colX = padX;
-    const colW = Math.max(MIN_NODE_W, width - padX * 2);
-
-    const stage = (title, list, indent = 0) => {
-      if (!list.length) return;
-      y += 8;
+    const stageStack = (list) => {
       list.forEach((node) => {
-        place(node, colX + indent, y);
-        y += nodeSize(node, mode).h + GAP_Y;
+        const cap = node.role === 'current' || node.type === 'paper' ? MAX_HUB_W : MAX_ENTITY_W;
+        const size = nodeSize(node, mode, Math.min(cap, themeAreaW));
+        place(node, padX, y, size);
+        y += size.h + GAP_Y;
       });
     };
 
-    stage('前驱', predecessors);
+    stageStack(predecessors);
     if (current) {
-      place(current, colX, y);
-      y += nodeSize(current, mode).h + GAP_Y + 6;
+      const size = nodeSize(current, mode, Math.min(MAX_HUB_W, themeAreaW));
+      place(current, padX, y, size);
+      y += size.h + GAP_Y + 6;
       spineY = positions.get(current.id)?.cy || y;
     }
     ['concept', 'method', 'training', 'experiment'].forEach((theme) => {
       if (!byTheme[theme].length) return;
-      y = placeWrappedBlock({
+      y = placeDistributedBlock({
         nodes: byTheme[theme],
         startY: y + 4,
-        areaX: colX,
-        areaW: colW,
+        areaX: themeAreaX,
+        areaW: themeAreaW,
         mode,
         place,
-      });
-      y += 6;
+      }) + 4;
     });
     if (topicPapers.length) {
-      y = placeWrappedBlock({
+      y = placeDistributedBlock({
         nodes: topicPapers,
         startY: y + 4,
-        areaX: colX,
-        areaW: colW,
+        areaX: themeAreaX,
+        areaW: themeAreaW,
         mode,
         place,
       });
     }
-    stage('后续', successors);
+    stageStack(successors);
 
-    resolveCollisions(positions, boxes, 16);
+    resolveCollisions(positions, boxes, 14);
     contentH = Math.max(...[...boxes.values()].map((b) => b.y + b.h), y) + padY;
-    contentW = Math.max(width, padX * 2 + MIN_NODE_W + 24);
   } else {
-    // Desktop zones:
-    // [above themes] / [left pred | hub | right succ] / [below themes] / [topic spur]
-    const hubSize = current ? nodeSize(current, mode) : { w: 208, h: 80 };
-    const leftPapers = predecessors;
-    const rightPapers = successors;
-
-    const leftBlockW = leftPapers.reduce(
-      (sum, n, i) => sum + nodeSize(n, mode).w + (i ? hubGapX : 0),
-      0,
-    );
-    const rightBlockW = rightPapers.reduce(
-      (sum, n, i) => sum + nodeSize(n, mode).w + (i ? hubGapX : 0),
-      0,
-    );
-
-    const spineInnerW = leftBlockW + (leftBlockW ? hubGapX : 0) + hubSize.w
-      + (rightBlockW ? hubGapX : 0) + rightBlockW;
-    const hubX = Math.max(padX + leftBlockW + (leftBlockW ? hubGapX : 0), (width - hubSize.w) / 2);
-    // Ensure left papers fit; expand content width if needed
-    const minSpineLeft = padX;
-    const spineStart = Math.max(minSpineLeft, hubX - (leftBlockW ? hubGapX : 0) - leftBlockW);
-    contentW = Math.max(
-      width,
-      spineStart + spineInnerW + padX,
-      padX * 2 + spineInnerW,
-    );
+    const hubSize = current
+      ? nodeSize(current, mode, preferredWidth(current, mode))
+      : { w: 220, h: 80 };
 
     const aboveThemes = [
       byTheme.concept.length ? { key: 'concept', nodes: byTheme.concept } : null,
@@ -396,65 +407,68 @@ function buildMetroLayout(nodes, width, mode) {
       byTheme.experiment.length ? { key: 'experiment', nodes: byTheme.experiment } : null,
     ].filter(Boolean);
 
-    const themeAreaX = padX;
-    const themeAreaW = Math.max(MIN_NODE_W, contentW - padX * 2);
-
-    // Estimate above block height for spine Y
-    const estimateBlockH = (tracks) => tracks.reduce((sum, track) => {
-      const cellW = Math.max(...track.nodes.map((n) => nodeSize(n, mode).w)) + GAP_X;
-      const perRow = Math.max(1, Math.floor(themeAreaW / cellW));
-      const rows = Math.ceil(track.nodes.length / perRow);
-      const rowH = Math.max(...track.nodes.map((n) => nodeSize(n, mode).h));
-      return sum + rows * (rowH + GAP_Y) + 12;
-    }, 0);
-
-    let yCursor = padY + 20;
+    let yCursor = padY + 16;
     aboveThemes.forEach((track) => {
-      yCursor = placeWrappedBlock({
+      yCursor = placeDistributedBlock({
         nodes: track.nodes,
         startY: yCursor,
         areaX: themeAreaX,
         areaW: themeAreaW,
         mode,
         place,
-      }) + 8;
+      }) + 6;
     });
 
-    spineY = yCursor + hubSize.h / 2 + 12;
+    spineY = yCursor + hubSize.h / 2 + 10;
+    const hubX = Math.round((contentW - hubSize.w) / 2);
 
-    // Spine zone — papers only, no theme stations
-    let x = spineStart;
-    leftPapers.forEach((node) => {
-      const size = nodeSize(node, mode);
-      place(node, x, spineY - size.h / 2);
-      x += size.w + hubGapX;
-    });
-    if (current) {
-      place(current, hubX, spineY - hubSize.h / 2);
+    if (predecessors.length) {
+      const leftW = Math.max(MIN_NODE_W, hubX - hubGapX - padX);
+      placeDistributedBlock({
+        nodes: predecessors,
+        startY: spineY - 40,
+        areaX: padX,
+        areaW: leftW,
+        mode,
+        place,
+      });
+      alignRowToSpine(predecessors.map((n) => n.id), positions, boxes, spineY);
     }
-    x = hubX + hubSize.w + hubGapX;
-    rightPapers.forEach((node) => {
-      const size = nodeSize(node, mode);
-      place(node, x, spineY - size.h / 2);
-      x += size.w + hubGapX;
-    });
 
-    let belowY = spineY + hubSize.h / 2 + 28;
+    if (current) {
+      place(current, hubX, spineY - hubSize.h / 2, hubSize);
+    }
+
+    if (successors.length) {
+      const succAreaX = hubX + hubSize.w + hubGapX;
+      const succAreaW = Math.max(MIN_NODE_W, contentW - padX - succAreaX);
+      placeDistributedBlock({
+        nodes: successors,
+        startY: spineY - 40,
+        areaX: succAreaX,
+        areaW: succAreaW,
+        mode,
+        place,
+      });
+      alignRowToSpine(successors.map((n) => n.id), positions, boxes, spineY);
+    }
+
+    let belowY = spineY + hubSize.h / 2 + 24;
     belowThemes.forEach((track) => {
-      belowY = placeWrappedBlock({
+      belowY = placeDistributedBlock({
         nodes: track.nodes,
         startY: belowY,
         areaX: themeAreaX,
         areaW: themeAreaW,
         mode,
         place,
-      }) + 8;
+      }) + 6;
     });
 
     if (topicPapers.length) {
-      belowY = placeWrappedBlock({
+      belowY = placeDistributedBlock({
         nodes: topicPapers,
-        startY: belowY + 8,
+        startY: belowY + 6,
         areaX: themeAreaX,
         areaW: themeAreaW,
         mode,
@@ -462,9 +476,8 @@ function buildMetroLayout(nodes, width, mode) {
       });
     }
 
-    resolveCollisions(positions, boxes, 16);
+    resolveCollisions(positions, boxes, 14);
 
-    // Shift up if anything above pad
     const allBoxes = [...boxes.values()];
     if (allBoxes.length) {
       const minY = Math.min(...allBoxes.map((b) => b.y));
@@ -477,15 +490,10 @@ function buildMetroLayout(nodes, width, mode) {
         }
         spineY += dy;
       }
-      const maxX = Math.max(...[...boxes.values()].map((b) => b.x + b.w));
-      contentH = Math.max(...[...boxes.values()].map((b) => b.y + b.h)) + padY + 20;
-      contentW = Math.max(contentW, maxX + padX);
+      contentH = Math.max(...[...boxes.values()].map((b) => b.y + b.h)) + padY + 16;
     } else {
       contentH = padY * 2 + 120;
     }
-
-    // Silence unused estimate (kept for future tuning)
-    void estimateBlockH;
   }
 
   const tracksMeta = [];
@@ -675,8 +683,7 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
   return (
     <div className="paper-graph-wrap paper-graph-metro">
       <div className="paper-graph-hint">
-        地铁线路图：默认只显示时序主路径与当前论文到各主题的换乘线；悬停/点击站点可查看弱关系与主题相关连线。
-        节点标题过长会截断，完整信息见悬浮提示。点击其他论文可跳转详情。
+        地铁线路图：站点按全宽均分排布；概念/方法/领域等标题最多显示 3 行。默认只画主路径与换乘线，悬停可看弱关系。
       </div>
 
       <div className="paper-graph-legend" aria-label="线路与站点图例">
