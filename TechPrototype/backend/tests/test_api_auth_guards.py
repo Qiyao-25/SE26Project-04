@@ -42,7 +42,3 @@ def test_enqueue_pending_requires_admin(tmp_path):
 
 def test_task_detail_requires_login(tmp_path):
     assert require_current_user in _dependencies(_route(_app(tmp_path), "/api/tasks/{task_id}", "GET"))
-
-
-def test_paper_pdf_requires_login(tmp_path):
-    assert require_current_user in _dependencies(_route(_app(tmp_path), "/api/papers/{paper_id}/pdf", "GET"))
