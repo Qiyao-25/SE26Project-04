@@ -32,7 +32,6 @@ import {
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
-import PaperPdfViewer from '../../components/paper/detail/PaperPdfViewer';
 import { pushAnnotationSelection, readDomSelection } from '../../utils/annotationSelection';
 
 const { Title, Paragraph, Text } = Typography;
@@ -346,11 +345,12 @@ export default function PaperDetailPage() {
             {(shownPaper.authors || []).join?.(', ') || shownPaper.authorsText || shownPaper.authors}
           </Paragraph>
 
-          {shownContent?.pdfUrl || (shownPaperId && /^\d+$/.test(String(shownPaperId))) ? (
+          {shownContent?.pdfUrl ? (
             <>
-              <PaperPdfViewer
-                paperId={shownPaperId}
-                pdfUrl={shownContent?.pdfUrl}
+              <iframe
+                title={`${shownPaper.title} PDF`}
+                src={shownContent.pdfUrl}
+                className="paper-pdf-frame"
               />
 
               <Space wrap style={{ marginTop: 12 }}>
@@ -367,15 +367,14 @@ export default function PaperDetailPage() {
 
                 <Button
                   icon={<FilePdfOutlined />}
-                  href={shownContent?.pdfUrl}
+                  href={shownContent.pdfUrl}
                   target="_blank"
                   rel="noreferrer"
-                  disabled={!shownContent?.pdfUrl}
                 >
                   新窗口打开 PDF
                 </Button>
 
-                {shownContent?.htmlUrl && (
+                {shownContent.htmlUrl && (
                   <Button
                     icon={<LinkOutlined />}
                     href={shownContent.htmlUrl}
@@ -398,8 +397,7 @@ export default function PaperDetailPage() {
                 )}
 
                 <Text type="secondary">
-                  在 PDF 中划选文本可自动填入侧栏批注摘录
-                  {shownContent?.pageCount ? ` · 共 ${shownContent.pageCount} 页` : ''}
+                  {shownContent.pageCount ? `共 ${shownContent.pageCount} 页` : '页数待后端解析'}
                 </Text>
               </Space>
             </>
@@ -681,7 +679,7 @@ export default function PaperDetailPage() {
         )}
       </div>
 
-      {pdfFullscreen && (shownContent?.pdfUrl || (shownPaperId && /^\d+$/.test(String(shownPaperId)))) ? (
+      {pdfFullscreen && shownContent?.pdfUrl ? (
         <div className="pdf-fullscreen-overlay" role="dialog" aria-modal="true" aria-label="全屏阅读 PDF">
           <div className="pdf-fullscreen-toolbar">
             <div className="pdf-fullscreen-title">
@@ -693,10 +691,9 @@ export default function PaperDetailPage() {
             <Space wrap>
               <Button
                 icon={<FilePdfOutlined />}
-                href={shownContent?.pdfUrl}
+                href={shownContent.pdfUrl}
                 target="_blank"
                 rel="noreferrer"
-                disabled={!shownContent?.pdfUrl}
               >
                 新窗口打开
               </Button>
@@ -705,11 +702,10 @@ export default function PaperDetailPage() {
               </Button>
             </Space>
           </div>
-          <PaperPdfViewer
-            paperId={shownPaperId}
-            pdfUrl={shownContent?.pdfUrl}
-            fullscreen
-            className="pdf-fullscreen-viewer"
+          <iframe
+            title={`${shownPaper.title} 全屏 PDF`}
+            src={shownContent.pdfUrl}
+            className="pdf-fullscreen-frame"
           />
         </div>
       ) : null}
