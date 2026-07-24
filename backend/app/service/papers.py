@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from math import ceil
 from uuid import uuid4
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -44,6 +45,8 @@ from app.schema.papers import (
 )
 from app.service.search_query_normalize import paper_matches_excludes
 from app.service.search_session_store import create_search_session, get_search_session
+
+logger = logging.getLogger("papermate.papers")
 
 class PaperServiceError(Exception):
     def __init__(self, code: str, message: str, status_code: int):
