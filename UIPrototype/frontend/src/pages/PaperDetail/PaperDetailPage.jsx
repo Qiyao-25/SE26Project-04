@@ -27,11 +27,13 @@ import {
   getPaperDetail,
   getPaperSummary,
   getPaperGraph,
+  listPaperChunks,
   rebuildPaperGraph
 } from '../../services/paperService';
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
+import PaperExcerptsPanel from '../../components/paper/detail/PaperExcerptsPanel';
 import { pushAnnotationSelection, readDomSelection } from '../../utils/annotationSelection';
 
 const { Title, Paragraph, Text } = Typography;
@@ -76,6 +78,7 @@ export default function PaperDetailPage() {
   const [mainTab, setMainTab] = useState('content');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pdfFullscreen, setPdfFullscreen] = useState(false);
+  const [excerpts, setExcerpts] = useState([]);
   const historyRecordedFor = useRef(null);
   const annotatableRef = useRef(null);
 
@@ -84,6 +87,7 @@ export default function PaperDetailPage() {
   const [previewSummary, setPreviewSummary] = useState(null);
   const [previewGraph, setPreviewGraph] = useState(null);
   const [previewGraphError, setPreviewGraphError] = useState('');
+  const [previewExcerpts, setPreviewExcerpts] = useState([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
 
@@ -118,9 +122,7 @@ export default function PaperDetailPage() {
   const handleAnnotatableMouseUp = () => {
     const read = readDomSelection(annotatableRef.current);
     if (!read || read.text.length < 2) return;
-    if (pushAnnotationSelection({ text: read.text })) {
-      message.success('已选中文本并填入侧栏摘录', 1.2);
-    }
+    pushAnnotationSelection({ text: read.text });
   };
 
   useEffect(() => {
@@ -148,13 +150,15 @@ export default function PaperDetailPage() {
       setSummaryData(null);
       setGraphData(null);
       setGraphError('');
+      setExcerpts([]);
 
       try {
-        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
+        const [detailResult, contentResult, summaryResult, graphResult, chunksResult] = await Promise.allSettled([
           getPaperDetail(paperId),
           getPaperContent(paperId),
           getPaperSummary(paperId),
-          getPaperGraph(paperId)
+          getPaperGraph(paperId),
+          listPaperChunks(paperId, { limit: 120 }),
         ]);
 
         if (cancelled) return;
@@ -166,6 +170,7 @@ export default function PaperDetailPage() {
         setSummaryData(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
         setGraphData(graphResult.status === 'fulfilled' ? graphResult.value : null);
         setGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
+        setExcerpts(chunksResult.status === 'fulfilled' ? (chunksResult.value || []) : []);
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || '论文加载失败');
@@ -191,6 +196,7 @@ export default function PaperDetailPage() {
       setPreviewSummary(null);
       setPreviewGraph(null);
       setPreviewGraphError('');
+      setPreviewExcerpts([]);
       setPreviewError('');
       setPreviewLoading(false);
       return undefined;
@@ -203,11 +209,12 @@ export default function PaperDetailPage() {
 
     (async () => {
       try {
-        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
+        const [detailResult, contentResult, summaryResult, graphResult, chunksResult] = await Promise.allSettled([
           getPaperDetail(previewId),
           getPaperContent(previewId),
           getPaperSummary(previewId),
-          getPaperGraph(previewId)
+          getPaperGraph(previewId),
+          listPaperChunks(previewId, { limit: 120 }),
         ]);
         if (cancelled) return;
         if (detailResult.status === 'rejected') throw detailResult.reason;
@@ -216,9 +223,11 @@ export default function PaperDetailPage() {
         setPreviewSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
         setPreviewGraph(graphResult.status === 'fulfilled' ? graphResult.value : null);
         setPreviewGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
+        setPreviewExcerpts(chunksResult.status === 'fulfilled' ? (chunksResult.value || []) : []);
       } catch (error) {
         if (!cancelled) {
           setPreviewPaper(null);
+          setPreviewExcerpts([]);
           setPreviewError(error.message || '对比论文加载失败');
         }
       } finally {
@@ -273,6 +282,7 @@ export default function PaperDetailPage() {
   const viewSummary = viewingOther ? previewSummary : summaryData;
   const viewGraph = viewingOther ? previewGraph : graphData;
   const viewGraphError = viewingOther ? previewGraphError : graphError;
+  const viewExcerpts = viewingOther ? previewExcerpts : excerpts;
   const viewPaperId = viewingOther ? String(comparePaperB) : paperId;
 
   if (loading) {
@@ -319,8 +329,10 @@ export default function PaperDetailPage() {
   const shownSummary = viewingOther && viewPaper ? viewSummary : summaryData;
   const shownGraph = viewingOther && viewPaper ? viewGraph : graphData;
   const shownGraphError = viewingOther && viewPaper ? viewGraphError : graphError;
+  const shownExcerpts = viewingOther && viewPaper ? viewExcerpts : excerpts;
   const shownPaperId = viewingOther && viewPaper ? viewPaperId : paperId;
   const shownSummaryReady = ['completed', 'qa_ready'].includes(shownSummary?.parseStatus);
+  const shownParseReady = ['completed', 'qa_ready', 'succeeded'].includes(shownPaper?.parseStatus);
 
   const mainTabs = [
     {
@@ -408,8 +420,19 @@ export default function PaperDetailPage() {
       )
     },
     {
+      key: 'excerpts',
+      label: 'b · 原文段落',
+      children: (
+        <PaperExcerptsPanel
+          abstractText={shownPaper.abstract || shownPaper.summary || ''}
+          chunks={shownExcerpts}
+          parseReady={shownParseReady || shownSummaryReady}
+        />
+      ),
+    },
+    {
       key: 'summary',
-      label: 'b · 智能总结',
+      label: 'c · 智能总结',
       children: (
         <div>
           <Space size={6} wrap style={{ marginBottom: 12 }}>
@@ -525,7 +548,7 @@ export default function PaperDetailPage() {
     },
     {
       key: 'graph',
-      label: 'c · 知识图谱与研究脉络',
+      label: 'd · 知识图谱与研究脉络',
       children: (
         <div className="graph-placeholder">
           {shownGraph ? (

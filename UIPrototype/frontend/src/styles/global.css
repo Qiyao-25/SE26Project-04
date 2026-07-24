@@ -774,25 +774,32 @@ select {
   padding-right: 4px;
 }
 
-.annotation-body {
-  max-height: 220px;
-  overflow-y: auto;
-  padding: 8px;
-  margin-bottom: 4px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 8px;
-  background: #fafbfc;
+.paper-annotatable {
   user-select: text;
 }
 
-.annotation-chunk {
-  padding: 6px 4px;
-  border-radius: 6px;
-  margin-bottom: 6px;
+.paper-annotatable ::selection {
+  background: rgba(250, 204, 21, 0.45);
 }
 
-.annotation-chunk.is-active {
-  background: rgba(250, 204, 21, 0.12);
+.paper-excerpts-body {
+  user-select: text;
+}
+
+.paper-excerpt-chunk {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #fcfcfd 0%, #f7f8fa 100%);
+}
+
+.paper-excerpt-chunk:hover {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.paper-excerpts-body ::selection {
+  background: rgba(250, 204, 21, 0.45);
 }
 
 mark.pm-annotation-highlight {
@@ -800,14 +807,6 @@ mark.pm-annotation-highlight {
   color: inherit;
   padding: 0 1px;
   border-radius: 2px;
-}
-
-.paper-annotatable {
-  user-select: text;
-}
-
-.paper-annotatable ::selection {
-  background: rgba(250, 204, 21, 0.45);
 }
 
 .sidebar-scroll::-webkit-scrollbar,
