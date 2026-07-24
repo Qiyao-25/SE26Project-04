@@ -2,10 +2,10 @@
 """Build deployable packages for PaperMate (frontend dist + backend source bundle).
 
 Usage (from repo root):
-  python deploy/pack.py
-  python deploy/pack.py --out dist/packages
+  python TechPrototype/deploy/pack.py
+  python TechPrototype/deploy/pack.py --out dist/packages
   # 中间产物建议输出到 ppp 工作区：
-  python deploy/pack.py --out ../ppp/deploy-artifacts/packages
+  python TechPrototype/deploy/pack.py --out ../ppp/deploy-artifacts/packages
 
 Outputs:
   papermate-frontend-<version>.tar.gz   # Vite dist + README
@@ -22,10 +22,11 @@ import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-FRONTEND = ROOT / "UIPrototype" / "frontend"
-BACKEND = ROOT / "backend"
-DEFAULT_OUT = ROOT / "dist" / "packages"
+TECH_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = TECH_ROOT.parent
+FRONTEND = REPO_ROOT / "UIPrototype" / "frontend"
+BACKEND = TECH_ROOT / "backend"
+DEFAULT_OUT = REPO_ROOT / "dist" / "packages"
 
 BACKEND_EXCLUDE_DIRS = {".venv", "venv", "__pycache__", ".pytest_cache", "data", ".mypy_cache", "papermate_backend.egg-info"}
 BACKEND_EXCLUDE_FILES = {".env", ".env.local"}
@@ -42,7 +43,7 @@ def _run(cmd: list[str], cwd: Path) -> None:
 
 def build_frontend(stage: Path) -> None:
     env_prod = FRONTEND / ".env.production"
-    example = ROOT / "deploy" / "env.frontend.production.example"
+    example = TECH_ROOT / "deploy" / "env.frontend.production.example"
     if not env_prod.exists() and example.exists():
         shutil.copy2(example, env_prod)
         print(f"created {env_prod} from example")
@@ -93,7 +94,7 @@ def stage_backend(stage: Path) -> None:
             shutil.copy2(item, dest)
 
     # Ship production env template (not secrets)
-    shutil.copy2(ROOT / "deploy" / "env.backend.production.example", target / ".env.production.example")
+    shutil.copy2(TECH_ROOT / "deploy" / "env.backend.production.example", target / ".env.production.example")
     (target / "README.txt").write_text(
         "PaperMate 后端安装包\n"
         "1. 解压到 /opt/papermate/backend\n"
@@ -134,7 +135,7 @@ def main() -> int:
         shutil.copytree(dist, stage / "frontend")
 
     stage_backend(stage)
-    shutil.copytree(ROOT / "deploy", stage / "deploy", dirs_exist_ok=True)
+    shutil.copytree(TECH_ROOT / "deploy", stage / "deploy", dirs_exist_ok=True)
 
     version = args.version
     _tar(stage / "frontend", args.out / f"papermate-frontend-{version}.tar.gz")
@@ -144,8 +145,8 @@ def main() -> int:
     deploy_bundle.mkdir()
     for name in ("nginx.papermate.conf.example", "papermate-backend.service.example",
                  "env.backend.production.example", "env.frontend.production.example"):
-        shutil.copy2(ROOT / "deploy" / name, deploy_bundle / name)
-    docs = ROOT / "docs" / "部署说明.md"
+        shutil.copy2(TECH_ROOT / "deploy" / name, deploy_bundle / name)
+    docs = TECH_ROOT / "docs" / "部署说明.md"
     if docs.exists():
         shutil.copy2(docs, deploy_bundle / "部署说明.md")
     _tar(deploy_bundle, args.out / f"papermate-deploy-config-{version}.tar.gz")

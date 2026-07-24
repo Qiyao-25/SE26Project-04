@@ -9,7 +9,8 @@
 #   SEED_PATH     seed.json path
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Split-Path -Parent $PSScriptRoot
+$TechRoot = Split-Path -Parent $PSScriptRoot
+$RepoRoot = Split-Path -Parent $TechRoot
 $HostName = if ($env:SSH_HOST) { $env:SSH_HOST } else { "10.119.9.119" }
 $User = if ($env:SSH_USER) { $env:SSH_USER } else { "root" }
 $RemoteDir = "/tmp/papermate"
@@ -31,7 +32,7 @@ foreach ($c in $PkgCandidates) {
   }
 }
 if (-not $Pkg) {
-  throw "No papermate-*.tar.gz found. Run: python deploy/pack.py  (or set PACKAGES_DIR)"
+  throw "No papermate-*.tar.gz found. Run: python TechPrototype/deploy/pack.py  (or set PACKAGES_DIR)"
 }
 
 Write-Host ("Packages: {0}" -f $Pkg)
@@ -51,7 +52,7 @@ Get-ChildItem -Path (Join-Path $Pkg "papermate-*.tar.gz") | ForEach-Object {
 $SeedCandidates = New-Object System.Collections.Generic.List[string]
 if ($env:SEED_PATH) { [void]$SeedCandidates.Add($env:SEED_PATH) }
 [void]$SeedCandidates.Add((Join-Path $RepoRoot "..\ppp\deploy-artifacts\work\seed.json"))
-[void]$SeedCandidates.Add((Join-Path $RepoRoot "PaperPipeline\data\seed.json"))
+[void]$SeedCandidates.Add((Join-Path $TechRoot "PaperPipeline\data\seed.json"))
 foreach ($s in $SeedCandidates) {
   $sp = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($s)
   if (Test-Path -LiteralPath $sp) {
@@ -71,4 +72,4 @@ Write-Host ("  ssh {0}@{1}" -f $User, $HostName)
 Write-Host ("  sed -i 's/\r$//' {0}/deploy-on-host.sh" -f $RemoteDir)
 Write-Host ("  bash {0}/deploy-on-host.sh" -f $RemoteDir)
 Write-Host "  systemctl restart papermate-backend"
-Write-Host "See docs/服务器运维与更新.md"
+Write-Host "See TechPrototype/docs/服务器运维与更新.md"

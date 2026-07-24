@@ -45,20 +45,20 @@
 8. 业务测试数据集（100条标准论文数据）
 9. 100并发压力性能测试完整记录
 10. AI内容准确率评估测试报告
-11. 项目环境安装部署说明文档（见 `docs/部署说明.md`，样例配置在 `deploy/`）
+11. 项目环境安装部署说明文档（见 `TechPrototype/docs/部署说明.md`，样例配置在 `TechPrototype/deploy/`）
 12. 项目最终演示材料
 
 ## 部署速览
 正式服务器安装包建议 **前端 + 后端** 两套（可选第三套部署配置包）。打包命令：
 
 ```bash
-python deploy/pack.py
+python TechPrototype/deploy/pack.py
 ```
 
-- 安装步骤：[docs/部署说明.md](docs/部署说明.md)
-- **更新与运维**：[docs/服务器运维与更新.md](docs/服务器运维与更新.md)
-- 核对清单：[docs/部署核对清单.md](docs/部署核对清单.md)
-- 一键脚本：`deploy/deploy-on-host.sh`、`deploy/upload-packages.ps1`
+- 安装步骤：[TechPrototype/docs/部署说明.md](TechPrototype/docs/部署说明.md)
+- **更新与运维**：[TechPrototype/docs/服务器运维与更新.md](TechPrototype/docs/服务器运维与更新.md)
+- 核对清单：[TechPrototype/docs/部署核对清单.md](TechPrototype/docs/部署核对清单.md)
+- 一键脚本：`TechPrototype/deploy/deploy-on-host.sh`、`TechPrototype/deploy/upload-packages.ps1`
 ## 三、项目主要风险及应对方案
 ### 风险1：功能新增过多，需求范围膨胀，工期无法按期交付
 - 缓解方案：严格遵循「MVP优先、核心亮点可演示、非核心功能可降级」原则管控需求范围
@@ -89,11 +89,13 @@ python deploy/pack.py
 | 整体迭代起止时间 | 2026/07/06 — 2026/07/31 |
 | 关键评审节点 | 07月13日（技术原型迭代细化评审）、07月24日（构造迭代细化评审） |
 
-## 五、仓库结构（技术原型）
+## 五、仓库结构
 
-| 目录 | 负责人 | 说明 |
-|------|--------|------|
-| [PaperPipeline/](./PaperPipeline/) | 成员 D | 论文处理流水线（抓取、解析、摘要、出处问答） |
-| [backend/](./backend/) | 成员 C | FastAPI 后端骨架 |
-| [UIPrototype/](./UIPrototype/) | 成员 B | 前端原型 |
-| [docs/](./docs/) | 全员 | 需求与架构文档 |
+| 目录 | 说明 |
+|------|------|
+| [UIPrototype/](./UIPrototype/) | 界面原型（前端） |
+| [TechPrototype/](./TechPrototype/) | 技术迭代：后端、流水线、部署与技术文档 |
+| [TechPrototype/backend/](./TechPrototype/backend/) | FastAPI 后端 |
+| [TechPrototype/PaperPipeline/](./TechPrototype/PaperPipeline/) | 论文处理流水线 |
+| [TechPrototype/deploy/](./TechPrototype/deploy/) | 打包与服务器部署脚本 |
+| [TechPrototype/docs/](./TechPrototype/docs/) | 架构与部署文档 |
