@@ -478,6 +478,21 @@ export async function createParseTask(paperId, { force = false } = {}) {
   });
 }
 
+/** Prioritize existing parse job (or create one stable task). Does not flood the queue. */
+export async function boostParsePriority(paperId) {
+  if (USE_MOCK) {
+    return {
+      taskId: `mock-priority-${paperId}`,
+      task_id: `mock-priority-${paperId}`,
+      paperId,
+      taskType: 'full_parse',
+      status: 'queued',
+      errorCode: null,
+    };
+  }
+  return apiClient.post(`/papers/${paperId}/parse/priority`);
+}
+
 export async function getParseTask(taskId) {
   if (USE_MOCK) return { taskId, status: 'succeeded' };
   return apiClient.get(`/tasks/${taskId}`);

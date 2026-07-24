@@ -6,7 +6,7 @@ from datetime import timedelta
 from app.schema.papers import ParseResultCommit, PaperUpsert, StructuredResultBatch, StructuredResultInput, TaskUpdate, TextChunkBatch, TextChunkInput
 from app.repository.chunks import upsert_chunks
 from app.service.papers import batch_upsert_papers, get_wiki
-from app.service.tasks import claim_task, create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
+from app.service.tasks import boost_parse_priority, claim_task, create_task, enqueue_pending_tasks, get_task, list_tasks, queue_stats, recover_stale_tasks, retry_task, save_parse_result, save_results, update_task
 from sqlalchemy.orm import Session
 
 
@@ -188,3 +188,54 @@ def test_finalize_replaces_chunks_and_updates_queue_readiness() -> None:
         stats = queue_stats(session)
         assert stats["counts"]["succeeded"] == 1
         assert stats["counts"]["queued"] == 0
+
+
+def test_boost_parse_priority_moves_existing_task_to_front_without_duplicate() -> None:
+    with make_session() as session:
+        older_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="boost-a", title="Older")]).items[0].paper_id
+        newer_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="boost-b", title="Newer")]).items[0].paper_id
+        older, _ = create_task(session, older_id, "full_parse", "boost-older")
+        newer, _ = create_task(session, newer_id, "full_parse", "boost-newer")
+        assert list_tasks(session, status="queued", limit=10)[0].task_id == older.task_id
+
+        boosted, should_start = boost_parse_priority(session, newer_id)
+        assert should_start is True
+        assert boosted.task_id == newer.task_id
+        assert list_tasks(session, status="queued", limit=10)[0].task_id == newer.task_id
+
+        again, should_start_again = boost_parse_priority(session, newer_id)
+        assert again.task_id == newer.task_id
+        assert should_start_again is True
+        queued = list_tasks(session, status="queued", limit=20)
+        assert len([t for t in queued if t.paper_id == newer_id]) == 1
+
+
+def test_boost_parse_priority_creates_at_most_one_stable_task() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="boost-create", title="Create")]).items[0].paper_id
+        first, should_start = boost_parse_priority(session, paper_id)
+        assert should_start is True
+        assert first.status == "queued"
+        second, _ = boost_parse_priority(session, paper_id)
+        assert second.task_id == first.task_id
+        queued = [t for t in list_tasks(session, status="queued", limit=20) if t.paper_id == paper_id]
+        assert len(queued) == 1
+
+
+def test_boost_parse_priority_rejects_already_parsed() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="boost-done", title="Done")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "boost-done-task")
+        save_results(
+            session,
+            task.task_id,
+            StructuredResultBatch(
+                results=[StructuredResultInput(result_type="summary", content_json={"summary": "ok"})]
+            ),
+        )
+        try:
+            boost_parse_priority(session, paper_id)
+        except ValueError as exc:
+            assert str(exc) == "PAPER_ALREADY_PARSED"
+        else:
+            raise AssertionError("expected PAPER_ALREADY_PARSED")

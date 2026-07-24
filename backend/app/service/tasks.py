@@ -283,6 +283,80 @@ def retry_task(session: Session, task_id: int) -> TaskResponse:
     return to_task(task)
 
 
+def _bump_queued_to_front(session: Session, task: ParseTask) -> ParseTask:
+    """Move an existing queued task ahead of all other queued tasks (no new row)."""
+    oldest = session.scalar(select(func.min(ParseTask.requested_at)).where(ParseTask.status == "queued"))
+    if oldest is None:
+        task.requested_at = _now() - timedelta(days=365)
+    else:
+        # Keep strictly before current head so claim/scheduler picks this first.
+        task.requested_at = oldest - timedelta(milliseconds=1)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+def boost_parse_priority(session: Session, paper_id: int) -> tuple[TaskResponse, bool]:
+    """Raise priority of this paper's parse job without spawning duplicate tasks.
+
+    Returns (task, should_start_runner).
+    - Reuses queued/running tasks (bumps queued to front).
+    - Retries a failed/timed_out task in place when still retryable.
+    - Creates at most one task via stable idempotency key if none exists.
+    """
+    paper = session.get(Paper, paper_id)
+    if paper is None or paper.deleted_at is not None:
+        raise ValueError("PAPER_NOT_FOUND")
+    if paper.ingest_status in {"parsed", "qa_ready"}:
+        raise ValueError("PAPER_ALREADY_PARSED")
+
+    active = session.scalar(
+        select(ParseTask)
+        .where(ParseTask.paper_id == paper_id, ParseTask.status.in_(("queued", "running")))
+        .order_by(ParseTask.requested_at.desc(), ParseTask.id.desc())
+    )
+    if active is not None:
+        if active.status == "running":
+            return to_task(active), False
+        paper.ingest_status = "queued"
+        active = _bump_queued_to_front(session, active)
+        return to_task(active), True
+
+    latest = session.scalar(
+        select(ParseTask)
+        .where(ParseTask.paper_id == paper_id)
+        .order_by(ParseTask.requested_at.desc(), ParseTask.id.desc())
+    )
+    if latest is not None and latest.status in {"failed", "timed_out"}:
+        if latest.attempt >= MAX_ATTEMPTS:
+            raise ValueError("TASK_RETRY_EXHAUSTED")
+        retried = retry_task(session, latest.id)
+        task = session.get(ParseTask, retried.task_id)
+        assert task is not None
+        task = _bump_queued_to_front(session, task)
+        return to_task(task), True
+
+    if latest is not None and latest.status == "succeeded":
+        raise ValueError("PAPER_ALREADY_PARSED")
+
+    # Stable key: repeated clicks reuse this row instead of flooding the queue.
+    task, _created = create_task(
+        session,
+        paper_id,
+        "full_parse",
+        f"user-priority:{paper_id}",
+        force=False,
+    )
+    if task.status == "running":
+        return task, False
+    if task.status == "queued":
+        row = session.get(ParseTask, task.task_id)
+        assert row is not None
+        row = _bump_queued_to_front(session, row)
+        return to_task(row), True
+    raise ValueError("TASK_CONFLICT")
+
+
 def delete_task(session: Session, task_id: int) -> dict:
     task = session.get(ParseTask, task_id)
     if task is None:

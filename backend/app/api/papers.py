@@ -15,7 +15,7 @@ from app.service.paper import require_content, require_paper, require_summary, s
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, fetch_one_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.qa import ask_paper
-from app.service.tasks import create_task
+from app.service.tasks import boost_parse_priority, create_task
 
 router = APIRouter(prefix="/api/papers", tags=["papers"])
 
@@ -163,6 +163,37 @@ def parse(
     settings = request.app.state.settings
     # 解析由当前 FastAPI 进程直接执行；无 LLM 配置时 runner 使用本地降级摘要。
     if data.status == "queued" and data.started_at is None:
+        background_tasks.add_task(run_parse_agent_job, request.app.state.engine, data.task_id, settings)
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.post("/{paper_id}/parse/priority", response_model=ApiResponse[TaskResponse], summary="提高解析优先级并立即执行")
+def parse_priority(
+    paper_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
+):
+    """Bump an existing parse job to the front of the queue (no duplicate tasks).
+
+    If the paper has no task yet, creates at most one via a stable idempotency key.
+    When the task is queued, starts the in-process runner immediately.
+    """
+    try:
+        data, should_start = boost_parse_priority(db, paper_id)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "PAPER_NOT_FOUND":
+            return _db_error(request, PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404))
+        if code == "PAPER_ALREADY_PARSED":
+            return _db_error(request, PaperServiceError("PAPER_ALREADY_PARSED", "论文已解析完成，无需提高优先级", 409))
+        if code == "TASK_RETRY_EXHAUSTED":
+            return _db_error(request, PaperServiceError("TASK_RETRY_EXHAUSTED", "解析重试次数已用尽", 409))
+        return _db_error(request, PaperServiceError("TASK_CONFLICT", "无法提高该论文的解析优先级", 409))
+
+    if should_start and data.status == "queued":
+        settings = request.app.state.settings
         background_tasks.add_task(run_parse_agent_job, request.app.state.engine, data.task_id, settings)
     return ApiResponse(data=data, request_id=request.state.request_id)
 

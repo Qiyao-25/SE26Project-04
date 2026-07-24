@@ -18,11 +18,13 @@ import {
   FilePdfOutlined,
   LinkOutlined,
   MenuUnfoldOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
+  boostParsePriority,
   getPaperContent,
   getPaperDetail,
   getPaperSummary,
@@ -78,6 +80,7 @@ export default function PaperDetailPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pdfFullscreen, setPdfFullscreen] = useState(false);
   const [excerpts, setExcerpts] = useState([]);
+  const [priorityLoading, setPriorityLoading] = useState(false);
   const historyRecordedFor = useRef(null);
 
   const [previewPaper, setPreviewPaper] = useState(null);
@@ -269,6 +272,30 @@ export default function PaperDetailPage() {
     }
   };
 
+  const handleBoostParsePriority = async () => {
+    if (priorityLoading || viewingOther) return;
+    setPriorityLoading(true);
+    try {
+      const task = await boostParsePriority(paperId);
+      const status = task?.status || '';
+      if (status === 'running') {
+        message.info('该论文已在解析中');
+      } else {
+        message.success('已提高优先级，正在立即解析');
+      }
+      setPaper((prev) => (prev ? {
+        ...prev,
+        parseStatus: status === 'running' ? 'parsing' : 'queued',
+      } : prev));
+      // Refresh soon so status Tag / button update after runner claims the task.
+      window.setTimeout(() => setReloadToken((n) => n + 1), 2500);
+    } catch (error) {
+      message.error(error.message || '提高解析优先级失败');
+    } finally {
+      setPriorityLoading(false);
+    }
+  };
+
   const viewPaper = viewingOther ? previewPaper : paper;
   const viewContent = viewingOther ? previewContent : content;
   const viewSummary = viewingOther ? previewSummary : summaryData;
@@ -325,6 +352,7 @@ export default function PaperDetailPage() {
   const shownPaperId = viewingOther && viewPaper ? viewPaperId : paperId;
   const shownSummaryReady = ['completed', 'qa_ready'].includes(shownSummary?.parseStatus);
   const shownParseReady = ['completed', 'qa_ready', 'succeeded'].includes(shownPaper?.parseStatus);
+  const canBoostParse = !viewingOther && ['pending', 'queued', 'failed'].includes(String(shownPaper?.parseStatus || ''));
 
   const mainTabs = [
     {
@@ -343,6 +371,17 @@ export default function PaperDetailPage() {
             <Tag color={['completed', 'qa_ready'].includes(shownPaper.parseStatus) ? 'success' : 'warning'}>
               解析状态：{getParseStatusLabel(shownPaper.parseStatus)}
             </Tag>
+            {canBoostParse ? (
+              <Button
+                type="primary"
+                size="small"
+                icon={<ThunderboltOutlined />}
+                loading={priorityLoading}
+                onClick={handleBoostParsePriority}
+              >
+                立即解析
+              </Button>
+            ) : null}
           </Space>
 
           <Paragraph type="secondary">
@@ -433,8 +472,23 @@ export default function PaperDetailPage() {
             >
               解析状态：{getParseStatusLabel(shownSummary?.parseStatus)}
             </Tag>
+            {canBoostParse ? (
+              <Button
+                type="primary"
+                size="small"
+                icon={<ThunderboltOutlined />}
+                loading={priorityLoading}
+                onClick={handleBoostParsePriority}
+              >
+                立即解析
+              </Button>
+            ) : null}
             {!shownSummaryReady ? (
-              <Text type="secondary">未解析论文由后台自动解析（优先新入库），完成后刷新即可查看</Text>
+              <Text type="secondary">
+                {canBoostParse
+                  ? '可点「立即解析」插队执行已有任务；解析完成后按钮会消失'
+                  : '后台自动解析中，完成后刷新即可查看'}
+              </Text>
             ) : null}
           </Space>
 
