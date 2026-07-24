@@ -29,13 +29,12 @@ import {
   getPaperDetail,
   getPaperSummary,
   getPaperGraph,
-  listPaperChunks,
   rebuildPaperGraph
 } from '../../services/paperService';
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
-import PaperExcerptsPanel from '../../components/paper/detail/PaperExcerptsPanel';
+import PaperPdfViewer from '../../components/paper/detail/PaperPdfViewer';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -59,6 +58,7 @@ export default function PaperDetailPage() {
   const navigate = useNavigate();
   const {
     userId,
+    getPaperNotes,
     setCompareForPaper,
     setLockedPaperId,
     exitLockedPaper,
@@ -79,7 +79,6 @@ export default function PaperDetailPage() {
   const [mainTab, setMainTab] = useState('content');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pdfFullscreen, setPdfFullscreen] = useState(false);
-  const [excerpts, setExcerpts] = useState([]);
   const [priorityLoading, setPriorityLoading] = useState(false);
   const historyRecordedFor = useRef(null);
 
@@ -88,7 +87,6 @@ export default function PaperDetailPage() {
   const [previewSummary, setPreviewSummary] = useState(null);
   const [previewGraph, setPreviewGraph] = useState(null);
   const [previewGraphError, setPreviewGraphError] = useState('');
-  const [previewExcerpts, setPreviewExcerpts] = useState([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
 
@@ -145,15 +143,13 @@ export default function PaperDetailPage() {
       setSummaryData(null);
       setGraphData(null);
       setGraphError('');
-      setExcerpts([]);
 
       try {
-        const [detailResult, contentResult, summaryResult, graphResult, chunksResult] = await Promise.allSettled([
+        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
           getPaperDetail(paperId),
           getPaperContent(paperId),
           getPaperSummary(paperId),
           getPaperGraph(paperId),
-          listPaperChunks(paperId, { limit: 120 }),
         ]);
 
         if (cancelled) return;
@@ -165,7 +161,6 @@ export default function PaperDetailPage() {
         setSummaryData(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
         setGraphData(graphResult.status === 'fulfilled' ? graphResult.value : null);
         setGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
-        setExcerpts(chunksResult.status === 'fulfilled' ? (chunksResult.value || []) : []);
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || '论文加载失败');
@@ -191,7 +186,6 @@ export default function PaperDetailPage() {
       setPreviewSummary(null);
       setPreviewGraph(null);
       setPreviewGraphError('');
-      setPreviewExcerpts([]);
       setPreviewError('');
       setPreviewLoading(false);
       return undefined;
@@ -204,12 +198,11 @@ export default function PaperDetailPage() {
 
     (async () => {
       try {
-        const [detailResult, contentResult, summaryResult, graphResult, chunksResult] = await Promise.allSettled([
+        const [detailResult, contentResult, summaryResult, graphResult] = await Promise.allSettled([
           getPaperDetail(previewId),
           getPaperContent(previewId),
           getPaperSummary(previewId),
           getPaperGraph(previewId),
-          listPaperChunks(previewId, { limit: 120 }),
         ]);
         if (cancelled) return;
         if (detailResult.status === 'rejected') throw detailResult.reason;
@@ -218,11 +211,9 @@ export default function PaperDetailPage() {
         setPreviewSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
         setPreviewGraph(graphResult.status === 'fulfilled' ? graphResult.value : null);
         setPreviewGraphError(graphResult.status === 'rejected' ? (graphResult.reason?.message || '知识图谱加载失败') : '');
-        setPreviewExcerpts(chunksResult.status === 'fulfilled' ? (chunksResult.value || []) : []);
       } catch (error) {
         if (!cancelled) {
           setPreviewPaper(null);
-          setPreviewExcerpts([]);
           setPreviewError(error.message || '对比论文加载失败');
         }
       } finally {
@@ -301,7 +292,6 @@ export default function PaperDetailPage() {
   const viewSummary = viewingOther ? previewSummary : summaryData;
   const viewGraph = viewingOther ? previewGraph : graphData;
   const viewGraphError = viewingOther ? previewGraphError : graphError;
-  const viewExcerpts = viewingOther ? previewExcerpts : excerpts;
   const viewPaperId = viewingOther ? String(comparePaperB) : paperId;
 
   if (loading) {
@@ -348,11 +338,21 @@ export default function PaperDetailPage() {
   const shownSummary = viewingOther && viewPaper ? viewSummary : summaryData;
   const shownGraph = viewingOther && viewPaper ? viewGraph : graphData;
   const shownGraphError = viewingOther && viewPaper ? viewGraphError : graphError;
-  const shownExcerpts = viewingOther && viewPaper ? viewExcerpts : excerpts;
   const shownPaperId = viewingOther && viewPaper ? viewPaperId : paperId;
   const shownSummaryReady = ['completed', 'qa_ready'].includes(shownSummary?.parseStatus);
-  const shownParseReady = ['completed', 'qa_ready', 'succeeded'].includes(shownPaper?.parseStatus);
   const canBoostParse = !viewingOther && ['pending', 'queued', 'failed'].includes(String(shownPaper?.parseStatus || ''));
+  const canShowPdf = Boolean(
+    shownContent?.pdfUrl
+    || (shownPaperId && /^\d+$/.test(String(shownPaperId)))
+  );
+  const annotationHighlights = (getPaperNotes(shownPaperId)?.notes || [])
+    .filter((item) => item.kind === 'annotation' && Array.isArray(item.highlightRects) && item.highlightRects.length > 0)
+    .map((item) => ({
+      id: item.id,
+      pageNo: item.pageNo,
+      rects: item.highlightRects,
+      color: item.highlightColor || '#fde68a',
+    }));
 
   const mainTabs = [
     {
@@ -388,12 +388,12 @@ export default function PaperDetailPage() {
             {(shownPaper.authors || []).join?.(', ') || shownPaper.authorsText || shownPaper.authors}
           </Paragraph>
 
-          {shownContent?.pdfUrl ? (
+          {canShowPdf ? (
             <>
-              <iframe
-                title={`${shownPaper.title} PDF`}
-                src={shownContent.pdfUrl}
-                className="paper-pdf-frame"
+              <PaperPdfViewer
+                paperId={shownPaperId}
+                pdfUrl={shownContent?.pdfUrl}
+                highlights={annotationHighlights}
               />
 
               <Space wrap style={{ marginTop: 12 }}>
@@ -408,16 +408,18 @@ export default function PaperDetailPage() {
                   全屏阅读 PDF
                 </Button>
 
-                <Button
-                  icon={<FilePdfOutlined />}
-                  href={shownContent.pdfUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  新窗口打开 PDF
-                </Button>
+                {shownContent?.pdfUrl ? (
+                  <Button
+                    icon={<FilePdfOutlined />}
+                    href={shownContent.pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    新窗口打开 PDF
+                  </Button>
+                ) : null}
 
-                {shownContent.htmlUrl && (
+                {shownContent?.htmlUrl && (
                   <Button
                     icon={<LinkOutlined />}
                     href={shownContent.htmlUrl}
@@ -439,9 +441,7 @@ export default function PaperDetailPage() {
                   </Button>
                 )}
 
-                <Text type="secondary">
-                  {shownContent.pageCount ? `共 ${shownContent.pageCount} 页` : '页数待后端解析'}
-                </Text>
+                <Text type="secondary">在 PDF 正文划选即可添加批注高亮</Text>
               </Space>
             </>
           ) : (
@@ -451,19 +451,8 @@ export default function PaperDetailPage() {
       )
     },
     {
-      key: 'excerpts',
-      label: 'b · 原文段落',
-      children: (
-        <PaperExcerptsPanel
-          abstractText={shownPaper.abstract || shownPaper.summary || ''}
-          chunks={shownExcerpts}
-          parseReady={shownParseReady || shownSummaryReady}
-        />
-      ),
-    },
-    {
       key: 'summary',
-      label: 'c · 智能总结',
+      label: 'b · 智能总结',
       children: (
         <div>
           <Space size={6} wrap style={{ marginBottom: 12 }}>
@@ -594,7 +583,7 @@ export default function PaperDetailPage() {
     },
     {
       key: 'graph',
-      label: 'd · 知识图谱与研究脉络',
+      label: 'c · 知识图谱与研究脉络',
       children: (
         <div className="graph-placeholder">
           {shownGraph ? (
@@ -665,7 +654,7 @@ export default function PaperDetailPage() {
             <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper}>
               退出论文
             </Button>
-            {shownContent?.pdfUrl ? (
+            {canShowPdf ? (
               <Button
                 icon={<ExpandOutlined />}
                 onClick={() => {
@@ -742,7 +731,7 @@ export default function PaperDetailPage() {
         )}
       </div>
 
-      {pdfFullscreen && shownContent?.pdfUrl ? (
+      {pdfFullscreen && canShowPdf ? (
         <div className="pdf-fullscreen-overlay" role="dialog" aria-modal="true" aria-label="全屏阅读 PDF">
           <div className="pdf-fullscreen-toolbar">
             <div className="pdf-fullscreen-title">
@@ -752,23 +741,27 @@ export default function PaperDetailPage() {
               </Text>
             </div>
             <Space wrap>
-              <Button
-                icon={<FilePdfOutlined />}
-                href={shownContent.pdfUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                新窗口打开
-              </Button>
+              {shownContent?.pdfUrl ? (
+                <Button
+                  icon={<FilePdfOutlined />}
+                  href={shownContent.pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  新窗口打开
+                </Button>
+              ) : null}
               <Button type="primary" onClick={() => setPdfFullscreen(false)}>
                 退出全屏（Esc）
               </Button>
             </Space>
           </div>
-          <iframe
-            title={`${shownPaper.title} 全屏 PDF`}
-            src={shownContent.pdfUrl}
-            className="pdf-fullscreen-frame"
+          <PaperPdfViewer
+            paperId={shownPaperId}
+            pdfUrl={shownContent?.pdfUrl}
+            fullscreen
+            className="pdf-fullscreen-viewer"
+            highlights={annotationHighlights}
           />
         </div>
       ) : null}
