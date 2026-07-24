@@ -34,7 +34,6 @@ import { createAction, isPersistedPaperId } from '../../services/learningService
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
 import PaperExcerptsPanel from '../../components/paper/detail/PaperExcerptsPanel';
-import { pushAnnotationSelection, readDomSelection } from '../../utils/annotationSelection';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -80,7 +79,6 @@ export default function PaperDetailPage() {
   const [pdfFullscreen, setPdfFullscreen] = useState(false);
   const [excerpts, setExcerpts] = useState([]);
   const historyRecordedFor = useRef(null);
-  const annotatableRef = useRef(null);
 
   const [previewPaper, setPreviewPaper] = useState(null);
   const [previewContent, setPreviewContent] = useState(null);
@@ -118,12 +116,6 @@ export default function PaperDetailPage() {
   useEffect(() => {
     setPdfFullscreen(false);
   }, [paperId, comparePreviewActive, comparePaperB]);
-
-  const handleAnnotatableMouseUp = () => {
-    const read = readDomSelection(annotatableRef.current);
-    if (!read || read.text.length < 2) return;
-    pushAnnotationSelection({ text: read.text });
-  };
 
   useEffect(() => {
     if (!pdfFullscreen) return undefined;
@@ -668,13 +660,7 @@ export default function PaperDetailPage() {
                 action={<Button size="small" onClick={() => setComparePreviewActive(false)}>返回原论文</Button>}
               />
             ) : (
-              <div
-                ref={annotatableRef}
-                className="paper-annotatable"
-                onMouseUp={handleAnnotatableMouseUp}
-              >
-                <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
-              </div>
+              <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
             )}
           </Card>
         </div>

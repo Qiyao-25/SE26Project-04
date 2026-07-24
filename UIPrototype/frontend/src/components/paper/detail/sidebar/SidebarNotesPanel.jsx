@@ -229,7 +229,7 @@ export default function SidebarNotesPanel({ paperId }) {
     <div className="sidebar-scroll">
       <Text className="block-label">笔记 / 批注</Text>
       <Paragraph type="secondary" style={{ fontSize: 11, padding: 8, background: '#fafafa', borderLeft: '3px solid #d9d9d9' }}>
-        笔记与批注仅自己可见；评论公开。批注请到左侧「原文段落」或「智能总结」中划选，摘录会自动填入；也可下拉选段或手改。
+        笔记与批注仅自己可见；评论公开。批注请到左侧「原文段落」中划选填入摘录；也可下拉选段或手改。
       </Paragraph>
       <Segmented
         block

@@ -774,14 +774,6 @@ select {
   padding-right: 4px;
 }
 
-.paper-annotatable {
-  user-select: text;
-}
-
-.paper-annotatable ::selection {
-  background: rgba(250, 204, 21, 0.45);
-}
-
 .paper-excerpts-body {
   user-select: text;
 }
