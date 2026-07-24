@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.auth import require_admin, require_current_user, db_session
@@ -14,6 +14,7 @@ from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, fetch_one_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
+from app.service.pdf_stream import load_paper_pdf_bytes, pdf_response
 from app.service.qa import ask_paper
 from app.service.tasks import create_task
 
@@ -204,6 +205,20 @@ def content(paper_id: str, request: Request, db: Session = Depends(db_session)):
     except KeyError:
         return _not_found(request, paper_id)
     return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/pdf", summary="代理论文 PDF（同源可划词阅读）", response_class=Response)
+def paper_pdf(
+    paper_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
+):
+    try:
+        data, _content_type = load_paper_pdf_bytes(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return pdf_response(data, filename=f"paper-{paper_id}.pdf")
 
 
 @router.get("/{paper_id}/summary", response_model=ApiResponse[PaperSummary], summary="获取结构化摘要")

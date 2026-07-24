@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Input,
   Button,
@@ -22,10 +22,7 @@ import {
   listPublicComments,
 } from '../../../../services/learningService';
 import { listPaperChunks } from '../../../../services/paperService';
-import {
-  highlightDomSelection,
-  setAnnotationSelectionHandler,
-} from '../../../../utils/annotationSelection';
+import { setAnnotationSelectionHandler } from '../../../../utils/annotationSelection';
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -48,7 +45,6 @@ export default function SidebarNotesPanel({ paperId }) {
   const [chunks, setChunks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const bodyRef = useRef(null);
   const data = getPaperNotes(paperId);
   const persist = isPersistedPaperId(paperId);
 
@@ -114,34 +110,18 @@ export default function SidebarNotesPanel({ paperId }) {
   useEffect(() => {
     setAnnotationSelectionHandler((payload) => {
       applySelectionPayload(payload);
-      message.success('已选中文本并填入摘录', 1.2);
+      message.success('已从 PDF 选中文本并填入摘录', 1.2);
     });
     return () => setAnnotationSelectionHandler(null);
   }, []);
 
   const selectedChunk = chunks.find((item) => item.chunk_id === chunkId);
 
-  const handleBodyMouseUp = () => {
-    const text = highlightDomSelection(bodyRef.current);
-    if (!text) return;
-    const marked = bodyRef.current?.querySelector('mark.pm-annotation-highlight');
-    const host = marked?.closest?.('[data-chunk-id]');
-    const selectedId = host?.getAttribute('data-chunk-id') || undefined;
-    const metaChunk = chunks.find((item) => item.chunk_id === selectedId);
-    applySelectionPayload({
-      text,
-      chunkId: selectedId || null,
-      pageNo: metaChunk?.page_no ?? null,
-      section: metaChunk?.section || null,
-    });
-    message.success('已选中文本并填入摘录', 1.2);
-  };
-
   const handleSaveNote = async () => {
     const text = noteText.trim();
     if (!text) return message.warning('请输入笔记内容');
     if (noteMode === 'annotation' && !quote.trim() && !chunkId) {
-      return message.warning('批注请划选文本、填写摘录或选择段落');
+      return message.warning('批注请在左侧 PDF 划选文本、填写摘录或选择段落');
     }
     const payload = {
       kind: noteMode === 'annotation' ? 'annotation' : 'note',
@@ -238,7 +218,7 @@ export default function SidebarNotesPanel({ paperId }) {
     <div className="sidebar-scroll">
       <Text className="block-label">笔记 / 批注</Text>
       <Paragraph type="secondary" style={{ fontSize: 11, padding: 8, background: '#fafafa', borderLeft: '3px solid #d9d9d9' }}>
-        笔记与批注仅自己可见；评论对所有登录用户公开。批注时可在下方段落或左侧摘要中划选文本，自动高亮并填入摘录。
+        笔记与批注仅自己可见；评论对所有登录用户公开。批注时请在左侧 PDF 阅读器中划选文本，摘录会自动填入。
       </Paragraph>
       <Segmented
         block
@@ -266,41 +246,13 @@ export default function SidebarNotesPanel({ paperId }) {
           }))}
         />
       )}
-      {(noteMode === 'annotation' || chunks.length > 0) && chunks.length > 0 && (
-        <div
-          ref={bodyRef}
-          className="annotation-body"
-          onMouseUp={handleBodyMouseUp}
-          role="region"
-          aria-label="可划选正文段落"
-        >
-          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
-            在段落中划选文本即可高亮并填入摘录
-          </Text>
-          {chunks.slice(0, 24).map((item) => (
-            <div
-              key={item.chunk_id}
-              data-chunk-id={item.chunk_id}
-              className={`annotation-chunk${chunkId === item.chunk_id ? ' is-active' : ''}`}
-            >
-              <Text type="secondary" style={{ fontSize: 10 }}>
-                {item.section || '段落'}
-                {item.page_no ? ` · p${item.page_no}` : ''}
-              </Text>
-              <Paragraph style={{ margin: '2px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>
-                {item.content || item.preview}
-              </Paragraph>
-            </div>
-          ))}
-        </div>
-      )}
       {(noteMode === 'annotation' || chunkId || quote) && (
         <TextArea
           rows={2}
           value={quote}
           onChange={(e) => setQuote(e.target.value)}
-          placeholder="摘录 / 高亮原文（划选后自动填入，也可手改）"
-          style={{ marginBottom: 8, marginTop: 8 }}
+          placeholder="摘录 / 高亮原文（在左侧 PDF 划选后自动填入，也可手改）"
+          style={{ marginBottom: 8 }}
         />
       )}
       <TextArea rows={3} value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={noteMode === 'annotation' ? '写下批注...' : '记录阅读笔记...'} />
