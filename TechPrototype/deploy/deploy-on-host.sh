@@ -149,6 +149,14 @@ server {
     index index.html;
     client_max_body_size 32m;
 
+    # PDF.js worker (.mjs) must be served as JavaScript for dynamic import()
+    location ~* \.mjs$ {
+        default_type application/javascript;
+        types { application/javascript mjs; }
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
     location /api/ {
         proxy_pass http://papermate_api/api/;
         proxy_http_version 1.1;
