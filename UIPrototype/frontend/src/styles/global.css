@@ -774,6 +774,42 @@ select {
   padding-right: 4px;
 }
 
+.annotation-body {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+  margin-bottom: 4px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: #fafbfc;
+  user-select: text;
+}
+
+.annotation-chunk {
+  padding: 6px 4px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.annotation-chunk.is-active {
+  background: rgba(250, 204, 21, 0.12);
+}
+
+mark.pm-annotation-highlight {
+  background: #fde68a;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+.paper-annotatable {
+  user-select: text;
+}
+
+.paper-annotatable ::selection {
+  background: rgba(250, 204, 21, 0.45);
+}
+
 .sidebar-scroll::-webkit-scrollbar,
 .chat-panel::-webkit-scrollbar {
   width: 6px;

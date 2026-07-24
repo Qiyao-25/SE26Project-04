@@ -157,6 +157,7 @@ export default function PaperSidebar({ paperId, paper, onCollapse }) {
     {
       key: 'notes',
       label: '笔记',
+      forceRender: true,
       children: <SidebarNotesPanel paperId={paperId} />
     },
     {

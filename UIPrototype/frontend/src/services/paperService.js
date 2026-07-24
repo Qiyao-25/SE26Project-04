@@ -351,8 +351,25 @@ export async function smartSearchPapers({
   };
 }
 
-export async function listPaperChunks(paperId, { limit = 40 } = {}) {
-  if (USE_MOCK) return [];
+export async function listPaperChunks(paperId, { limit = 80 } = {}) {
+  if (USE_MOCK) {
+    return [
+      {
+        chunk_id: 'mock-1',
+        page_no: 1,
+        section: 'Abstract',
+        preview: 'This is a mock abstract paragraph for annotation selection.',
+        content: 'This is a mock abstract paragraph for annotation selection. Multi-head attention allows the model to jointly attend to information from different representation subspaces.',
+      },
+      {
+        chunk_id: 'mock-2',
+        page_no: 2,
+        section: 'Method',
+        preview: 'We propose a novel architecture based entirely on attention.',
+        content: 'We propose a novel architecture based entirely on attention, dispensing with recurrence and convolutions entirely.',
+      },
+    ];
+  }
   return apiClient.get(`/papers/${paperId}/chunks`, { params: { limit } });
 }
 

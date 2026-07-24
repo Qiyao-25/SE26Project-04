@@ -1,19 +1,45 @@
-import { useEffect, useState } from 'react';
-import { Input, Button, List, Typography, Badge, message, Select, Space, Tag, Segmented } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Input,
+  Button,
+  List,
+  Typography,
+  Badge,
+  message,
+  Select,
+  Space,
+  Tag,
+  Segmented,
+  Popconfirm,
+} from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { useApp } from '../../../../context/AppContext';
 import {
   createAction,
+  deleteAction,
   isPersistedPaperId,
   listPaperNotes,
   listPublicComments,
 } from '../../../../services/learningService';
 import { listPaperChunks } from '../../../../services/paperService';
+import {
+  highlightDomSelection,
+  setAnnotationSelectionHandler,
+} from '../../../../utils/annotationSelection';
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 export default function SidebarNotesPanel({ paperId }) {
-  const { userId, getPaperNotes, replacePaperNotes, saveNote, addComment } = useApp();
+  const {
+    userId,
+    getPaperNotes,
+    replacePaperNotes,
+    saveNote,
+    addComment,
+    removePaperNote,
+    removePaperComment,
+  } = useApp();
   const [noteText, setNoteText] = useState('');
   const [commentText, setCommentText] = useState('');
   const [noteMode, setNoteMode] = useState('note'); // note | annotation
@@ -21,8 +47,18 @@ export default function SidebarNotesPanel({ paperId }) {
   const [chunkId, setChunkId] = useState(undefined);
   const [chunks, setChunks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const bodyRef = useRef(null);
   const data = getPaperNotes(paperId);
   const persist = isPersistedPaperId(paperId);
+
+  const applySelectionPayload = (payload) => {
+    const text = String(payload?.text || '').trim();
+    if (!text) return;
+    setNoteMode('annotation');
+    setQuote(text.slice(0, 2000));
+    if (payload.chunkId) setChunkId(payload.chunkId);
+  };
 
   const reload = async () => {
     if (!persist) return;
@@ -31,7 +67,7 @@ export default function SidebarNotesPanel({ paperId }) {
       const [privateActions, publicComments, chunkRows] = await Promise.all([
         listPaperNotes(userId, paperId),
         listPublicComments(paperId),
-        listPaperChunks(paperId).catch(() => []),
+        listPaperChunks(paperId, { limit: 80 }).catch(() => []),
       ]);
       const notes = privateActions
         .filter((action) => action.payload_json?.kind !== 'comment')
@@ -63,25 +99,54 @@ export default function SidebarNotesPanel({ paperId }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!persist) return undefined;
+    if (!persist) {
+      listPaperChunks(paperId).then((rows) => {
+        if (!cancelled) setChunks(rows || []);
+      }).catch(() => {});
+      return () => { cancelled = true; };
+    }
     replacePaperNotes(paperId, { notes: [], comments: [] });
     reload().then(() => { if (cancelled) return; });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId, persist, userId]);
 
+  useEffect(() => {
+    setAnnotationSelectionHandler((payload) => {
+      applySelectionPayload(payload);
+      message.success('已选中文本并填入摘录', 1.2);
+    });
+    return () => setAnnotationSelectionHandler(null);
+  }, []);
+
   const selectedChunk = chunks.find((item) => item.chunk_id === chunkId);
+
+  const handleBodyMouseUp = () => {
+    const text = highlightDomSelection(bodyRef.current);
+    if (!text) return;
+    const marked = bodyRef.current?.querySelector('mark.pm-annotation-highlight');
+    const host = marked?.closest?.('[data-chunk-id]');
+    const selectedId = host?.getAttribute('data-chunk-id') || undefined;
+    const metaChunk = chunks.find((item) => item.chunk_id === selectedId);
+    applySelectionPayload({
+      text,
+      chunkId: selectedId || null,
+      pageNo: metaChunk?.page_no ?? null,
+      section: metaChunk?.section || null,
+    });
+    message.success('已选中文本并填入摘录', 1.2);
+  };
 
   const handleSaveNote = async () => {
     const text = noteText.trim();
     if (!text) return message.warning('请输入笔记内容');
     if (noteMode === 'annotation' && !quote.trim() && !chunkId) {
-      return message.warning('批注请填写摘录或选择段落');
+      return message.warning('批注请划选文本、填写摘录或选择段落');
     }
     const payload = {
       kind: noteMode === 'annotation' ? 'annotation' : 'note',
       text,
-      highlight: quote.trim() || selectedChunk?.preview || undefined,
+      highlight: quote.trim() || selectedChunk?.preview || selectedChunk?.content || undefined,
       chunk_id: chunkId || undefined,
       page_no: selectedChunk?.page_no ?? undefined,
       section: selectedChunk?.section || undefined,
@@ -97,7 +162,13 @@ export default function SidebarNotesPanel({ paperId }) {
         });
         await reload();
       } else {
-        saveNote(paperId, text);
+        saveNote(paperId, text, {
+          kind: payload.kind,
+          highlight: payload.highlight,
+          chunkId: payload.chunk_id,
+          pageNo: payload.page_no,
+          section: payload.section,
+        });
       }
       setNoteText('');
       setQuote('');
@@ -129,11 +200,45 @@ export default function SidebarNotesPanel({ paperId }) {
     }
   };
 
+  const handleDeleteNote = async (noteId) => {
+    setDeletingId(noteId);
+    try {
+      if (persist) {
+        await deleteAction(noteId);
+        await reload();
+      } else {
+        removePaperNote?.(paperId, noteId);
+      }
+      message.success('已删除');
+    } catch (error) {
+      message.error(error.message || '删除失败');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    setDeletingId(commentId);
+    try {
+      if (persist) {
+        await deleteAction(commentId);
+        await reload();
+      } else {
+        removePaperComment?.(paperId, commentId);
+      }
+      message.success('已删除评论');
+    } catch (error) {
+      message.error(error.message || '删除失败');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="sidebar-scroll">
       <Text className="block-label">笔记 / 批注</Text>
       <Paragraph type="secondary" style={{ fontSize: 11, padding: 8, background: '#fafafa', borderLeft: '3px solid #d9d9d9' }}>
-        笔记与批注仅自己可见；评论对所有登录用户公开。可选择正文段落做段落笔记。
+        笔记与批注仅自己可见；评论对所有登录用户公开。批注时可在下方段落或左侧摘要中划选文本，自动高亮并填入摘录。
       </Paragraph>
       <Segmented
         block
@@ -157,17 +262,45 @@ export default function SidebarNotesPanel({ paperId }) {
           onChange={setChunkId}
           options={chunks.map((item) => ({
             value: item.chunk_id,
-            label: `${item.section || '段落'}${item.page_no ? ` · p${item.page_no}` : ''} · ${(item.preview || '').slice(0, 40)}`,
+            label: `${item.section || '段落'}${item.page_no ? ` · p${item.page_no}` : ''} · ${(item.preview || item.content || '').slice(0, 40)}`,
           }))}
         />
       )}
-      {(noteMode === 'annotation' || chunkId) && (
+      {(noteMode === 'annotation' || chunks.length > 0) && chunks.length > 0 && (
+        <div
+          ref={bodyRef}
+          className="annotation-body"
+          onMouseUp={handleBodyMouseUp}
+          role="region"
+          aria-label="可划选正文段落"
+        >
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
+            在段落中划选文本即可高亮并填入摘录
+          </Text>
+          {chunks.slice(0, 24).map((item) => (
+            <div
+              key={item.chunk_id}
+              data-chunk-id={item.chunk_id}
+              className={`annotation-chunk${chunkId === item.chunk_id ? ' is-active' : ''}`}
+            >
+              <Text type="secondary" style={{ fontSize: 10 }}>
+                {item.section || '段落'}
+                {item.page_no ? ` · p${item.page_no}` : ''}
+              </Text>
+              <Paragraph style={{ margin: '2px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                {item.content || item.preview}
+              </Paragraph>
+            </div>
+          ))}
+        </div>
+      )}
+      {(noteMode === 'annotation' || chunkId || quote) && (
         <TextArea
           rows={2}
           value={quote}
           onChange={(e) => setQuote(e.target.value)}
-          placeholder="摘录 / 高亮原文（批注建议填写）"
-          style={{ marginBottom: 8 }}
+          placeholder="摘录 / 高亮原文（划选后自动填入，也可手改）"
+          style={{ marginBottom: 8, marginTop: 8 }}
         />
       )}
       <TextArea rows={3} value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={noteMode === 'annotation' ? '写下批注...' : '记录阅读笔记...'} />
@@ -184,7 +317,27 @@ export default function SidebarNotesPanel({ paperId }) {
           dataSource={data.notes}
           locale={{ emptyText: '暂无笔记' }}
           renderItem={(n) => (
-            <List.Item>
+            <List.Item
+              actions={[
+                <Popconfirm
+                  key="del"
+                  title="删除这条笔记/批注？"
+                  okText="删除"
+                  cancelText="取消"
+                  onConfirm={() => handleDeleteNote(n.id)}
+                >
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={deletingId === n.id}
+                  >
+                    删除
+                  </Button>
+                </Popconfirm>,
+              ]}
+            >
               <div style={{ fontSize: 12, width: '100%' }}>
                 <Space size={4} wrap>
                   <Tag>{n.kind === 'annotation' ? '批注' : '笔记'}</Tag>
@@ -209,7 +362,27 @@ export default function SidebarNotesPanel({ paperId }) {
           dataSource={data.comments}
           locale={{ emptyText: '暂无评论' }}
           renderItem={(c) => (
-            <List.Item>
+            <List.Item
+              actions={c.mine ? [
+                <Popconfirm
+                  key="del"
+                  title="删除这条评论？"
+                  okText="删除"
+                  cancelText="取消"
+                  onConfirm={() => handleDeleteComment(c.id)}
+                >
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={deletingId === c.id}
+                  >
+                    删除
+                  </Button>
+                </Popconfirm>,
+              ] : undefined}
+            >
               <div style={{ fontSize: 12 }}>
                 <Text type="secondary" style={{ fontSize: 10 }}>{c.mine ? '我' : `用户 ${c.author}`}</Text>
                 <Paragraph style={{ margin: '2px 0', fontSize: 12 }}>{c.text}</Paragraph>

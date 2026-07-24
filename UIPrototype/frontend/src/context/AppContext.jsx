@@ -142,18 +142,57 @@ export function AppProvider({ children }) {
   const showAdminNav = WIREFRAME_DEMO || isAdmin;
   const getPaperNotes = useCallback((paperId) => paperNotes[paperId] || { notes: [], comments: [] }, [paperNotes]);
   const replacePaperNotes = useCallback((paperId, data) => setPaperNotes((prev) => ({ ...prev, [paperId]: data })), []);
-  const saveNote = useCallback((paperId, text) => {
+  const saveNote = useCallback((paperId, text, meta = {}) => {
     setPaperNotes((prev) => {
       const data = prev[paperId] ? { ...prev[paperId] } : { notes: [], comments: [] };
-      data.notes = [{ id: Date.now(), highlight: '选中文本高亮', text, date: '2026-07-09' }, ...data.notes];
+      data.notes = [{
+        id: Date.now(),
+        kind: meta.kind || 'note',
+        highlight: meta.highlight || '',
+        text,
+        chunkId: meta.chunkId,
+        pageNo: meta.pageNo,
+        section: meta.section,
+        date: new Date().toISOString().slice(0, 10),
+      }, ...data.notes];
       return { ...prev, [paperId]: data };
     });
   }, []);
   const addComment = useCallback((paperId, text) => {
     setPaperNotes((prev) => {
       const data = prev[paperId] ? { ...prev[paperId] } : { notes: [], comments: [] };
-      data.comments = [{ id: Date.now(), text, date: '2026-07-09' }, ...data.comments];
+      data.comments = [{
+        id: Date.now(),
+        text,
+        author: 'me',
+        mine: true,
+        date: new Date().toISOString().slice(0, 10),
+      }, ...data.comments];
       return { ...prev, [paperId]: data };
+    });
+  }, []);
+  const removePaperNote = useCallback((paperId, noteId) => {
+    setPaperNotes((prev) => {
+      const data = prev[paperId] ? { ...prev[paperId] } : { notes: [], comments: [] };
+      return {
+        ...prev,
+        [paperId]: {
+          ...data,
+          notes: (data.notes || []).filter((item) => String(item.id) !== String(noteId)),
+        },
+      };
+    });
+  }, []);
+  const removePaperComment = useCallback((paperId, commentId) => {
+    setPaperNotes((prev) => {
+      const data = prev[paperId] ? { ...prev[paperId] } : { notes: [], comments: [] };
+      return {
+        ...prev,
+        [paperId]: {
+          ...data,
+          comments: (data.comments || []).filter((item) => String(item.id) !== String(commentId)),
+        },
+      };
     });
   }, []);
   // Entering a paper must not reshuffle A/B: if it is already A or B, keep slots.
@@ -180,11 +219,12 @@ export function AppProvider({ children }) {
     lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, comparePreviewActive, showAdminNav,
     login, register, applyAuthResponse: applyAuth, logout, setPersona, setTopics, setWorkspaceSearched, setLastSearchQuery,
     setLockedPaperId, exitLockedPaper, setComparePaperA, setComparePaperB, setCompareActiveSlot, setComparePreviewActive,
-    getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
+    getPaperNotes, replacePaperNotes, saveNote, addComment, removePaperNote, removePaperComment, setCompareForPaper
   }), [
     loggedIn, authReady, isAdmin, userId, email, persona, topics, workspaceSearched, lastSearchQuery,
     lockedPaperId, comparePaperA, comparePaperB, compareActiveSlot, comparePreviewActive, showAdminNav,
-    login, register, applyAuth, logout, exitLockedPaper, getPaperNotes, replacePaperNotes, saveNote, addComment, setCompareForPaper
+    login, register, applyAuth, logout, exitLockedPaper, getPaperNotes, replacePaperNotes, saveNote, addComment,
+    removePaperNote, removePaperComment, setCompareForPaper
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -32,6 +32,7 @@ import {
 import { createAction, isPersistedPaperId } from '../../services/learningService';
 import PaperSidebar from '../../components/paper/detail/PaperSidebar';
 import PaperGraphCanvas from '../../components/paper/detail/PaperGraphCanvas';
+import { pushAnnotationSelection, readDomSelection } from '../../utils/annotationSelection';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -76,6 +77,7 @@ export default function PaperDetailPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pdfFullscreen, setPdfFullscreen] = useState(false);
   const historyRecordedFor = useRef(null);
+  const annotatableRef = useRef(null);
 
   const [previewPaper, setPreviewPaper] = useState(null);
   const [previewContent, setPreviewContent] = useState(null);
@@ -112,6 +114,14 @@ export default function PaperDetailPage() {
   useEffect(() => {
     setPdfFullscreen(false);
   }, [paperId, comparePreviewActive, comparePaperB]);
+
+  const handleAnnotatableMouseUp = () => {
+    const read = readDomSelection(annotatableRef.current);
+    if (!read || read.text.length < 2) return;
+    if (pushAnnotationSelection({ text: read.text })) {
+      message.success('已选中文本并填入侧栏摘录', 1.2);
+    }
+  };
 
   useEffect(() => {
     if (!pdfFullscreen) return undefined;
@@ -635,7 +645,13 @@ export default function PaperDetailPage() {
                 action={<Button size="small" onClick={() => setComparePreviewActive(false)}>返回原论文</Button>}
               />
             ) : (
-              <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
+              <div
+                ref={annotatableRef}
+                className="paper-annotatable"
+                onMouseUp={handleAnnotatableMouseUp}
+              >
+                <Tabs activeKey={mainTab} onChange={setMainTab} items={mainTabs} />
+              </div>
             )}
           </Card>
         </div>

@@ -55,6 +55,8 @@ def list_chunks_for_paper(session: Session, paper_id: int, *, limit: int = 40) -
             "page_no": row.page_no,
             "section": row.section,
             "preview": (row.content or "")[:160],
+            # Longer body for in-app text selection / annotation quotes.
+            "content": (row.content or "")[:2000],
         }
         for row in rows
         if (row.content or "").strip()
