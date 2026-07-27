@@ -1,8 +1,5 @@
 /**
- * 首页推荐服务。
- *
- * - 每日精选：从数据库随机抽取论文
- * - 画像推荐：当前同样从库中抽样（可按 topics 粗过滤），函数签名预留给后续 AI 画像总结
+ * 首页推荐服务：每日精选 / 画像排序 / 订阅更新。
  */
 import { searchPapers } from './paperService';
 import { USE_MOCK } from './runtimeConfig';
@@ -43,7 +40,7 @@ function normalizeRecommendations(items) {
   return (items || []).map(normalizeRecommendedPaper).filter((item) => item.paperId !== undefined && item.paperId !== null);
 }
 
-/** 每日 ArXiv 精选：数据库随机论文 */
+/** 每日精选：近期 + 可问答 + 类别多样性 */
 export async function fetchDailyArxivPicks({ limit = 3, excludeIds = [] } = {}) {
   if (USE_MOCK) {
     const data = await searchPapers({ page: 1, pageSize: 24, sortBy: 'date' });
@@ -62,12 +59,7 @@ export async function fetchDailyArxivPicks({ limit = 3, excludeIds = [] } = {}) 
 }
 
 /**
- * 基于画像推荐论文。
- *
- * @param {{ persona?: string, topics?: string[], limit?: number, excludeIds?: Array<string|number> }} options
- * @returns {Promise<Array>} 论文列表（与 searchPapers items 同结构）
- *
- * 当前通过后端画像推荐接口读取数据库结果；后续可在后端替换为更复杂的画像模型。
+ * 基于画像推荐论文（多信号排序：兴趣主题、阅读/收藏亲和、词典概念、人格权重等）。
  */
 export async function fetchProfileRecommendations({
   userId = 'demo-user',
@@ -76,15 +68,6 @@ export async function fetchProfileRecommendations({
   limit = 3,
   excludeIds = []
 } = {}) {
-  // 预留：画像上下文写入，便于后续 AI 管线消费
-  const profileContext = {
-    userId,
-    persona,
-    topics: Array.isArray(topics) ? topics : [],
-    source: 'heuristic-random', // 将来改为 'ai-profile'
-    generatedAt: new Date().toISOString()
-  };
-
   if (USE_MOCK) {
     const data = await searchPapers({ page: 1, pageSize: 12 });
     return shuffle(data.items || []).slice(0, limit);
@@ -92,9 +75,9 @@ export async function fetchProfileRecommendations({
 
   const data = await apiClient.get('/recommendations/profile', {
     params: {
-      user_id: profileContext.userId || 'demo-user',
+      user_id: userId || 'demo-user',
       persona,
-      topics: profileContext.topics.join(','),
+      topics: (Array.isArray(topics) ? topics : []).join(','),
       limit,
       exclude_ids: excludeIds.join(','),
       _t: Date.now()
