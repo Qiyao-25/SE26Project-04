@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -87,6 +88,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    def __init__(self, **values: Any):
+        # Tests must be hermetic and must never inherit local model credentials.
+        if values.get("environment") == "test":
+            values.setdefault("_env_file", None)
+        super().__init__(**values)
 
     @model_validator(mode="after")
     def merge_agent_settings(self):

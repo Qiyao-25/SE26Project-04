@@ -8,3 +8,4 @@ def test_default_runtime_paths_are_rooted_at_backend_directory():
 
     assert settings.database_url == f"sqlite:///{(BACKEND_DIR / 'data' / 'dev.db').as_posix()}"
     assert Path(settings.paper_storage_dir) == (BACKEND_DIR / "data" / "pdfs").resolve()
+    assert settings.llm_api_key == ""

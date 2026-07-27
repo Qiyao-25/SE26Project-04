@@ -3,8 +3,8 @@
 | 项 | 内容 |
 |----|------|
 | 角色 | 成员 D · 算法与数据管线 |
-| 交付目录 | `SE26Project-04/PaperPipeline/`（本地副本：`ppp/PaperPipeline/`） |
-| 对齐后端 | `SE26Project-04/backend/`（已含 `/api/papers/*`） |
+| 交付目录 | `SE26Project-04/TechPrototype/PaperPipeline/`（本地副本：`ppp/PaperPipeline/`） |
+| 对齐后端 | `SE26Project-04/TechPrototype/backend/`（已含 `/api/papers/*`） |
 | 对齐前端 | `SE26Project-04/UIPrototype/` |
 
 ---
