@@ -22,10 +22,13 @@ import {
   Outlet,
   useNavigate,
   useLocation,
+  useMatch,
 } from 'react-router-dom';
+import { useEffect } from 'react';
 
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
+import PaperDetailPage from '../pages/PaperDetail/PaperDetailPage';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -37,6 +40,10 @@ export default function MainLayout({
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useI18n();
+  const paperMatch = useMatch('/paper/:paperId');
+  const routePaperId = paperMatch?.params?.paperId
+    ? String(paperMatch.params.paperId)
+    : null;
 
   const {
     logout,
@@ -45,9 +52,15 @@ export default function MainLayout({
     isAdmin,
     showAdminNav,
     lockedPaperId,
+    setLockedPaperId,
   } = useApp();
 
-  const onPaperDetail = location.pathname.startsWith('/paper/');
+  useEffect(() => {
+    if (routePaperId) setLockedPaperId(routePaperId);
+  }, [routePaperId, setLockedPaperId]);
+
+  const keptPaperId = routePaperId || (lockedPaperId ? String(lockedPaperId) : null);
+  const onPaperDetail = Boolean(routePaperId);
   // 论文详情归属工作空间页签
   const pathKey = onPaperDetail ? '/workspace' : location.pathname;
 
@@ -250,7 +263,18 @@ export default function MainLayout({
         </Header>
 
         <Content className="main-content">
-          <Outlet context={{ themeMode, setThemeMode }} />
+          {keptPaperId ? (
+            <div
+              className="paper-detail-keepalive"
+              style={{ display: onPaperDetail ? 'block' : 'none' }}
+              aria-hidden={!onPaperDetail}
+            >
+              <PaperDetailPage key={keptPaperId} paperIdProp={keptPaperId} />
+            </div>
+          ) : null}
+          {!onPaperDetail ? (
+            <Outlet context={{ themeMode, setThemeMode }} />
+          ) : null}
         </Content>
       </Layout>
     </Layout>

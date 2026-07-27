@@ -9,7 +9,6 @@ import ProtectedRoute from './ProtectedRoute';
 import MainLayout from '../layouts/MainLayout';
 import LoginPage from '../pages/Login/LoginPage';
 import WorkspacePage from '../pages/Workspace/WorkspacePage';
-import PaperDetailPage from '../pages/PaperDetail/PaperDetailPage';
 import LearningPage from '../pages/Learning/LearningPage';
 import AdminPage from '../pages/Admin/AdminPage';
 import AdminRoute from './AdminRoute';
@@ -261,7 +260,7 @@ function LocalizedApp({ theme, themeMode, setThemeMode }) {
                 >
                   <Route path="/" element={<Navigate to="/workspace" replace />} />
                   <Route path="/workspace" element={<WorkspacePage />} />
-                  <Route path="/paper/:paperId" element={<PaperDetailPage />} />
+                  <Route path="/paper/:paperId" element={null} />
                   <Route path="/learning" element={<LearningPage />} />
                   <Route element={<AdminRoute />}>
                     <Route path="/admin" element={<AdminPage />} />

@@ -53,8 +53,9 @@ function getParseStatusLabel(status) {
   return labels[status] || status || '未知';
 }
 
-export default function PaperDetailPage() {
-  const { paperId } = useParams();
+export default function PaperDetailPage({ paperIdProp = null }) {
+  const { paperId: routePaperId } = useParams();
+  const paperId = paperIdProp || routePaperId;
   const navigate = useNavigate();
   const {
     userId,
@@ -101,6 +102,7 @@ export default function PaperDetailPage() {
   }, [paperId, setCompareForPaper]);
 
   // 进入详情即锁定工作空间到本篇；切换学习/设置后再点工作空间仍回来
+  // （MainLayout 也会根据 URL 同步锁定；此处保留以兼容直接渲染详情页）
   useEffect(() => {
     if (paperId) setLockedPaperId(String(paperId));
   }, [paperId, setLockedPaperId]);
