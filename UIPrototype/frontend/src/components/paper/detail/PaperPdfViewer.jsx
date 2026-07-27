@@ -5,11 +5,33 @@ import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { API_BASE_URL } from '../../../services/runtimeConfig';
 import { pushAnnotationSelection, readDomSelection } from '../../../utils/annotationSelection';
 
-GlobalWorkerOptions.workerSrc = workerSrc;
-
 const { Text } = Typography;
 const MAX_PAGES = 60;
 const SCALE = 1.25;
+
+let workerReadyPromise = null;
+
+function ensurePdfWorker() {
+  if (GlobalWorkerOptions.workerSrc && String(GlobalWorkerOptions.workerSrc).startsWith('blob:')) {
+    return Promise.resolve(GlobalWorkerOptions.workerSrc);
+  }
+  if (workerReadyPromise) return workerReadyPromise;
+  workerReadyPromise = (async () => {
+    const response = await fetch(workerSrc);
+    if (!response.ok) {
+      throw new Error(`PDF worker download failed (HTTP ${response.status})`);
+    }
+    const buffer = await response.arrayBuffer();
+    const blob = new Blob([buffer], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    GlobalWorkerOptions.workerSrc = url;
+    return url;
+  })().catch((err) => {
+    workerReadyPromise = null;
+    throw err;
+  });
+  return workerReadyPromise;
+}
 
 function authHeaders() {
   const token = localStorage.getItem('papermate.accessToken');
@@ -52,7 +74,6 @@ function clearHighlightLayers(host) {
 function paintHighlights(host, highlights) {
   clearHighlightLayers(host);
   if (!host || !Array.isArray(highlights) || highlights.length < 1) return;
-
   const byPage = new Map();
   highlights.forEach((item) => {
     const page = Number(item?.pageNo || item?.page_no || 0);
@@ -66,7 +87,6 @@ function paintHighlights(host, highlights) {
     });
     byPage.set(page, list);
   });
-
   byPage.forEach((entries, pageNo) => {
     const pageEl = host.querySelector(`.pdf-page[data-page-number="${pageNo}"]`);
     if (!pageEl) return;
@@ -88,6 +108,12 @@ function paintHighlights(host, highlights) {
     pageEl.appendChild(layer);
   });
 }
+
+const MSG_NO_PDF = '当前论文没有可读取的 PDF';
+const MSG_LOADING = '正在加载可划词 PDF（同源缓存）...';
+const MSG_LOAD_FAIL = 'PDF 加载失败';
+const MSG_HINT = '可改用「新窗口打开 PDF」；同源缓存失败时通常是外网拉取受阻。';
+const MSG_ARIA = '可划选 PDF 正文';
 
 export default function PaperPdfViewer({
   paperId,
@@ -112,7 +138,7 @@ export default function PaperPdfViewer({
     if (!source) {
       setLoading(false);
       setReady(false);
-      setError('褰撳墠璁烘枃娌℃湁鍙鍙栫殑 PDF');
+      setError(MSG_NO_PDF);
       return undefined;
     }
 
@@ -122,10 +148,13 @@ export default function PaperPdfViewer({
     host.innerHTML = '';
 
     const tasks = [];
-    const loadingTask = getDocument(source);
+    let loadingTask = null;
 
     (async () => {
       try {
+        await ensurePdfWorker();
+        if (cancelled) return;
+        loadingTask = getDocument(source);
         const pdf = await loadingTask.promise;
         if (cancelled) return;
         const total = Math.min(pdf.numPages || 0, MAX_PAGES);
@@ -180,7 +209,7 @@ export default function PaperPdfViewer({
         if (cancelled) return;
         setLoading(false);
         setReady(false);
-        setError(err?.message || 'PDF 鍔犺浇澶辫触');
+        setError(err?.message || MSG_LOAD_FAIL);
       }
     })();
 
@@ -189,7 +218,7 @@ export default function PaperPdfViewer({
       tasks.forEach((task) => {
         try { task.cancel(); } catch { /* ignore */ }
       });
-      try { loadingTask.destroy(); } catch { /* ignore */ }
+      try { loadingTask?.destroy(); } catch { /* ignore */ }
       if (host) host.innerHTML = '';
     };
   }, [paperId, pdfUrl, fullscreen]);
@@ -217,14 +246,16 @@ export default function PaperPdfViewer({
   };
 
   if (!pdfUrl && !(paperId && /^\d+$/.test(String(paperId)))) {
-    return <Empty description="褰撳墠璁烘枃娌℃湁鍙鍙栫殑 PDF" />;
+    return <Empty description={MSG_NO_PDF} />;
   }
+
+  const noteText = `在线预览前 ${MAX_PAGES} 页（共 ${pageCount} 页），完整内容请新窗口打开 PDF。`;
 
   return (
     <div className={`paper-pdf-viewer ${fullscreen ? 'is-fullscreen' : ''} ${className}`.trim()}>
       {loading ? (
         <div className="paper-pdf-viewer-status">
-          <Spin tip="姝ｅ湪鍔犺浇鍙垝璇?PDF锛堝悓婧愮紦瀛橈級..." />
+          <Spin tip={MSG_LOADING} />
         </div>
       ) : null}
       {error ? (
@@ -232,7 +263,8 @@ export default function PaperPdfViewer({
           <Empty description={error} />
           {pdfUrl ? (
             <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-              鍙敼鐢ㄣ€屾柊绐楀彛鎵撳紑 PDF銆嶏紱鍚屾簮缂撳瓨澶辫触鏃堕€氬父鏄缃戞媺鍙栧彈闃汇€?            </Text>
+              {MSG_HINT}
+            </Text>
           ) : null}
         </div>
       ) : null}
@@ -241,12 +273,14 @@ export default function PaperPdfViewer({
         className="paper-pdf-pages"
         onMouseUp={handleMouseUp}
         role="document"
-        aria-label="鍙垝閫?PDF 姝ｆ枃"
+        aria-label={MSG_ARIA}
       />
       {!loading && !error && pageCount > MAX_PAGES ? (
         <Text type="secondary" className="paper-pdf-viewer-note">
-          鍦ㄧ嚎棰勮鍓?{MAX_PAGES} 椤碉紙鍏?{pageCount} 椤碉級锛屽畬鏁村唴瀹硅鏂扮獥鍙ｆ墦寮€ PDF銆?        </Text>
+          {noteText}
+        </Text>
       ) : null}
     </div>
   );
 }
+
