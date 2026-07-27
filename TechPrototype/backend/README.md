@@ -200,7 +200,7 @@ python -m scripts.benchmark_api --base-url http://127.0.0.1:8000 --concurrency 1
 
 ## 6. 前端联调接口
 
-后端提供数据库论文 API，并兼容固定样例论文 API，供 React 前端在 `VITE_USE_MOCK=false` 时调用：
+后端仅提供数据库论文 API，供 React 前端在 `VITE_USE_MOCK=false` 时调用：
 
 ```text
 GET  /api/papers?keyword=attention&page=1&page_size=12
@@ -245,4 +245,4 @@ GET  /api/learning/actions?user_id=demo
 
 论文问答必须启用 QA Agent，并把检索到的文本块交给模型生成回答。模型必须返回 `answer` 和 `citation_ids`，后端会校验引用只能来自当前检索证据；证据不足、引用无效、模型未配置或调用失败时返回明确错误，不使用抽取式回答兜底。
 
-数字 `paper_id` 走 SQLAlchemy 数据库；字符串样例 ID 继续走 PaperPipeline 固定样例。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。
+所有 `paper_id` 均来自 SQLAlchemy 数据库。论文必须先通过批量导入、订阅同步或 `fetch-one` 入库，之后才能访问详情、解析、摘要和问答接口。启动后可在 `http://127.0.0.1:8000/docs` 直接检查和调用。

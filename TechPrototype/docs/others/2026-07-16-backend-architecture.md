@@ -106,9 +106,9 @@ sequenceDiagram
 | `GET` | `/health` | API 与数据库健康检查 |
 | `GET` | `/api/papers` | 关键词、作者、分类、时间范围、分页检索 |
 | `POST` | `/api/papers/batch` | 按 `arxiv_id` 批量幂等写入论文和作者 |
-| `GET` | `/api/papers/{paper_id}` | 数字 ID 读取数据库论文；字符串 ID 兼容 Pipeline 样例 |
+| `GET` | `/api/papers/{paper_id}` | 读取数据库论文 |
 | `GET` | `/api/papers/{paper_id}/wiki` | 读取数据库结构化结果；未生成时回退论文摘要 |
-| `POST` | `/api/papers/{paper_id}/qa` | 数据库论文或 Pipeline 样例的可追溯问答 |
+| `POST` | `/api/papers/{paper_id}/qa` | 数据库论文的可追溯问答 |
 
 成功响应统一为 `{code: "OK", message: "", data: ..., request_id: "..."}`。前端开发环境默认通过 `/api` 代理到 `http://127.0.0.1:8000`，设置 `VITE_USE_MOCK=true` 可切回原型 Mock。
 

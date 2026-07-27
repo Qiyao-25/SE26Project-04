@@ -10,12 +10,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.agents.llm_client import use_llm_client
+from app.agents.qa_agent import QaAgent
 from app.agents.summarize_agent import SummarizeAgent
 from app.core.config import Settings, get_settings
 from app.core.database import create_engine_for
 from app.model import Base, Paper, ParseTask, StructuredResult
 from app.service.parse_agent_runner import run_parse_agent_job
-from app.service.qa import answer_with_agent
 from app.service.tasks import create_task
 
 from .llm_stub import HarnessLlmStub
@@ -50,7 +50,7 @@ def run_agent_scenario(*, live: bool = False) -> ScenarioResult:
             body_text=FIXTURE_BODY,
             arxiv_id="harness-paper",
         )
-        grounded = answer_with_agent(
+        grounded = QaAgent(settings).run(
             title="Harness Paper",
             question="这篇论文提出了什么方法？",
             evidence=[
@@ -61,7 +61,6 @@ def run_agent_scenario(*, live: bool = False) -> ScenarioResult:
                     "content": FIXTURE_BODY,
                 }
             ],
-            settings=settings,
         )
 
     checks = {
@@ -83,7 +82,7 @@ def run_qa_scenario(*, live: bool = False) -> ScenarioResult:
     stub = HarnessLlmStub()
     client_context = nullcontext() if live else use_llm_client(stub)
     with client_context:
-        grounded = answer_with_agent(
+        grounded = QaAgent(settings).run(
             title="Harness Paper",
             question="这篇论文提出了什么方法？",
             evidence=[
@@ -94,11 +93,10 @@ def run_qa_scenario(*, live: bool = False) -> ScenarioResult:
                     "content": FIXTURE_BODY,
                 }
             ],
-            settings=settings,
         )
     checks = {
         "answer_present": bool(grounded.answer.strip()),
-        "not_refused": not grounded.refused,
+        "not_refused": not grounded.refuse,
         "citation_from_evidence": grounded.citation_ids == ["harness-c1"],
     }
     return ScenarioResult("qa", all(checks.values()), checks)
