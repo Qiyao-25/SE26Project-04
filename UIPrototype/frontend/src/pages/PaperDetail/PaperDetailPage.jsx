@@ -25,6 +25,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   boostParsePriority,
+  fetchPaperPdfObjectUrl,
   getPaperContent,
   getPaperDetail,
   getPaperSummary,
@@ -91,6 +92,10 @@ export default function PaperDetailPage() {
   const [previewExcerpts, setPreviewExcerpts] = useState([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
+  const [cachedPdfUrl, setCachedPdfUrl] = useState('');
+  const [cachedPdfLoading, setCachedPdfLoading] = useState(false);
+  const [cachedPdfError, setCachedPdfError] = useState('');
+  const cachedPdfUrlRef = useRef('');
 
   const viewingOther = Boolean(
     comparePreviewActive
@@ -119,6 +124,53 @@ export default function PaperDetailPage() {
   useEffect(() => {
     setPdfFullscreen(false);
   }, [paperId, comparePreviewActive, comparePaperB]);
+
+  useEffect(() => {
+    const targetId = viewingOther ? String(comparePaperB || '') : String(paperId || '');
+    let cancelled = false;
+    const revoke = () => {
+      if (cachedPdfUrlRef.current) {
+        URL.revokeObjectURL(cachedPdfUrlRef.current);
+        cachedPdfUrlRef.current = '';
+      }
+    };
+
+    if (!isPersistedPaperId(targetId)) {
+      revoke();
+      setCachedPdfUrl('');
+      setCachedPdfError('');
+      setCachedPdfLoading(false);
+      return undefined;
+    }
+
+    setCachedPdfLoading(true);
+    setCachedPdfError('');
+    setCachedPdfUrl('');
+    revoke();
+
+    fetchPaperPdfObjectUrl(targetId)
+      .then((url) => {
+        if (cancelled) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        cachedPdfUrlRef.current = url || '';
+        setCachedPdfUrl(url || '');
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setCachedPdfError(error.message || '同源 PDF 加载失败，将尝试外链');
+        setCachedPdfUrl('');
+      })
+      .finally(() => {
+        if (!cancelled) setCachedPdfLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      revoke();
+    };
+  }, [paperId, viewingOther, comparePaperB]);
 
   useEffect(() => {
     if (!pdfFullscreen) return undefined;
@@ -353,6 +405,8 @@ export default function PaperDetailPage() {
   const shownSummaryReady = ['completed', 'qa_ready'].includes(shownSummary?.parseStatus);
   const shownParseReady = ['completed', 'qa_ready', 'succeeded'].includes(shownPaper?.parseStatus);
   const canBoostParse = !viewingOther && ['pending', 'queued', 'failed'].includes(String(shownPaper?.parseStatus || ''));
+  const viewerPdfUrl = cachedPdfUrl || shownContent?.pdfUrl || '';
+  const externalPdfUrl = shownContent?.pdfUrl || shownPaper?.pdfUrl || '';
 
   const mainTabs = [
     {
@@ -388,18 +442,37 @@ export default function PaperDetailPage() {
             {(shownPaper.authors || []).join?.(', ') || shownPaper.authorsText || shownPaper.authors}
           </Paragraph>
 
-          {shownContent?.pdfUrl ? (
+          {viewerPdfUrl || cachedPdfLoading ? (
             <>
-              <iframe
-                title={`${shownPaper.title} PDF`}
-                src={shownContent.pdfUrl}
-                className="paper-pdf-frame"
-              />
+              {cachedPdfLoading ? (
+                <div style={{ minHeight: 240, display: 'grid', placeItems: 'center', marginBottom: 12 }}>
+                  <Spin tip="正在加载同源 PDF 缓存..." />
+                </div>
+              ) : null}
+              {cachedPdfError ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="同源 PDF 暂不可用"
+                  description={`${cachedPdfError}；下方将回退到外链预览（若有）。`}
+                />
+              ) : null}
+              {viewerPdfUrl ? (
+                <iframe
+                  title={`${shownPaper.title} PDF`}
+                  src={viewerPdfUrl}
+                  className="paper-pdf-frame"
+                />
+              ) : (
+                <Empty description="当前论文没有可读取的 PDF" />
+              )}
 
               <Space wrap style={{ marginTop: 12 }}>
                 <Button
                   type="primary"
                   icon={<ExpandOutlined />}
+                  disabled={!viewerPdfUrl}
                   onClick={() => {
                     setMainTab('content');
                     setPdfFullscreen(true);
@@ -408,16 +481,18 @@ export default function PaperDetailPage() {
                   全屏阅读 PDF
                 </Button>
 
-                <Button
-                  icon={<FilePdfOutlined />}
-                  href={shownContent.pdfUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  新窗口打开 PDF
-                </Button>
+                {externalPdfUrl ? (
+                  <Button
+                    icon={<FilePdfOutlined />}
+                    href={externalPdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    新窗口打开 PDF
+                  </Button>
+                ) : null}
 
-                {shownContent.htmlUrl && (
+                {shownContent?.htmlUrl && (
                   <Button
                     icon={<LinkOutlined />}
                     href={shownContent.htmlUrl}
@@ -440,7 +515,7 @@ export default function PaperDetailPage() {
                 )}
 
                 <Text type="secondary">
-                  {shownContent.pageCount ? `共 ${shownContent.pageCount} 页` : '页数待后端解析'}
+                  {cachedPdfUrl ? '正在使用同源 PDF 缓存' : (shownContent?.pageCount ? `共 ${shownContent.pageCount} 页` : '页数待后端解析')}
                 </Text>
               </Space>
             </>
@@ -665,7 +740,7 @@ export default function PaperDetailPage() {
             <Button icon={<ArrowLeftOutlined />} onClick={handleExitPaper}>
               退出论文
             </Button>
-            {shownContent?.pdfUrl ? (
+            {viewerPdfUrl ? (
               <Button
                 icon={<ExpandOutlined />}
                 onClick={() => {
@@ -742,7 +817,7 @@ export default function PaperDetailPage() {
         )}
       </div>
 
-      {pdfFullscreen && shownContent?.pdfUrl ? (
+      {pdfFullscreen && viewerPdfUrl ? (
         <div className="pdf-fullscreen-overlay" role="dialog" aria-modal="true" aria-label="全屏阅读 PDF">
           <div className="pdf-fullscreen-toolbar">
             <div className="pdf-fullscreen-title">
@@ -752,14 +827,16 @@ export default function PaperDetailPage() {
               </Text>
             </div>
             <Space wrap>
-              <Button
-                icon={<FilePdfOutlined />}
-                href={shownContent.pdfUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                新窗口打开
-              </Button>
+              {externalPdfUrl ? (
+                <Button
+                  icon={<FilePdfOutlined />}
+                  href={externalPdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  新窗口打开
+                </Button>
+              ) : null}
               <Button type="primary" onClick={() => setPdfFullscreen(false)}>
                 退出全屏（Esc）
               </Button>
@@ -767,7 +844,7 @@ export default function PaperDetailPage() {
           </div>
           <iframe
             title={`${shownPaper.title} 全屏 PDF`}
-            src={shownContent.pdfUrl}
+            src={viewerPdfUrl}
             className="pdf-fullscreen-frame"
           />
         </div>

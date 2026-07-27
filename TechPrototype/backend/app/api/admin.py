@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.service.admin import admin_audit, admin_overview, admin_quality, admin_tasks, admin_users, delete_user, update_user_status
+from app.service.pdf_stream import pdf_cache_stats, sync_missing_paper_pdfs
 from app.service.runtime_settings import apply_runtime_settings, update_crawl_settings
 
 
@@ -119,6 +120,28 @@ def crawl_settings_patch(payload: CrawlSettingsUpdate, request: Request, _admin:
         request.app.state.settings,
         crawl_enabled=payload.crawl_enabled,
         crawl_interval_s=payload.crawl_interval_s,
+    )
+    return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/pdfs/stats", response_model=ApiResponse[dict], summary="PDF 本地缓存统计")
+def pdfs_stats(request: Request, _admin: AuthUser = Depends(require_admin), db: Session = Depends(db_session)):
+    return ApiResponse(data=pdf_cache_stats(db, request.app.state.settings), request_id=request.state.request_id)
+
+
+@router.post("/pdfs/sync", response_model=ApiResponse[dict], summary="同步已入库论文 PDF 到本地缓存")
+def pdfs_sync(
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+    delay_s: float = Query(default=0.4, ge=0, le=5),
+    _admin: AuthUser = Depends(require_admin),
+    db: Session = Depends(db_session),
+):
+    data = sync_missing_paper_pdfs(
+        db,
+        limit=limit,
+        delay_s=delay_s,
+        settings=request.app.state.settings,
     )
     return ApiResponse(data=data, request_id=request.state.request_id)
 

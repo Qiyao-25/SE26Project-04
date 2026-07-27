@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { API_TIMEOUT_MS, USE_MOCK } from './runtimeConfig';
+import { API_BASE_URL, API_TIMEOUT_MS, USE_MOCK } from './runtimeConfig';
 import { PAPERS, PAPER_LIST } from '../data/papers';
 import detailMock from '../mocks/paper-detail.json';
 import contentMock from '../mocks/paper-content.json';
@@ -381,6 +381,41 @@ export async function getPaperDetail(paperId) {
 export async function getPaperContent(paperId) {
   if (USE_MOCK) return getMockPaperContent(paperId);
   return apiClient.get(`/papers/${paperId}/content`);
+}
+
+/** Fetch same-origin cached PDF as a blob: URL (iframe cannot send Bearer). */
+export async function fetchPaperPdfObjectUrl(paperId, { timeoutMs = 120000 } = {}) {
+  if (!paperId || !/^\d+$/.test(String(paperId))) {
+    throw new Error('仅数据库论文支持同源 PDF');
+  }
+  if (USE_MOCK) {
+    return null;
+  }
+  const token = localStorage.getItem('papermate.accessToken');
+  const base = String(API_BASE_URL || '/api').replace(/\/$/, '');
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${base}/papers/${paperId}/pdf`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`;
+      try {
+        const payload = await response.json();
+        detail = payload?.message || detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail || 'PDF 加载失败');
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export async function getPaperSummary(paperId) {

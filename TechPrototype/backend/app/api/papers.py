@@ -14,6 +14,7 @@ from app.schema.qa import AskPaperRequest, AskPaperResult
 from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, fetch_one_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
+from app.service.pdf_stream import load_paper_pdf_bytes, pdf_response
 from app.service.qa import ask_paper
 from app.service.tasks import boost_parse_priority, create_task
 
@@ -229,12 +230,36 @@ def content(paper_id: str, request: Request, db: Session = Depends(db_session)):
             paper = get_paper_detail(db, int(paper_id))
         except PaperServiceError as exc:
             return _db_error(request, exc)
-        return ApiResponse(data=PaperContent(paperId=str(paper.paper_id), contentType="pdf+html", pdfUrl=paper.pdf_url, htmlUrl=f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}", defaultPage=1, sections=[]), request_id=request.state.request_id)
+        return ApiResponse(
+            data=PaperContent(
+                paperId=str(paper.paper_id),
+                contentType="pdf+html",
+                pdfUrl=paper.pdf_url,
+                htmlUrl=f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}",
+                defaultPage=1,
+                sections=[],
+            ),
+            request_id=request.state.request_id,
+        )
     try:
         data = require_content(paper_id)
     except KeyError:
         return _not_found(request, paper_id)
     return ApiResponse(data=data, request_id=request.state.request_id)
+
+
+@router.get("/{paper_id}/pdf", summary="同源 PDF（优先本地缓存，缺失则拉取并落盘）")
+def paper_pdf(
+    paper_id: int,
+    request: Request,
+    db: Session = Depends(db_session),
+    _user: AuthUser = Depends(require_current_user),
+):
+    try:
+        data, _ctype = load_paper_pdf_bytes(db, paper_id, settings=request.app.state.settings)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    return pdf_response(data, filename=f"paper-{paper_id}.pdf")
 
 
 @router.get("/{paper_id}/summary", response_model=ApiResponse[PaperSummary], summary="获取结构化摘要")
