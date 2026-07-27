@@ -17,7 +17,7 @@ export default function ReadingAssistView({
   if (loading) {
     return (
       <div style={{ padding: compact ? 12 : 24, textAlign: 'center' }}>
-        <Spin tip="正在按阅读模式生成辅助内容..." />
+        <Spin tip="加载中…" />
       </div>
     );
   }
@@ -27,8 +27,7 @@ export default function ReadingAssistView({
       <Alert
         type="error"
         showIcon
-        message="辅助阅读生成失败"
-        description={error}
+        message={error}
         action={
           onRetry ? (
             <Button size="small" onClick={onRetry}>
@@ -41,29 +40,16 @@ export default function ReadingAssistView({
   }
 
   if (!data || !(data.sections || []).length) {
-    return (
-      <Alert
-        type="info"
-        showIcon
-        message="暂无辅助内容"
-        description="可点击重新生成，或先完成论文解析以获得更准确的模式化导读。"
-      />
-    );
+    return <Text type="secondary">暂无内容</Text>;
   }
 
   return (
     <div className="reading-assist-view">
       <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Space wrap>
-          <Tag color="blue">{data.mode}模式</Tag>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {data.source || ''}
-            {data.generated ? ' · 刚生成' : ' · 已缓存'}
-          </Text>
-        </Space>
+        <Tag color="blue">{data.mode}模式</Tag>
         {onRefresh && (
           <Button size="small" icon={<ReloadOutlined />} onClick={onRefresh}>
-            按此模式重生成
+            重新生成
           </Button>
         )}
       </Space>

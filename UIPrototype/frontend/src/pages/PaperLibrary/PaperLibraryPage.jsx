@@ -259,9 +259,6 @@ export default function PaperLibraryPage() {
   return (
     <div className="page-paper-library">
       <Card className="section-card" title="论文库">
-        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          支持按关键词、作者、发表时间、主题大类与 arXiv 类别筛选。点击表头列名排序，箭头表示当前方向，再次点击切换正序/倒序。
-        </Text>
         <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
           <Col xs={24} sm={12} md={8} lg={6}>
             <Input

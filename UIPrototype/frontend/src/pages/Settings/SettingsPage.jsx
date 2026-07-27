@@ -459,9 +459,6 @@ export default function SettingsPage() {
           <Col xs={24} lg={14}>
             <Card title={t('settings.subscriptions.title')} size="small">
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Typography.Text type="secondary">
-                  {t('settings.subscriptions.hint')}
-                </Typography.Text>
                 <Segmented
                   className="subscription-type-segmented"
                   block
@@ -534,12 +531,6 @@ export default function SettingsPage() {
           </Col>
           <Col xs={24} lg={10}>
             <Card title={t('settings.sync.title')} size="small">
-              <Alert
-                type="info"
-                showIcon
-                style={{ marginBottom: 16 }}
-                message={t('settings.sync.alert', { count: enabledCount })}
-              />
               <Form
                 form={crawlForm}
                 layout="vertical"
@@ -554,7 +545,6 @@ export default function SettingsPage() {
                 <Form.Item
                   name="maxPerSubscription"
                   label={t('settings.sync.maxPer')}
-                  extra={t('settings.sync.maxPerExtra')}
                 >
                   <InputNumber min={1} max={15} style={{ width: '100%' }} />
                 </Form.Item>
@@ -562,7 +552,6 @@ export default function SettingsPage() {
                   name="codeOnly"
                   label={t('settings.sync.codeOnly')}
                   valuePropName="checked"
-                  extra={t('settings.sync.codeOnlyExtra')}
                 >
                   <Switch />
                 </Form.Item>
@@ -578,10 +567,7 @@ export default function SettingsPage() {
               </Form>
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                 <Typography.Text strong>{t('settings.sync.fetchOne')}</Typography.Text>
-                <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 10 }}>
-                  {t('settings.sync.fetchOneExtra')}
-                </Typography.Paragraph>
-                <Space.Compact style={{ width: '100%' }}>
+                <Space.Compact style={{ width: '100%', marginTop: 10 }}>
                   <Input
                     value={fetchOneQuery}
                     onChange={(event) => setFetchOneQuery(event.target.value)}
@@ -617,14 +603,12 @@ export default function SettingsPage() {
                     name="crawlEnabled"
                     label={t('settings.crawlAdmin.enabled')}
                     valuePropName="checked"
-                    extra={t('settings.crawlAdmin.enabledExtra')}
                   >
                     <Switch />
                   </Form.Item>
                   <Form.Item
                     name="crawlIntervalHours"
                     label={t('settings.crawlAdmin.interval')}
-                    extra={t('settings.crawlAdmin.intervalExtra')}
                     rules={[{ required: true, message: t('settings.crawlAdmin.interval') }]}
                   >
                     <InputNumber min={1 / 60} max={168} step={0.5} style={{ width: '100%' }} />

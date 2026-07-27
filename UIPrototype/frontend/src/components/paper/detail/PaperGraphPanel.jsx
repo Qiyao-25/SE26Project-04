@@ -162,7 +162,7 @@ export default function PaperGraphPanel({ paperId, paperTitle }) {
   if (loading) {
     return (
       <div style={{ minHeight: 240, display: 'grid', placeItems: 'center' }}>
-        <Spin tip="正在加载知识图谱与研究脉络..." />
+        <Spin tip="加载中…" />
       </div>
     );
   }
@@ -185,7 +185,7 @@ export default function PaperGraphPanel({ paperId, paperTitle }) {
 
   if (!graph || !(graph.nodes || []).length) {
     return (
-      <Empty description="暂无图谱数据。可先完成解析，或点击生成。">
+      <Empty description="暂无图谱">
         <Button type="primary" icon={<ApartmentOutlined />} loading={rebuilding} onClick={() => load({ force: true })}>
           生成知识图谱
         </Button>

@@ -160,14 +160,6 @@ function QualityTab({ quality, onRefresh }) {
 
   return (
     <Row gutter={16}>
-      <Col span={24} style={{ marginBottom: 16 }}>
-        <Alert
-          type="info"
-          showIcon
-          message="质量异常处理说明"
-          description="重试=失败任务再跑；删除=可仅删任务或直接删论文；入队待解析=把未解析论文入队；打开论文=人工查看。"
-        />
-      </Col>
       <Col xs={24} lg={14}>
         <Card
           title="异常论文工作台"
@@ -185,9 +177,6 @@ function QualityTab({ quality, onRefresh }) {
             </Space>
           )}
         >
-          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-            汇总解析失败 / 超时任务。PDF/HTML 均空会自动软删；崩溃类失败最多自动重试 1 次，仍失败则软删。可手动重试或删除。
-          </Text>
           <List dataSource={exceptions} locale={{ emptyText: '暂无质量异常' }} renderItem={(e) => (
             <List.Item actions={[
               e.retryable ? (

@@ -28,7 +28,7 @@ const WORKSPACE_SEARCH_CACHE_KEY = 'papermate-workspace-search-v1';
 const WELCOME_MESSAGE = {
   messageId: 'workspace-welcome',
   role: 'assistant',
-  content: '您好，可输入自然语言检索论文。系统会智能改写关键词、匹配数据库论文，并生成检索说明。',
+  content: '输入检索词开始查找论文。',
   status: 'success',
   citations: []
 };
@@ -460,13 +460,12 @@ export default function WorkspacePage() {
   return (
     <div className="page-workspace">
       <Card title="智能论文检索" className="section-card smart-search-card">
-        <ChatBox messages={messages} onSend={handleSearch} placeholder="试试：有哪些关于注意力机制或 Transformer 的论文？" minHeight={140} loading={searchStatus === 'loading'} />
-        <Text type="secondary" style={{ fontSize: 12 }}>支持自然语言；系统会改写关键词并匹配数据库论文，再给出检索说明。</Text>
+        <ChatBox messages={messages} onSend={handleSearch} placeholder="检索论文…" minHeight={140} loading={searchStatus === 'loading'} />
       </Card>
       {!workspaceSearched ? (
         <>
           {bootStatus === 'loading' && !dailyPapers.length && !profilePapers.length && !subscriptionPapers.length && (
-            <Card className="section-card"><div style={{ textAlign: 'center', padding: 40 }}><Spin tip="正在从数据库加载推荐论文..." /></div></Card>
+            <Card className="section-card"><div style={{ textAlign: 'center', padding: 40 }}><Spin tip="加载中…" /></div></Card>
           )}
           {bootStatus === 'failed' && (
             <Alert
@@ -504,14 +503,14 @@ export default function WorkspacePage() {
               <Card
                 title="基于画像推荐的论文"
                 className="section-card"
-                extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>兴趣主题 + 阅读历史</Text>{sectionRefresh('画像推荐', profileLoading, () => refreshProfile({ excludeCurrent: true }))}</Space>}
+                extra={sectionRefresh('画像推荐', profileLoading, () => refreshProfile({ excludeCurrent: true }))}
               >
                 {profileLoading && !profilePapers.length ? <Spin /> : (profilePapers.length ? renderPaperGrid(profilePapers) : <Empty description="暂无推荐论文，请先在学习页设置兴趣主题" />)}
               </Card>
               <Card
                 title="订阅更新"
                 className="section-card"
-                extra={<Space size={8}><Text type="secondary" style={{ fontSize: 12 }}>来自设置页订阅 · 可立即同步 arXiv</Text>{sectionRefresh('订阅更新', subscriptionLoading, () => refreshSubscriptions({ excludeCurrent: true }))}</Space>}
+                extra={sectionRefresh('订阅更新', subscriptionLoading, () => refreshSubscriptions({ excludeCurrent: true }))}
               >
                 {subscriptionLoading && !subscriptionPapers.length ? <Spin /> : (subscriptionPapers.length ? renderPaperGrid(subscriptionPapers) : <Empty description="暂无订阅更新，请到设置页添加订阅并点击「立即同步」" />)}
               </Card>

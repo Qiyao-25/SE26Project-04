@@ -446,7 +446,7 @@ export default function PaperDetailPage() {
                 )}
 
                 <Text type="secondary">
-                  {shownContent?.pageCount ? `共 ${shownContent.pageCount} 页` : '页数待后端解析'}
+                  {shownContent?.pageCount ? `共 ${shownContent.pageCount} 页` : null}
                 </Text>
               </Space>
             </>
@@ -477,13 +477,6 @@ export default function PaperDetailPage() {
               >
                 立即解析
               </Button>
-            ) : null}
-            {!shownSummaryReady ? (
-              <Text type="secondary">
-                {canBoostParse
-                  ? '可点「立即解析」插队执行已有任务；解析完成后按钮会消失'
-                  : '后台自动解析中，完成后刷新即可查看'}
-              </Text>
             ) : null}
           </Space>
 
@@ -554,35 +547,15 @@ export default function PaperDetailPage() {
               )}
 
               {(shownSummary.validationFlags || []).length > 0 && (
-                <Alert
-                  type="warning"
-                  showIcon
-                  message="内容校验 Agent：不确定内容已标记"
-                  description={
-                    <div>
-                      <div style={{ marginBottom: 8 }}>
-                        {(shownSummary.validationLabels || shownSummary.validationFlags).map((label) => (
-                          <Tag key={label} color="gold" style={{ marginBottom: 4 }}>{label}</Tag>
-                        ))}
-                      </div>
-                      {(shownSummary.uncertainFields || []).length > 0 && (
-                        <Text type="secondary">
-                          待复核字段：{shownSummary.uncertainFields.join('、')}
-                        </Text>
-                      )}
-                    </div>
-                  }
-                  style={{ marginTop: 16 }}
-                />
+                <Space wrap style={{ marginTop: 16 }}>
+                  {(shownSummary.validationLabels || shownSummary.validationFlags).map((label) => (
+                    <Tag key={label} color="gold">{label}</Tag>
+                  ))}
+                </Space>
               )}
             </>
           ) : (
-            <Alert
-              type="info"
-              showIcon
-              message="智能总结暂不可用"
-              description="完成论文解析后，这里才会显示摘要、核心概念、方法、实验结果和局限性。"
-            />
+            <Empty description="暂无智能总结" />
           )}
         </div>
       )
@@ -595,26 +568,14 @@ export default function PaperDetailPage() {
           {shownGraph ? (
             <>
               <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Space wrap>
-                  <Tag color={shownGraph.preview ? 'default' : 'success'}>
-                    {shownGraph.preview ? '解析前主题预览' : '解析后结构化脉络'}
-                  </Tag>
-                  <Text type="secondary">节点 {shownGraph.nodes.length} 个 · 关系 {shownGraph.edges.length} 条 · 来源 {shownGraph.source || 'heuristic'}</Text>
-                </Space>
+                <Tag color={shownGraph.preview ? 'default' : 'success'}>
+                  {shownGraph.preview ? '预览' : '图谱'}
+                </Tag>
                 <Button icon={<ReloadOutlined />} loading={graphRefreshing} onClick={handleGraphRefresh}>
-                  刷新图谱
+                  刷新
                 </Button>
               </Space>
-              {shownGraph.preview && (
-                <Alert
-                  type="info"
-                  showIcon
-                  message="当前为解析前主题脉络预览"
-                  description="完成正文解析后，图谱会补充概念、方法、数据集及更完整的关系。"
-                  style={{ marginBottom: 12 }}
-                />
-              )}
-              <Paragraph>{shownGraph.narrative || '暂无研究脉络说明。'}</Paragraph>
+              <Paragraph>{shownGraph.narrative}</Paragraph>
               <PaperGraphCanvas paperId={shownPaperId} nodes={shownGraph.nodes} edges={shownGraph.edges} />
               <List
                 size="small"
@@ -637,11 +598,10 @@ export default function PaperDetailPage() {
             <Alert
               type="error"
               showIcon
-              message="知识图谱加载失败"
-              description={shownGraphError}
-              action={<Button size="small" onClick={handleGraphRefresh}>重新加载</Button>}
+              message={shownGraphError}
+              action={<Button size="small" onClick={handleGraphRefresh}>重试</Button>}
             />
-          ) : <Spin size="small" tip="正在生成知识图谱..." />}
+          ) : <Spin size="small" tip="加载中…" />}
         </div>
       )
     }
@@ -671,7 +631,6 @@ export default function PaperDetailPage() {
                 全屏阅读 PDF
               </Button>
             ) : null}
-            <Text type="secondary">可切换学习空间 / 设置等；再点工作空间仍回到本篇。退出后恢复检索首页</Text>
           </Space>
           <Text ellipsis style={{ maxWidth: 360 }} strong>
             {paper.title}
@@ -687,8 +646,7 @@ export default function PaperDetailPage() {
                 type="info"
                 showIcon
                 style={{ marginBottom: 12 }}
-                message="正在查看对比论文"
-                description="对比阅读侧栏仍锚定原论文。再次点击「返回原论文」可切回。"
+                message="对比论文"
                 action={(
                   <Button size="small" onClick={() => setComparePreviewActive(false)}>
                     返回原论文

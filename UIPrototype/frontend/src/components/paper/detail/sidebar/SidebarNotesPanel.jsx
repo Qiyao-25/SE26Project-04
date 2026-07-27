@@ -212,9 +212,6 @@ export default function SidebarNotesPanel({ paperId }) {
   return (
     <div className="sidebar-scroll">
       <Text className="block-label">笔记 / 批注</Text>
-      <Paragraph type="secondary" style={{ fontSize: 11, padding: 8, background: '#fafafa', borderLeft: '3px solid #d9d9d9' }}>
-        笔记与批注仅自己可见；评论公开。批注请在左侧 PDF 正文划选高亮。
-      </Paragraph>
       <Segmented
         block
         size="small"
@@ -231,7 +228,7 @@ export default function SidebarNotesPanel({ paperId }) {
           rows={2}
           value={quote}
           onChange={(e) => setQuote(e.target.value)}
-          placeholder="摘录 / 高亮原文（PDF 划选后自动填入，也可手改）"
+          placeholder="摘录原文"
           style={{ marginBottom: 8 }}
         />
       )}

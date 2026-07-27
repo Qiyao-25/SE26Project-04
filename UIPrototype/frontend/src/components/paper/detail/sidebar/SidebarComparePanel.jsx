@@ -322,7 +322,7 @@ export default function SidebarComparePanel({ paperId, paper }) {
           <List
             size="small"
             style={{ marginTop: 8 }}
-            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="输入关键词后检索" /> }}
+            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无结果" /> }}
             dataSource={searchResults}
             renderItem={renderPickerItem}
           />
@@ -372,9 +372,6 @@ export default function SidebarComparePanel({ paperId, paper }) {
   return (
     <div className="sidebar-scroll">
       <Text strong>对比阅读</Text>
-      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-        先选定对比论文，再点击「生成对比」由 LLM 输出智能总结；打开对比论文不会离开本页。
-      </Text>
 
       <div className="compare-slot" style={{ marginTop: 12 }}>
         <Text className="block-label">当前论文</Text>
@@ -407,13 +404,13 @@ export default function SidebarComparePanel({ paperId, paper }) {
 
       <div className="compare-body" style={{ marginTop: 12 }}>
         {!hasOther ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请先选择对比论文" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未选择对比论文" />
         ) : compareGenerating ? (
-          <div style={{ textAlign: 'center', padding: 24 }}><Spin tip="正在生成智能对比…" /></div>
+          <div style={{ textAlign: 'center', padding: 24 }}><Spin tip="生成中…" /></div>
         ) : compareError ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={compareError} />
         ) : !compareResult ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选定后点击「生成对比」查看 LLM 总结" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无对比" />
         ) : (
           <>
             <div style={{ marginBottom: 8 }}>

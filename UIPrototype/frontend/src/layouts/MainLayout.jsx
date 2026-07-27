@@ -209,10 +209,6 @@ export default function MainLayout({
             >
               {meta.title}
             </Title>
-
-            <Text type="secondary">
-              {meta.sub}
-            </Text>
           </div>
 
           <Space

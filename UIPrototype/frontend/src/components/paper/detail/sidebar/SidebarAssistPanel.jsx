@@ -1,11 +1,9 @@
-import { Alert, Typography, Segmented } from 'antd';
+import { Typography, Segmented } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../../../../context/AppContext';
-import { MODE_DESC, PERSONAS } from '../../../../data/papers';
+import { PERSONAS } from '../../../../data/papers';
 import { getReadingAssist } from '../../../../services/paperService';
 import ReadingAssistView from '../ReadingAssistView';
-
-const { Text } = Typography;
 
 export default function SidebarAssistPanel({ paper, paperId }) {
   const { persona, setPersona } = useApp();
@@ -42,22 +40,12 @@ export default function SidebarAssistPanel({ paper, paperId }) {
 
   return (
     <div>
-      <Text type="secondary" style={{ fontSize: 12 }}>
-        默认模式在学习空间设置 · 此处可快捷切换。切换后会按该模式重新组织导读。
-      </Text>
       <Segmented
         block
         options={PERSONAS}
         value={persona}
         onChange={setPersona}
-        style={{ margin: '12px 0' }}
-      />
-      <Alert
-        type="info"
-        showIcon
         style={{ marginBottom: 12 }}
-        message={`${persona}模式`}
-        description={`${MODE_DESC[persona]}；优先由 ReadingMode Agent 生成，不可用时降级为规则模板。`}
       />
       {parsed ? (
         <ReadingAssistView
@@ -68,12 +56,7 @@ export default function SidebarAssistPanel({ paper, paperId }) {
           onRefresh={() => load({ force: true, mode: persona })}
         />
       ) : (
-        <Alert
-          type="info"
-          showIcon
-          message="完成解析后可用"
-          description="论文解析完成后，会基于智能总结按阅读模式生成更易读的辅助内容。"
-        />
+        <Typography.Text type="secondary">完成解析后可用</Typography.Text>
       )}
     </div>
   );

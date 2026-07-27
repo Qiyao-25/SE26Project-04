@@ -24,7 +24,7 @@ export default function ChatPanel({ messages, minHeight = 120 }) {
           >
             {isFallback ? (
               <Tag color="orange" style={{ marginBottom: 6 }}>
-                降级摘录（非 Agent 总结）
+                摘录
               </Tag>
             ) : null}
             <Text style={{ fontSize: 13 }}>{content}</Text>

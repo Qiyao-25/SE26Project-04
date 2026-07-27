@@ -1,6 +1,5 @@
 import { Card, Tag, Typography, Button, Space } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
-import { useApp } from '../../../../context/AppContext';
 import SidebarNotesPreview from './SidebarNotesPreview';
 import { ChatBox } from '../../../common/ChatBox';
 import FavoriteButton from './FavoriteButton';
@@ -96,7 +95,6 @@ export default function SidebarAllPanel({
   onSend,
   qaStatus
 }) {
-  const { persona } = useApp();
   const parsed = ['completed', 'qa_ready'].includes(paper.parseStatus);
 
   const sections = [
@@ -113,9 +111,7 @@ export default function SidebarAllPanel({
       content: parsed ? (
         <SidebarAssistPreview paper={paper} paperId={paperId} />
       ) : (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          完成解析后可用 · 当前 {persona}模式
-        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>完成解析后可用</Text>
       )
     },
     {
@@ -128,11 +124,7 @@ export default function SidebarAllPanel({
       key: 'compare',
       title: '对比阅读',
       extra: <GoViewButton onClick={() => onGoTab('compare')} />,
-      content: (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          双论文并排对比，快捷切换
-        </Text>
-      )
+      content: null
     },
     {
       key: 'qa',

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Tag, Input, Button, Space, Typography, List, Segmented, Alert } from 'antd';
+import { Tag, Input, Button, Space, Typography, List, Segmented } from 'antd';
 import { SearchOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { searchPaperWiki as searchMockPaperWiki } from '../../../../utils/wiki';
@@ -126,13 +126,6 @@ export default function SidebarInfoPanel({ paper, paperId }) {
 
       <div className="wiki-section">
         <Title level={5}>论文知识 Wiki</Title>
-        <Text type="secondary" style={{ fontSize: 12 }}>按标题、作者、关键词、研究方向、概念标签检索</Text>
-        <Alert
-          type="info"
-          showIcon
-          style={{ margin: '8px 0' }}
-          message="主题/概念关联请在主区「知识图谱」查看；关联为语义主题相关，非文献引用网络。"
-        />
         <Segmented
           size="small"
           options={WIKI_MODES}
@@ -165,8 +158,8 @@ export default function SidebarInfoPanel({ paper, paperId }) {
             >
               {t.text}
             </Tag>
-          )) : (
-            <Text type="secondary" style={{ fontSize: 12 }}>解析完成后将显示概念与研究方向标签</Text>
+          )          ) : (
+            <Text type="secondary" style={{ fontSize: 12 }}>暂无标签</Text>
           )}
         </Space>
         <Text className="block-label" style={{ marginTop: 12 }}>

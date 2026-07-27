@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Tabs, Row, Col, List, Tag, Typography, Segmented, Switch, Input, Select, Empty, Spin, Alert, message, Button, Popconfirm, Pagination, Space } from 'antd';
-import { READING_HISTORY, PERSONAS, MODE_DESC, PAPERS } from '../../data/papers';
+import { READING_HISTORY, PERSONAS, PAPERS } from '../../data/papers';
 import { useApp } from '../../context/AppContext';
 import { getPaperDetail } from '../../services/paperService';
 import { getConceptDictionary, clearConceptDictionary, getLearningProfile, listActions, updateLearningProfile, deleteAction, deleteActionsByType } from '../../services/learningService';
@@ -426,7 +426,7 @@ export default function LearningPage() {
       key: 'wiki',
       label: '概念词典',
       children: USE_MOCK
-        ? <Row gutter={[16, 16]}>{['Self-Attention', 'Pre-training', 'LoRA'].map((name) => <Col xs={24} sm={8} key={name}><Card hoverable size="small"><Text strong>{name}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>Wiki 词条</Text></Card></Col>)}</Row>
+        ? <Row gutter={[16, 16]}>{['Self-Attention', 'Pre-training', 'LoRA'].map((name) => <Col xs={24} sm={8} key={name}><Card hoverable size="small"><Text strong>{name}</Text></Card></Col>)}</Row>
         : (
           <>
             <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
@@ -477,7 +477,7 @@ export default function LearningPage() {
                   />
                 </div>
               </>
-            ) : <Empty description="收藏、阅读或批注已解析论文后，会从解析出的概念自动汇总词典" />}
+            ) : <Empty description="暂无词条" />}
           </>
         )
     },
@@ -488,29 +488,22 @@ export default function LearningPage() {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Card title="兴趣主题" size="small">
-              <Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                用于个性化推荐；可选择常见方向或自定义输入。
-              </Paragraph>
               <Select
                 mode="tags"
                 style={{ width: '100%' }}
-                placeholder="例如 cs.CL、Transformer"
+                placeholder="兴趣主题"
                 value={topics}
                 options={TOPIC_OPTIONS.map((value) => ({ value, label: value }))}
                 onChange={handleTopicsChange}
                 tokenSeparators={[',']}
               />
               <div style={{ marginTop: 12 }}>
-                <Text type="secondary">当前模式 </Text>
                 <Tag color="processing">{profile?.persona || persona}</Tag>
               </div>
             </Card>
           </Col>
           <Col xs={24} md={12}>
             <Card title="偏好设置" size="small">
-              <Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                会参与「基于画像推荐」打分：开启「偏好有代码」时更倾向摘要中提到开源/代码的论文；关注作者/机构按逗号分隔，匹配作者名或摘要时加权。
-              </Paragraph>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>偏好有代码</span>
                 <Switch
@@ -522,9 +515,8 @@ export default function LearningPage() {
                 />
               </div>
               <div style={{ marginTop: 8 }}>
-                <Text type="secondary">关注作者/机构</Text>
                 <Input
-                  placeholder="例如 Vaswani, Google, Stanford"
+                  placeholder="关注作者/机构"
                   defaultValue={profile?.preferences?.authors || ''}
                   onBlur={(event) => updateLearningProfile(userId, {
                     preferences: { ...(profile?.preferences || {}), authors: event.target.value }
@@ -540,7 +532,7 @@ export default function LearningPage() {
     {
       key: 'mode',
       label: '默认模式',
-      children: <Card><Paragraph type="secondary">设置全局默认阅读模式；论文详情页可快捷切换</Paragraph><Segmented block options={PERSONAS} value={persona} onChange={handlePersonaChange} /><Paragraph style={{ marginTop: 16, padding: 12, background: '#fafafa' }}>{MODE_DESC[persona]}</Paragraph></Card>
+      children: <Card><Segmented block options={PERSONAS} value={persona} onChange={handlePersonaChange} /></Card>
     }
   ];
 

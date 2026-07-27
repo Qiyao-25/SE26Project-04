@@ -677,15 +677,11 @@ export default function PaperGraphCanvas({ paperId, nodes = [], edges = [] }) {
   }, [focusId, prepared.canvasEdges, prepared.listEdges]);
 
   if (!nodes.length) {
-    return <div className="paper-graph-empty">暂无足够的结构化实体，请先完成论文解析。</div>;
+    return <div className="paper-graph-empty">暂无图谱</div>;
   }
 
   return (
     <div className="paper-graph-wrap paper-graph-metro">
-      <div className="paper-graph-hint">
-        地铁线路图：站点按全宽均分排布；概念/方法/领域等标题最多显示 3 行。默认只画主路径与换乘线，悬停可看弱关系。
-      </div>
-
       <div className="paper-graph-legend" aria-label="线路与站点图例">
         {Object.values(LINES).map((line) => (
           <span key={line.key} className="paper-graph-legend-item">

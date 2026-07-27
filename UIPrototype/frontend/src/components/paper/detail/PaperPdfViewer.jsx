@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Empty, Spin, Typography } from 'antd';
+import { Empty, Spin } from 'antd';
 import { getDocument, GlobalWorkerOptions, TextLayer } from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { API_BASE_URL } from '../../../services/runtimeConfig';
 import { pushAnnotationSelection, readDomSelection } from '../../../utils/annotationSelection';
 
-const { Text } = Typography;
 const MAX_PAGES = 60;
 const SCALE = 1.25;
 
@@ -109,11 +108,10 @@ function paintHighlights(host, highlights) {
   });
 }
 
-const MSG_NO_PDF = '当前论文没有可读取的 PDF';
-const MSG_LOADING = '正在加载可划词 PDF（同源缓存）...';
+const MSG_NO_PDF = '暂无 PDF';
+const MSG_LOADING = '加载中…';
 const MSG_LOAD_FAIL = 'PDF 加载失败';
-const MSG_HINT = '可改用「新窗口打开 PDF」；同源缓存失败时通常是外网拉取受阻。';
-const MSG_ARIA = '可划选 PDF 正文';
+const MSG_ARIA = 'PDF';
 
 export default function PaperPdfViewer({
   paperId,
@@ -249,8 +247,6 @@ export default function PaperPdfViewer({
     return <Empty description={MSG_NO_PDF} />;
   }
 
-  const noteText = `在线预览前 ${MAX_PAGES} 页（共 ${pageCount} 页），完整内容请新窗口打开 PDF。`;
-
   return (
     <div className={`paper-pdf-viewer ${fullscreen ? 'is-fullscreen' : ''} ${className}`.trim()}>
       {loading ? (
@@ -260,12 +256,7 @@ export default function PaperPdfViewer({
       ) : null}
       {error ? (
         <div className="paper-pdf-viewer-status">
-          <Empty description={error} />
-          {pdfUrl ? (
-            <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-              {MSG_HINT}
-            </Text>
-          ) : null}
+          <Empty description={error || MSG_LOAD_FAIL} />
         </div>
       ) : null}
       <div
@@ -275,11 +266,6 @@ export default function PaperPdfViewer({
         role="document"
         aria-label={MSG_ARIA}
       />
-      {!loading && !error && pageCount > MAX_PAGES ? (
-        <Text type="secondary" className="paper-pdf-viewer-note">
-          {noteText}
-        </Text>
-      ) : null}
     </div>
   );
 }
