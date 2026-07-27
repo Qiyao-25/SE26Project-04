@@ -1,4 +1,6 @@
 # Local secrets and runtime artifacts (repo root)
+/backend/
+/PaperPipeline/
 dist/
 *.tar.gz
 .DS_Store

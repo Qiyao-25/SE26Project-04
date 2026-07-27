@@ -15,7 +15,7 @@
 
 推荐在独立虚拟环境中执行：
 
-    cd SE26Project-04/backend
+    cd SE26Project-04/TechPrototype/backend
     python3 -m venv .venv
     source .venv/bin/activate
     python -m pip install -e ".[dev]"
@@ -30,7 +30,7 @@
 
 `.env.example` 只是可提交的配置模板，真正运行时读取的是 `backend/.env`；该文件已被 Git 忽略，不应提交。后端会按固定路径读取它，因此从项目根目录或 `backend` 目录启动，使用的都是同一份配置。若同名变量同时存在于终端环境和 `.env`，终端环境变量优先。
 
-默认使用 data/dev.db。测试使用内存 SQLite，不会污染开发数据库。PostgreSQL 只需替换：
+默认使用 `TechPrototype/backend/data/dev.db`，PDF 缓存位于 `TechPrototype/backend/data/pdfs/`。这些目录会随首次启动自动创建，仓库只保留目录占位文件，不提交数据库、PDF 和运行时配置。相对路径也会自动锚定到后端目录，因此从仓库根目录启动不会把数据写到其他位置。测试使用内存 SQLite，不会污染开发数据库。PostgreSQL 只需替换：
 
     PAPERMATE_ENV=dev
 PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/papermate
@@ -68,6 +68,10 @@ python -c "from app.core.config import get_settings; s=get_settings(); print({'e
 ```bash
 python -m harness health
 python -m harness orm
+python -m harness agent
+python -m harness parse
+python -m harness qa
+python -m harness e2e
 python -m alembic upgrade head
 python -m alembic current
 python -m alembic upgrade head
@@ -184,7 +188,7 @@ python -m pytest --capture=no
 
 生产部署步骤见仓库根目录 `docs/部署说明.md` 与 `deploy/` 样例配置。
 
-Harness 只编排和验证，不复制 service 业务规则；后续论文导入、解析和检索都应沿用这一边界。
+Harness 只编排和验证，不复制 service 业务规则；后续论文导入、解析和检索都应沿用这一边界。`agent`、`parse`、`qa` 和 `e2e` 默认使用确定性的 Harness Stub，因此不会访问真实 LLM 或消耗 API 配额；需要验证真实模型时显式添加 `--live`，例如 `python -m harness e2e --live`。Harness 会检查结构化结果、任务落库、问答引用是否来自证据，任何一项失败都会返回非零退出码。
 
 在后端目录执行空库验收和本地并发测试：
 

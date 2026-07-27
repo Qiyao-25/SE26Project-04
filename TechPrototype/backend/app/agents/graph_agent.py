@@ -345,7 +345,8 @@ class GraphAgent:
         focus = "、".join(item["label"] for item in concept_items[:3]) or "相关核心概念"
         limitations_note = "；存在待人工复核的局限性" if limitations else ""
         narrative = (
-            f"当前论文围绕「{focus}」展开；图谱仅保留高相关关联论文（相关度≥{RELATED_SCORE_THRESHOLD}）"
+            f"当前论文围绕「{focus}」展开；图谱仅保留高相关关联论文（相关度≥{RELATED_SCORE_THRESHOLD}），"
+            "关联边表示主题和时间上的推断，并非真实引用关系"
             f"{limitations_note}。"
         )
         return PaperGraph(nodes=nodes, edges=edges, lineage=lineage, narrative=narrative)

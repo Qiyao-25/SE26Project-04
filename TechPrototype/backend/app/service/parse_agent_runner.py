@@ -12,6 +12,7 @@ import re
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Callable
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -28,12 +29,20 @@ from app.service.tasks import MAX_ATTEMPTS, save_parse_result
 logger = logging.getLogger("papermate.parse_agent")
 
 
-def run_parse_agent_job(engine, task_id: int, settings: Settings | None = None) -> None:
+TextExtractor = Callable[[Paper, Settings], tuple[str, int, str, str | None]]
+
+
+def run_parse_agent_job(
+    engine,
+    task_id: int,
+    settings: Settings | None = None,
+    text_extractor: TextExtractor | None = None,
+) -> None:
     settings = settings or get_settings()
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
     session = SessionLocal()
     try:
-        _execute(session, task_id, settings)
+        _execute(session, task_id, settings, text_extractor=text_extractor)
     except Exception as exc:  # noqa: BLE001
         logger.exception("parse_agent_job_crashed task_id=%s err=%s", task_id, exc)
         try:
@@ -45,7 +54,13 @@ def run_parse_agent_job(engine, task_id: int, settings: Settings | None = None) 
         session.close()
 
 
-def _execute(session: Session, task_id: int, settings: Settings) -> None:
+def _execute(
+    session: Session,
+    task_id: int,
+    settings: Settings,
+    *,
+    text_extractor: TextExtractor | None = None,
+) -> None:
     task = session.get(ParseTask, task_id)
     if task is None or task.status not in {"queued", "running"}:
         logger.info("parse_agent_skip task_id=%s status=%s", task_id, getattr(task, "status", None))
@@ -57,7 +72,8 @@ def _execute(session: Session, task_id: int, settings: Settings) -> None:
         return
 
     _mark_running(session, task, paper, stage="fetch")
-    body_text, page_count, source, storage_path = _extract_paper_text(paper, settings)
+    extractor = text_extractor or _extract_paper_text
+    body_text, page_count, source, storage_path = extractor(paper, settings)
     if storage_path:
         try:
             _persist_paper_content(session, paper, storage_path)
