@@ -105,7 +105,7 @@ def test_qa_without_chunk_evidence_is_rejected() -> None:
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="no-chunk-paper", title="No Chunk", abstract="abstract")]).items[0]
         try:
-            answer_question(session, paper.paper_id, "unsupported fact")
+            answer_question(session, paper.paper_id, "unsupported fact", settings=Settings(environment="test"))
         except PaperServiceError as exc:
             assert exc.code == "NO_EVIDENCE"
             assert exc.status_code == 422
@@ -113,7 +113,7 @@ def test_qa_without_chunk_evidence_is_rejected() -> None:
             raise AssertionError("expected NO_EVIDENCE")
 
 
-def test_qa_rejects_structured_result_without_original_chunks() -> None:
+def test_qa_requires_agent_when_only_structured_evidence_exists() -> None:
     with make_session() as session:
         paper = batch_upsert_papers(session, [PaperUpsert(arxiv_id="structured-only", title="Structured Only", abstract="abstract")]).items[0]
         from app.schema.papers import StructuredResultBatch, StructuredResultInput
@@ -122,12 +122,12 @@ def test_qa_rejects_structured_result_without_original_chunks() -> None:
         task, _ = create_task(session, paper.paper_id, "full_parse", "structured-only-task")
         save_results(session, task.task_id, StructuredResultBatch(results=[StructuredResultInput(result_type="summary", content_json={"summary": "summary"})]))
         try:
-            answer_question(session, paper.paper_id, "unsupported fact")
+            answer_question(session, paper.paper_id, "unsupported fact", settings=Settings(environment="test"))
         except PaperServiceError as exc:
-            assert exc.code == "NO_EVIDENCE"
-            assert exc.status_code == 422
+            assert exc.code == "QA_AGENT_UNAVAILABLE"
+            assert exc.status_code == 503
         else:
-            raise AssertionError("expected NO_EVIDENCE")
+            raise AssertionError("expected QA_AGENT_UNAVAILABLE")
 
 
 def test_qa_rejects_weak_long_chunk_without_query_match() -> None:

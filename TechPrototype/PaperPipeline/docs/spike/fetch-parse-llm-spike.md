@@ -7,7 +7,7 @@
 | 负责人 | 成员 D |
 | 脚本 | `PaperPipeline/scripts/spike_one_paper.py` |
 | 依赖 | `pypdf`（见 `requirements.txt`） |
-| Backend | `SE26Project-04/backend/app/model/entities.py`（H015/H016 骨架） |
+| Backend | `SE26Project-04/TechPrototype/backend/app/model/entities.py`（H015/H016 骨架） |
 | 样例 | **P1** `1706.03762`（Attention Is All You Need） |
 
 ---

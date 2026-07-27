@@ -4,7 +4,9 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+reports/
 data/*.db
 data/*.sqlite
 data/pdfs/
 .venv/
+*.egg-info/

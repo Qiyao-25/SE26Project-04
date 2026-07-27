@@ -197,4 +197,4 @@ pending → fetching → fetched → parsing → parsed
 | 2026-07-14 | P10 失败 ID 冻结为 `0000.00001`（见样例清单；禁止再用 `2607.01001`） |
 | 2026-07-14 | 在 `PaperPipeline/docs/spike/` 定稿；文档级 DoD 通过 |
 | 2026-07-15 | H017–H018：P1 贯通跑通；回填 S1/S2/S3-P1；见 [fetch-parse-llm-spike.md](./fetch-parse-llm-spike.md) |
-| 2026-07-16 | 按 `SE26Project-04/backend` ORM 修订 H017–H018 输出映射与 H027–H028 UML（V1.1） |
+| 2026-07-16 | 按 `SE26Project-04/TechPrototype/backend` ORM 修订 H017–H018 输出映射与 H027–H028 UML（V1.1） |

@@ -1,11 +1,13 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+ENV_FILE = BACKEND_DIR / ".env"
 
 _WEAK_SECRET_PREFIXES = ("replace-with", "change_me", "changeme")
 _WEAK_SECRETS = {
@@ -29,8 +31,8 @@ def _is_weak_secret(value: str) -> bool:
 class Settings(BaseSettings):
     environment: str = "dev"
     version: str = "0.1.0"
-    database_url: str = "sqlite:///./data/dev.db"
-    paper_storage_dir: str = "data/pdfs"
+    database_url: str = f"sqlite:///{(BACKEND_DIR / 'data' / 'dev.db').as_posix()}"
+    paper_storage_dir: str = str(BACKEND_DIR / "data" / "pdfs")
     echo_sql: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     agent_enabled: bool | None = None
@@ -87,6 +89,12 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    def __init__(self, **values: Any):
+        # Tests must be hermetic and must never inherit local model credentials.
+        if values.get("environment") == "test":
+            values.setdefault("_env_file", None)
+        super().__init__(**values)
+
     @model_validator(mode="after")
     def merge_agent_settings(self):
         """Accept both current PAPERMATE_AGENT_* and remote LLM names."""
@@ -114,6 +122,23 @@ class Settings(BaseSettings):
             self.crawl_enabled = False
         if self.enable_docs is None:
             self.enable_docs = self.environment not in {"prod", "production"}
+        return self
+
+    @model_validator(mode="after")
+    def resolve_local_paths(self):
+        """Keep relative SQLite and PDF paths stable regardless of cwd."""
+        if self.database_url.startswith("sqlite:///"):
+            raw_path = self.database_url.removeprefix("sqlite:///")
+            if raw_path not in {":memory:", ""}:
+                database_path = Path(raw_path).expanduser()
+                if not database_path.is_absolute():
+                    database_path = BACKEND_DIR / database_path
+                self.database_url = f"sqlite:///{database_path.resolve().as_posix()}"
+
+        storage_path = Path(self.paper_storage_dir).expanduser()
+        if not storage_path.is_absolute():
+            storage_path = BACKEND_DIR / storage_path
+        self.paper_storage_dir = str(storage_path.resolve())
         return self
 
     def validate_runtime(self) -> None:

@@ -5,14 +5,82 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from typing import Any
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Iterator, Protocol
 
 
 class LlmError(RuntimeError):
     """Raised when the configured LLM cannot return a usable response."""
 
 
+class LlmClient(Protocol):
+    """Minimal client contract shared by production and harness callers."""
+
+    def complete(
+        self,
+        *,
+        api_key: str,
+        api_base: str,
+        model: str,
+        messages: list[dict[str, str]],
+        timeout_s: float,
+        temperature: float,
+        json_mode: bool,
+    ) -> str:
+        ...
+
+
+_override_client: ContextVar[LlmClient | None] = ContextVar(
+    "papermate_llm_client_override",
+    default=None,
+)
+
+
+@contextmanager
+def use_llm_client(client: LlmClient) -> Iterator[None]:
+    """Temporarily replace the network client for deterministic harness runs."""
+    token = _override_client.set(client)
+    try:
+        yield
+    finally:
+        _override_client.reset(token)
+
+
 def chat_completion(
+    *,
+    api_key: str,
+    api_base: str,
+    model: str,
+    messages: list[dict[str, str]],
+    timeout_s: float = 90.0,
+    temperature: float = 0.2,
+    json_mode: bool = False,
+) -> str:
+    override = _override_client.get()
+    if override is not None:
+        return override.complete(
+            api_key=api_key,
+            api_base=api_base,
+            model=model,
+            messages=messages,
+            timeout_s=timeout_s,
+            temperature=temperature,
+            json_mode=json_mode,
+        )
+
+    return _http_chat_completion(
+        api_key=api_key,
+        api_base=api_base,
+        model=model,
+        messages=messages,
+        timeout_s=timeout_s,
+        temperature=temperature,
+        json_mode=json_mode,
+    )
+
+
+def _http_chat_completion(
     *,
     api_key: str,
     api_base: str,
@@ -64,4 +132,4 @@ def chat_completion(
     return content
 
 
-__all__ = ["LlmError", "chat_completion"]
+__all__ = ["LlmClient", "LlmError", "chat_completion", "use_llm_client"]

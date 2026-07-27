@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |----|------|
 | 任务 | **H028** · ParseTask 序列图 + 问答序列图 |
-| 版本 | **V1.1** · 2026-07-16（对齐 `SE26Project-04/backend`） |
+| 版本 | **V1.1** · 2026-07-16（对齐 `SE26Project-04/TechPrototype/backend`） |
 | 配套 | [pipeline-activity.md](./pipeline-activity.md) |
 | 渲染 | https://mermaid.live |
 

@@ -3,9 +3,9 @@
 | 项 | 内容 |
 |----|------|
 | 任务 | **H027** · 抓取→下载→解析→切分→摘要→入库 |
-| 版本 | **V1.1** · 2026-07-16（对齐 `SE26Project-04/backend` ORM） |
+| 版本 | **V1.1** · 2026-07-16（对齐 `SE26Project-04/TechPrototype/backend` ORM） |
 | 状态约定 | Spike 流水线状态见 `docs/spike/技术Spike清单.md`；任务表用 `ParseTask` |
-| Backend | `backend/app/model/entities.py` |
+| Backend | `TechPrototype/backend/app/model/entities.py` |
 | 渲染 | https://mermaid.live |
 
 ---

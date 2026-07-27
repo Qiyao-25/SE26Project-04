@@ -4,10 +4,10 @@
 
 | 子目录 | 说明 |
 |--------|------|
-| `backend/` | FastAPI 后端 |
+| `backend/` | FastAPI 后端（运行数据位于 `backend/data/`） |
 | `PaperPipeline/` | 论文抓取 / 解析 / Worker 流水线 |
 | `deploy/` | 打包、Nginx/systemd 样例、主机部署脚本 |
-| `docs/` | 架构与部署说明 |
+| `docs/` | 架构、部署与[系统测试用例](./docs/系统测试用例.md)说明 |
 
 常用命令（在仓库根目录）：
 
