@@ -23,12 +23,28 @@ logger = logging.getLogger("papermate.pdf_stream")
 MAX_PDF_BYTES = 40 * 1024 * 1024
 
 
+def normalize_arxiv_id(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    if raw.lower().startswith("oai:arxiv.org:"):
+        raw = raw.split(":", 2)[-1]
+    raw = raw.removeprefix("arXiv:").removeprefix("arxiv:")
+    raw = raw.strip().removesuffix(".pdf")
+    return raw or None
+
+
 def _resolve_pdf_url(paper: Paper) -> str | None:
     url = (paper.pdf_url or "").strip()
-    if url:
+    if url and "oai:arXiv.org:" not in url and "/pdf/oai:" not in url:
         return url
-    if paper.arxiv_id:
-        return f"https://arxiv.org/pdf/{paper.arxiv_id}.pdf"
+    arxiv_id = normalize_arxiv_id(paper.arxiv_id)
+    if arxiv_id:
+        return f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+    if url:
+        fixed = normalize_arxiv_id(url.rsplit("/", 1)[-1])
+        if fixed:
+            return f"https://arxiv.org/pdf/{fixed}.pdf"
     return None
 
 
@@ -43,7 +59,7 @@ def resolve_storage_dir(settings: Settings | None = None) -> Path:
 
 
 def _cache_path_for(paper: Paper, settings: Settings) -> Path:
-    raw = paper.arxiv_id or f"paper-{paper.id}"
+    raw = normalize_arxiv_id(paper.arxiv_id) or f"paper-{paper.id}"
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", str(raw))
     return resolve_storage_dir(settings) / f"{safe}.pdf"
 
