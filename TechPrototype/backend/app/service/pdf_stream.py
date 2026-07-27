@@ -189,6 +189,34 @@ def list_papers_missing_pdf(session: Session, *, limit: int = 100) -> list[Paper
     return missing
 
 
+
+def cache_paper_ids(
+    session: Session,
+    paper_ids: list[int],
+    *,
+    settings: Settings | None = None,
+    delay_s: float = 0.25,
+) -> dict:
+    """Best-effort PDF cache for newly ingested paper IDs (crawl / fetch-one)."""
+    settings = settings or get_settings()
+    ok: list[int] = []
+    failed: list[dict] = []
+    unique_ids = list(dict.fromkeys(int(pid) for pid in paper_ids if pid is not None))
+    for index, paper_id in enumerate(unique_ids):
+        try:
+            ensure_paper_pdf_cached(session, paper_id, settings=settings)
+            ok.append(paper_id)
+        except PaperServiceError as exc:
+            failed.append({"paper_id": paper_id, "error": exc.code, "message": exc.message})
+            logger.warning("pdf_ingest_cache_fail paper_id=%s code=%s", paper_id, exc.code)
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"paper_id": paper_id, "error": "UNEXPECTED", "message": str(exc)})
+            logger.exception("pdf_ingest_cache_unexpected paper_id=%s", paper_id)
+        if delay_s > 0 and index + 1 < len(unique_ids):
+            time.sleep(delay_s)
+    return {"requested": len(unique_ids), "succeeded": len(ok), "failed": len(failed), "paper_ids": ok, "errors": failed[:30]}
+
+
 def sync_missing_paper_pdfs(
     session: Session,
     *,

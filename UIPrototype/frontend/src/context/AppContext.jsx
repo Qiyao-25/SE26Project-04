@@ -153,6 +153,8 @@ export function AppProvider({ children }) {
         chunkId: meta.chunkId,
         pageNo: meta.pageNo,
         section: meta.section,
+        highlightRects: meta.highlightRects || [],
+        highlightColor: meta.highlightColor || '#fde68a',
         date: new Date().toISOString().slice(0, 10),
       }, ...data.notes];
       return { ...prev, [paperId]: data };

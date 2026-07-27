@@ -317,6 +317,13 @@ def sync_subscriptions(
         created = result.created
         updated = result.updated
         paper_ids = [item.paper_id for item in result.items]
+        # Cache PDFs for just-ingested papers so later reading uses same-origin storage.
+        try:
+            from app.service.pdf_stream import cache_paper_ids
+
+            cache_paper_ids(session, paper_ids, settings=settings, delay_s=0.25)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("subscription_pdf_cache_failed user=%s err=%s", user_id, exc)
 
     paper_ids = list(dict.fromkeys([*paper_ids, *reused_ids]))
     if paper_ids or skipped_dupes or errors:

@@ -1,4 +1,4 @@
-/** Lightweight bus so paper detail body can push text selections into the notes panel. */
+/** Lightweight bus so PDF viewer can push text selections into the notes panel. */
 
 let captureHandler = null;
 let pendingSelection = null;
@@ -16,11 +16,16 @@ export function pushAnnotationSelection(payload) {
   if (!payload) return false;
   const text = String(payload.text || '').trim();
   if (text.length < 1) return false;
+  const rects = Array.isArray(payload.rects)
+    ? payload.rects
+    : (Array.isArray(payload.highlight_rects) ? payload.highlight_rects : []);
   const normalized = {
     text,
-    chunkId: payload.chunkId || null,
-    pageNo: payload.pageNo ?? null,
+    chunkId: payload.chunkId || payload.chunk_id || null,
+    pageNo: payload.pageNo ?? payload.page_no ?? null,
     section: payload.section || null,
+    rects,
+    highlightColor: payload.highlightColor || payload.highlight_color || '#fde68a',
   };
   if (captureHandler) {
     captureHandler(normalized);
@@ -38,29 +43,4 @@ export function readDomSelection(container) {
   const range = selection.getRangeAt(0);
   if (container && !container.contains(range.commonAncestorContainer)) return null;
   return { selection, range, text };
-}
-
-/** Wrap current selection in <mark>; returns selected text or null. */
-export function highlightDomSelection(container) {
-  const read = readDomSelection(container);
-  if (!read) return null;
-
-  container.querySelectorAll('mark.pm-annotation-highlight').forEach((mark) => {
-    const parent = mark.parentNode;
-    if (!parent) return;
-    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-    parent.removeChild(mark);
-    parent.normalize?.();
-  });
-
-  try {
-    const mark = document.createElement('mark');
-    mark.className = 'pm-annotation-highlight';
-    read.range.surroundContents(mark);
-  } catch {
-    // Cross-node ranges cannot always be wrapped; quote fill still works.
-  }
-
-  read.selection.removeAllRanges();
-  return read.text;
 }

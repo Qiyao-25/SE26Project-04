@@ -478,6 +478,15 @@ def fetch_one_paper(
     result = batch_upsert_papers(session, [payload])
     item = result.items[0]
     created = result.created > 0
+
+    # Same-origin PDF cache for newly ingested / refreshed papers.
+    try:
+        from app.service.pdf_stream import ensure_paper_pdf_cached
+
+        ensure_paper_pdf_cached(session, item.paper_id, settings=cfg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("fetch_one_pdf_cache_failed paper_id=%s err=%s", item.paper_id, exc)
+
     message = (
         f"已{'新建' if created else '更新'}论文：{item.title}"
         if matched_by == "arxiv_id"
