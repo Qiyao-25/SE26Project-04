@@ -78,6 +78,7 @@ def test_openapi_contains_paper_contract() -> None:
     assert "/api/papers" in paths
     assert "/api/papers/{paper_id}" in paths
     assert "/api/papers/{paper_id}/wiki" in paths
+    assert "/api/papers/search" not in paths
 
 
 def test_parse_endpoint_schedules_background_job() -> None:

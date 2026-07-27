@@ -8,21 +8,15 @@ from app.core.auth import require_admin, require_current_user, db_session
 from app.agents.llm_client import LlmError
 from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
-from app.schema.paper import PaperContent, PaperDetail, PaperSummary, SearchRequest, SearchResult
+from app.schema.content import PaperContent, PaperSummary
 from app.schema.papers import BatchPaperRequest, BatchUpsertResponse, FetchOnePaperRequest, FetchOnePaperResponse, ParseRequest, PaperCompareRequest, PaperCompareResponse, PaperGraphData, PaperItem, PaperPage, PaperUpsert, ReadingAssistData, ReadingAssistRequest, SmartSearchRequest, SmartSearchResponse, TaskResponse, TextChunkBatch, WikiData
 from app.schema.qa import AskPaperRequest, AskPaperResult
-from app.service.paper import require_content, require_paper, require_summary, search_papers as search_mock_papers
 from app.service.papers import PaperServiceError, answer_question, batch_upsert_papers, compare_papers, delete_paper, fetch_one_paper, get_paper_detail, get_paper_graph, get_reading_assist, get_wiki, search_papers, smart_search_papers
 from app.service.parse_agent_runner import run_parse_agent_job
 from app.service.pdf_stream import load_paper_pdf_bytes, pdf_response
-from app.service.qa import ask_paper
 from app.service.tasks import boost_parse_priority, create_task
 
 router = APIRouter(prefix="/api/papers", tags=["papers"])
-
-
-def _not_found(request: Request, paper_id: str):
-    return JSONResponse(status_code=404, content={"code": "PAPER_NOT_FOUND", "message": f"论文不存在：{paper_id}", "data": {}, "request_id": request.state.request_id})
 
 
 def _db_error(request: Request, error: PaperServiceError):
@@ -218,33 +212,20 @@ def chunks(
     return ApiResponse(data={"paper_id": paper_id, "upserted": count}, request_id=request.state.request_id)
 
 
-@router.post("/search", response_model=ApiResponse[SearchResult], summary="检索固定样例论文")
-def search(payload: SearchRequest, request: Request) -> ApiResponse[SearchResult]:
-    return ApiResponse(data=search_mock_papers(payload), request_id=request.state.request_id)
-
-
 @router.get("/{paper_id}/content", response_model=ApiResponse[PaperContent], summary="获取论文原文入口")
-def content(paper_id: str, request: Request, db: Session = Depends(db_session)):
-    if paper_id.isdigit():
-        try:
-            paper = get_paper_detail(db, int(paper_id))
-        except PaperServiceError as exc:
-            return _db_error(request, exc)
-        return ApiResponse(
-            data=PaperContent(
-                paperId=str(paper.paper_id),
-                contentType="pdf+html",
-                pdfUrl=paper.pdf_url,
-                htmlUrl=f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}",
-                defaultPage=1,
-                sections=[],
-            ),
-            request_id=request.state.request_id,
-        )
+def content(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
-        data = require_content(paper_id)
-    except KeyError:
-        return _not_found(request, paper_id)
+        paper = get_paper_detail(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    data = PaperContent(
+        paperId=str(paper.paper_id),
+        contentType="pdf+html",
+        pdfUrl=paper.pdf_url,
+        htmlUrl=f"https://ar5iv.labs.arxiv.org/html/{paper.arxiv_id}",
+        defaultPage=1,
+        sections=[],
+    )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
@@ -263,31 +244,25 @@ def paper_pdf(
 
 
 @router.get("/{paper_id}/summary", response_model=ApiResponse[PaperSummary], summary="获取结构化摘要")
-def summary(paper_id: str, request: Request, db: Session = Depends(db_session)):
-    if paper_id.isdigit():
-        try:
-            wiki = get_wiki(db, int(paper_id))
-        except PaperServiceError as exc:
-            return _db_error(request, exc)
-        data = PaperSummary(
-            paperId=str(wiki.paper_id),
-            parseStatus=wiki.parse_status,
-            summary=wiki.summary or "",
-            concepts=wiki.concepts,
-            methods=wiki.methods,
-            experiments=wiki.experiments,
-            limitations=wiki.limitations,
-            validationFlags=wiki.validation_flags,
-            validationLabels=wiki.validation_labels,
-            uncertainFields=wiki.uncertain_fields,
-            chunkCount=wiki.chunk_count,
-            qaReady=wiki.qa_ready,
-        )
-        return ApiResponse(data=data, request_id=request.state.request_id)
+def summary(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
-        data = require_summary(paper_id)
-    except KeyError:
-        return _not_found(request, paper_id)
+        wiki = get_wiki(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    data = PaperSummary(
+        paperId=str(wiki.paper_id),
+        parseStatus=wiki.parse_status,
+        summary=wiki.summary or "",
+        concepts=wiki.concepts,
+        methods=wiki.methods,
+        experiments=wiki.experiments,
+        limitations=wiki.limitations,
+        validationFlags=wiki.validation_flags,
+        validationLabels=wiki.validation_labels,
+        uncertainFields=wiki.uncertain_fields,
+        chunkCount=wiki.chunk_count,
+        qaReady=wiki.qa_ready,
+    )
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
@@ -378,34 +353,20 @@ def reading_assist(paper_id: int, payload: ReadingAssistRequest, request: Reques
 
 
 @router.post("/{paper_id}/qa", response_model=ApiResponse[AskPaperResult], summary="单论文问答")
-def qa(paper_id: str, payload: AskPaperRequest, request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
-    if paper_id.isdigit():
-        try:
-            result = answer_question(
-                db,
-                int(paper_id),
-                payload.question,
-                history=[item.model_dump() for item in payload.history],
-                conversation_id=payload.conversationId,
-                scope=getattr(payload, "scope", None) or "both",
-                settings=request.app.state.settings,
-            )
-        except PaperServiceError as exc:
-            return _db_error(request, exc)
-        data = _qa_payload(result, len(payload.history))
-        return ApiResponse(data=data, request_id=request.state.request_id)
+def qa(paper_id: int, payload: AskPaperRequest, request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     try:
-        data = ask_paper(paper_id, payload)
-    except KeyError:
-        return _not_found(request, paper_id)
-    except LlmError as exc:
-        message = str(exc)
-        code = "QA_AGENT_UNAVAILABLE" if "未配置" in message or "未启用" in message else "QA_AGENT_FAILED"
-        status_code = 503 if code == "QA_AGENT_UNAVAILABLE" else 502
-        return JSONResponse(
-            status_code=status_code,
-            content=ApiResponse[dict](code=code, message=message, data={}, request_id=request.state.request_id).model_dump(),
+        result = answer_question(
+            db,
+            paper_id,
+            payload.question,
+            history=[item.model_dump() for item in payload.history],
+            conversation_id=payload.conversationId,
+            scope=getattr(payload, "scope", None) or "both",
+            settings=request.app.state.settings,
         )
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
+    data = _qa_payload(result, len(payload.history))
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
@@ -424,15 +385,9 @@ def remove_paper(
 
 
 @router.get("/{paper_id}", summary="获取论文详情")
-def detail(paper_id: str, request: Request, db: Session = Depends(db_session)):
-    if paper_id.isdigit():
-        try:
-            data = get_paper_detail(db, int(paper_id))
-        except PaperServiceError as exc:
-            return _db_error(request, exc)
-        return ApiResponse(data=data, request_id=request.state.request_id)
+def detail(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
-        data = require_paper(paper_id)
-    except KeyError:
-        return _not_found(request, paper_id)
+        data = get_paper_detail(db, paper_id)
+    except PaperServiceError as exc:
+        return _db_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
