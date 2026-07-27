@@ -918,14 +918,21 @@ def answer_question(
     history: list[dict] | None = None,
     *,
     conversation_id: str | None = None,
+    scope: str = "both",
     settings=None,
 ) -> QaResponse:
     from app.service.qa_citations import build_retrieval_query, polish_quote, section_label, select_relevant_chunk_ids
+    from app.service.wiki_qa import build_wiki_evidence, wiki_has_content
 
     settings = settings or get_settings()
     paper = get_paper(session, paper_id)
     if paper is None:
         raise PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404)
+
+    qa_scope = (scope or "both").strip().lower()
+    if qa_scope not in {"both", "wiki", "chunks"}:
+        qa_scope = "both"
+
     top_k = min(12, max(5, int(getattr(settings, "qa_agent_top_k", 8))))
     retrieval_query = build_retrieval_query(question, history)
     agent = QaAgent(settings) if settings.qa_agent_ready else None
@@ -946,33 +953,67 @@ def answer_question(
                 raise PaperServiceError("NO_EVIDENCE", "这个问题与当前论文无关，无法基于论文内容回答", 422)
             search_queries.extend(plan.search_queries)
 
-    matched_by_id = {}
-    for query in dict.fromkeys(item.strip() for item in search_queries if item and item.strip()):
-        for chunk, score in search_chunks(session, ChunkSearchRequest(query=query, paper_id=paper_id, top_k=top_k)):
-            if score < MIN_QA_RETRIEVAL_SCORE:
-                continue
-            existing = matched_by_id.get(chunk.chunk_id)
-            if existing is None or score > existing[1]:
-                matched_by_id[chunk.chunk_id] = (chunk, score)
-    matches = sorted(
-        matched_by_id.values(),
-        key=lambda item: (item[1], len(item[0].content or ""), item[0].id),
+    wiki_evidence: list[dict] = []
+    if qa_scope in {"both", "wiki"}:
+        try:
+            wiki = get_wiki(session, paper_id)
+        except PaperServiceError:
+            wiki = None
+        if wiki is not None and wiki_has_content(wiki):
+            wiki_evidence = build_wiki_evidence(wiki, question, top_k=top_k, min_score=0.02)
+
+    chunk_evidence: list[dict] = []
+    if qa_scope in {"both", "chunks"}:
+        matched_by_id = {}
+        for query in dict.fromkeys(item.strip() for item in search_queries if item and item.strip()):
+            for chunk, score in search_chunks(session, ChunkSearchRequest(query=query, paper_id=paper_id, top_k=top_k)):
+                if score < MIN_QA_RETRIEVAL_SCORE:
+                    continue
+                existing = matched_by_id.get(chunk.chunk_id)
+                if existing is None or score > existing[1]:
+                    matched_by_id[chunk.chunk_id] = (chunk, score)
+        matches = sorted(
+            matched_by_id.values(),
+            key=lambda item: (item[1], len(item[0].content or ""), item[0].id),
+            reverse=True,
+        )[:top_k]
+        chunk_evidence = [
+            {
+                "chunk_id": chunk.chunk_id,
+                "page_no": chunk.page_no,
+                "section": chunk.section,
+                "section_title": section_label(chunk.section, chunk.content or ""),
+                "content": chunk.content,
+                "score": score,
+                "source": "chunk",
+            }
+            for chunk, score in matches
+        ]
+
+    # Prefer mixing: keep wiki hits then fill with chunks (or vice versa by score).
+    evidence_by_id: dict[str, dict] = {}
+    for item in [*wiki_evidence, *chunk_evidence]:
+        chunk_id = str(item["chunk_id"])
+        existing = evidence_by_id.get(chunk_id)
+        if existing is None or float(item.get("score") or 0) > float(existing.get("score") or 0):
+            evidence_by_id[chunk_id] = item
+    evidence = sorted(
+        evidence_by_id.values(),
+        key=lambda item: (float(item.get("score") or 0), len(item.get("content") or ""), str(item.get("chunk_id"))),
         reverse=True,
     )[:top_k]
-    if not matches:
-        raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
 
-    evidence = [
-        {
-            "chunk_id": chunk.chunk_id,
-            "page_no": chunk.page_no,
-            "section": chunk.section,
-            "content": chunk.content,
-            "score": score,
-        }
-        for chunk, score in matches
-    ]
-    chunk_by_id = {chunk.chunk_id: chunk for chunk, _score in matches}
+    if not evidence:
+        if qa_scope == "wiki":
+            raise PaperServiceError("NO_EVIDENCE", "当前论文还没有可用的 Wiki 内容，请先完成解析生成智能总结后再提问", 422)
+        if qa_scope == "chunks":
+            raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
+        raise PaperServiceError(
+            "NO_EVIDENCE",
+            "当前论文没有可用的 Wiki 或原文依据，请先完成解析后再提问",
+            422,
+        )
+
     history_payload = [
         {"role": str(item.get("role") or ""), "content": str(item.get("content") or "")}
         for item in (history or [])
@@ -1006,26 +1047,27 @@ def answer_question(
 
     citations = []
     for chunk_id in selected_ids:
-        chunk = chunk_by_id.get(chunk_id)
-        if chunk is None:
+        item = evidence_by_id.get(chunk_id)
+        if item is None:
             continue
-        quote = polish_quote(chunk.content or "", answer=answer, max_len=280)
+        quote = polish_quote(item.get("content") or "", answer=answer, max_len=280)
         if quote:
             citations.append(
                 {
-                    "citationId": f"citation-{paper.id}-{chunk.chunk_id}",
+                    "citationId": f"citation-{paper.id}-{chunk_id}",
                     "paperId": paper.id,
                     "paperTitle": paper.title,
-                    "sectionId": chunk.chunk_id,
-                    "sectionTitle": section_label(chunk.section, chunk.content or ""),
-                    "pageNumber": chunk.page_no,
+                    "sectionId": chunk_id,
+                    "sectionTitle": item.get("section_title")
+                    or section_label(item.get("section"), item.get("content") or ""),
+                    "pageNumber": item.get("page_no"),
                     "quote": quote,
                 }
             )
     if not answer.strip():
-        raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的原文依据，请先完成文本块解析后再提问", 422)
+        raise PaperServiceError("NO_EVIDENCE", "当前论文没有可核验的依据，请先完成解析后再提问", 422)
     if not citations:
-        raise PaperServiceError("NO_EVIDENCE", "回答没有找到足够的原文依据，请换个问题或先补充解析内容", 422)
+        raise PaperServiceError("NO_EVIDENCE", "回答没有找到足够的依据，请换个问题或先补充解析内容", 422)
 
     return QaResponse(
         conversation_id=conversation_id or f"conversation-{paper.id}",

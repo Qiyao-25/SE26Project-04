@@ -43,7 +43,8 @@ export async function askPaper(payload) {
   const data = await apiClient.post(`/papers/${payload.paperId}/qa`, {
     conversationId: payload.conversationId || null,
     question: payload.question,
-    history: payload.history || []
+    history: payload.history || [],
+    scope: payload.scope || 'both'
   });
   return normalizeQaResult(data, payload.paperId, (payload.history || []).length);
 }

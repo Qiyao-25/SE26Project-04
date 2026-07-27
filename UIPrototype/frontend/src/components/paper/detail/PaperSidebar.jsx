@@ -13,7 +13,7 @@ function createWelcomeMessage(paperTitle) {
   return {
     messageId: 'paper-qa-welcome',
     role: 'assistant',
-    content: `当前问答范围：《${paperTitle}》。可询问核心创新、方法、实验结果或局限性。`,
+    content: `当前问答范围：《${paperTitle}》。可基于论文 Wiki（摘要/概念/方法等）与原文提问核心创新、方法、实验结果或局限性。`,
     status: 'success',
     citations: []
   };
@@ -23,12 +23,14 @@ export default function PaperSidebar({ paperId, paper, onCollapse }) {
   const [activeKey, setActiveKey] = useState('all');
   const [conversationId, setConversationId] = useState(null);
   const [qaStatus, setQaStatus] = useState('idle');
+  const [qaScope, setQaScope] = useState('both');
   const [messages, setMessages] = useState(() => [createWelcomeMessage(paper.title)]);
 
   useEffect(() => {
     setActiveKey('all');
     setConversationId(null);
     setQaStatus('idle');
+    setQaScope('both');
     setMessages([createWelcomeMessage(paper.title)]);
   }, [paperId, paper.title]);
 
@@ -63,13 +65,14 @@ export default function PaperSidebar({ paperId, paper, onCollapse }) {
       .filter((item) => item.status !== 'generating')
       .map(({ role, content }) => ({ role, content }));
 
+    const scopeLabel = qaScope === 'wiki' ? 'Wiki' : qaScope === 'chunks' ? '原文' : 'Wiki 与原文';
     setMessages((current) => [
       ...current,
       userMessage,
       {
         messageId: generatingMessageId,
         role: 'assistant',
-        content: '正在基于论文内容生成回答...',
+        content: `正在基于${scopeLabel}生成回答...`,
         status: 'generating',
         citations: []
       }
@@ -81,7 +84,8 @@ export default function PaperSidebar({ paperId, paper, onCollapse }) {
         conversationId,
         paperId,
         question,
-        history
+        history,
+        scope: qaScope
       });
 
       setConversationId(data.conversationId);
@@ -100,16 +104,24 @@ export default function PaperSidebar({ paperId, paper, onCollapse }) {
       setQaStatus('success');
       setActiveKey('qa');
     } catch (error) {
+      const raw = error.message || '';
+      const noEvidence = raw.includes('没有可核验')
+        || raw.includes('尚未完成解析')
+        || raw.includes('依据不足')
+        || raw.includes('没有可用的 Wiki')
+        || raw.includes('没有可用的 Wiki 或原文');
       setMessages((current) => [
         ...current.filter((item) => item.messageId !== generatingMessageId),
         {
           messageId: `paper-qa-error-${Date.now()}`,
           role: 'assistant',
-          content: error.message?.includes('没有可核验') || error.message?.includes('尚未完成解析') || error.message?.includes('依据不足')
-            ? '当前论文还没有可用的原文依据，暂时无法进行带出处的问答。请先在详情页完成解析，待状态变为「可问答」后再试。'
-            : (error.message || '回答生成失败。'),
+          content: noEvidence
+            ? (qaScope === 'wiki'
+              ? '当前论文还没有可用的 Wiki 内容。请先在详情页完成解析，生成智能总结后再试；或切换到「Wiki+原文」。'
+              : '当前论文还没有可用的问答依据。请先完成解析；若已有智能总结，可尝试切换到「仅 Wiki」。')
+            : (raw || '回答生成失败。'),
           status: 'failed',
-          errorMessage: error.message || '未知错误',
+          errorMessage: raw || '未知错误',
           citations: []
         }
       ]);
@@ -146,6 +158,8 @@ export default function PaperSidebar({ paperId, paper, onCollapse }) {
           messages={messages}
           onSend={handleQaSend}
           qaStatus={qaStatus}
+          scope={qaScope}
+          onScopeChange={setQaScope}
         />
       )
     },

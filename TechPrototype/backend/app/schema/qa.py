@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -6,10 +8,15 @@ class HistoryMessage(BaseModel):
     content: str
 
 
+QaScope = Literal["both", "wiki", "chunks"]
+
+
 class AskPaperRequest(BaseModel):
     conversationId: str | None = None
     question: str = Field(min_length=1, max_length=2000)
     history: list[HistoryMessage] = []
+    # both = Wiki 结构化知识 + 原文块；wiki = 仅 Wiki；chunks = 仅原文块
+    scope: QaScope = "both"
 
 
 class CitationItem(BaseModel):

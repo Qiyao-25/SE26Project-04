@@ -387,6 +387,7 @@ def qa(paper_id: str, payload: AskPaperRequest, request: Request, _user: AuthUse
                 payload.question,
                 history=[item.model_dump() for item in payload.history],
                 conversation_id=payload.conversationId,
+                scope=getattr(payload, "scope", None) or "both",
                 settings=request.app.state.settings,
             )
         except PaperServiceError as exc:

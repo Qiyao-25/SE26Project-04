@@ -1,19 +1,37 @@
-import { Alert, Typography } from 'antd';
+import { Alert, Segmented, Typography } from 'antd';
 import { ChatBox } from '../../../common/ChatBox';
 
 const { Text } = Typography;
 
-export default function SidebarQaPanel({ messages, onSend, qaStatus }) {
+const SCOPE_OPTIONS = [
+  { label: 'Wiki+原文', value: 'both' },
+  { label: '仅 Wiki', value: 'wiki' },
+  { label: '仅原文', value: 'chunks' }
+];
+
+export default function SidebarQaPanel({ messages, onSend, qaStatus, scope = 'both', onScopeChange }) {
   const hasFallback = messages.some((item) => item.answerMode === 'extractive_fallback');
   return (
     <div>
       <Alert
         type="info"
         showIcon
-        message="当前为单论文智能问答"
-        description="默认由 QA Agent 基于已解析原文块生成并附出处。若 LLM 不可用，会降级为「原文摘录」并单独标记，请勿将其视为 Agent 总结。"
+        message="单论文智能问答（支持 Wiki）"
+        description="可基于论文知识 Wiki（摘要/概念/方法/实验/局限）与已解析原文块生成回答，并附出处。选择「仅 Wiki」时即使尚未切块也可提问。"
         style={{ marginBottom: 12 }}
       />
+      <div style={{ marginBottom: 12 }}>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 6, fontSize: 12 }}>
+          问答依据范围
+        </Text>
+        <Segmented
+          block
+          size="small"
+          value={scope}
+          options={SCOPE_OPTIONS}
+          onChange={(value) => onScopeChange?.(value)}
+        />
+      </div>
       {hasFallback ? (
         <Alert
           type="warning"
@@ -32,7 +50,7 @@ export default function SidebarQaPanel({ messages, onSend, qaStatus }) {
       />
 
       <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-        “全部”和“问答”标签共享同一会话，切换标签不会丢失消息。
+        “全部”和“问答”标签共享同一会话；切换依据范围不会清空消息。
       </Text>
     </div>
   );
