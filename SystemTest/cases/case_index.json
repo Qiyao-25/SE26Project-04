@@ -8,7 +8,7 @@
     "precondition": "系统已部署；浏览器打开登录页；该邮箱未被注册",
     "procedure": "1. 打开注册入口\n2. 输入合法邮箱、密码（≥6位）及确认密码\n3. 点击注册",
     "expected": "注册成功，完成登录态建立；可进入兴趣主题/阅读模式引导或工作区",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-002",
@@ -19,7 +19,7 @@
     "precondition": "打开注册页",
     "procedure": "1. 输入邮箱\n2. 密码与确认密码不一致\n3. 点击注册",
     "expected": "提示密码不一致或校验失败，不创建账号，停留在注册页",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-003",
@@ -30,7 +30,7 @@
     "precondition": "打开注册页",
     "procedure": "1. 分别用非法邮箱（如 a@b）、过短密码（<6）尝试注册",
     "expected": "表单校验拦截；显示明确错误提示；不创建账号",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-004",
@@ -41,7 +41,7 @@
     "precondition": "已存在有效账号；打开登录页",
     "procedure": "1. 输入正确邮箱与密码\n2. 点击登录",
     "expected": "登录成功并跳转工作区；侧栏显示用户/画像信息",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-005",
@@ -52,7 +52,7 @@
     "precondition": "已存在有效账号",
     "procedure": "1. 输入正确邮箱与错误密码\n2. 点击登录",
     "expected": "提示登录失败；不进入工作区；会话未建立",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-006",
@@ -63,7 +63,7 @@
     "precondition": "清除本地登录态（token）",
     "procedure": "1. 直接访问 /workspace 或 /paper/{id}\n2. 观察跳转",
     "expected": "跳转到 /login；登录成功后可回到原目标或工作区",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-007",
@@ -74,7 +74,7 @@
     "precondition": "已登录",
     "procedure": "1. 点击侧栏退出\n2. 再次访问 /workspace",
     "expected": "回到登录页；需重新登录才能访问业务页",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-008",
@@ -85,7 +85,7 @@
     "precondition": "已登录；库中有论文；用户已设置兴趣主题（可选）",
     "procedure": "1. 进入工作区（未发起检索）\n2. 等待推荐区加载完成\n3. 分别点击各分区刷新（若有）",
     "expected": "三个推荐分区有内容或合理空态；卡片可点击进入论文详情；推荐理由标签可见",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-009",
@@ -96,7 +96,7 @@
     "precondition": "已登录；可模拟后端不可用或断网",
     "procedure": "1. 进入工作区\n2. 观察推荐加载失败表现\n3. 点击重试",
     "expected": "显示加载失败提示；重试可恢复或仍给出明确失败信息，不白屏",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-010",
@@ -107,7 +107,7 @@
     "precondition": "已登录；库中有可匹配论文",
     "procedure": "1. 在检索框输入如“Transformer 注意力机制相关论文”\n2. 发送检索\n3. 浏览结果卡片并打开一篇",
     "expected": "返回匹配论文列表；有检索改写/说明；可打开详情页",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-011",
@@ -118,7 +118,7 @@
     "precondition": "已登录",
     "procedure": "1. 输入极不可能命中的检索词（如随机长串）\n2. 发送",
     "expected": "显示“未找到匹配”类空态；系统不崩溃",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-012",
@@ -129,7 +129,7 @@
     "precondition": "已登录，位于工作区检索框",
     "procedure": "1. 不输入内容直接发送或仅空格",
     "expected": "给出提示或不发送；不产生错误页",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-013",
@@ -140,7 +140,7 @@
     "precondition": "检索命中数量大于一页",
     "procedure": "1. 发起检索\n2. 切换到下一页/修改每页条数（若配置）",
     "expected": "分页正确；总数与当前页一致",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-014",
@@ -151,7 +151,7 @@
     "precondition": "已登录；存在有效 paperId",
     "procedure": "1. 从工作区/论文库点击论文\n2. 查看标题、作者、解析状态\n3. 切换主区：论文主体 / 智能总结 / 知识图谱",
     "expected": "详情加载成功；三页签可切换；侧栏可用",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-015",
@@ -162,7 +162,7 @@
     "precondition": "已登录",
     "procedure": "1. 访问不存在的 /paper/99999999",
     "expected": "显示论文不存在/加载失败；可返回",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-016",
@@ -173,7 +173,7 @@
     "precondition": "已打开某论文详情",
     "procedure": "1. 切换到学习空间/设置\n2. 再点侧栏“工作空间/正在阅读”\n3. 观察 PDF/问答会话是否保留",
     "expected": "回到同一论文；不出现整页重新加载转圈（保活生效）",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-017",
@@ -184,7 +184,7 @@
     "precondition": "处于论文详情锁定状态",
     "procedure": "1. 点击“退出论文”\n2. 再点工作空间",
     "expected": "回到检索首页；不再强制跳回该论文",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-018",
@@ -195,7 +195,7 @@
     "precondition": "论文 parseStatus 为 pending/queued/failed，且有“立即解析”按钮",
     "procedure": "1. 点击立即解析\n2. 观察状态变化",
     "expected": "任务提升优先级或进入解析；按钮在完成后消失/状态更新",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-019",
@@ -206,7 +206,7 @@
     "precondition": "论文有可用 PDF（库内缓存或外链）",
     "procedure": "1. 打开详情-论文主体\n2. 等待 PDF 渲染\n3. 划选一段文字",
     "expected": "PDF 正常显示；划选可触发批注摘录填入侧栏",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-020",
@@ -217,7 +217,7 @@
     "precondition": "选择无 PDF 的论文或屏蔽 PDF 接口",
     "procedure": "1. 打开论文主体页签",
     "expected": "显示暂无 PDF/加载失败空态；其他页签仍可访问",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-021",
@@ -228,7 +228,7 @@
     "precondition": "PDF 可正常加载",
     "procedure": "1. 点击全屏阅读 PDF\n2. 按 Esc",
     "expected": "进入全屏；Esc 退出全屏回到详情",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-022",
@@ -239,7 +239,7 @@
     "precondition": "论文 parseStatus 为 completed 或 qa_ready",
     "procedure": "1. 打开智能总结页签\n2. 检查各结构化区块",
     "expected": "各区块有内容或合理“暂无”；不确定字段有标记（如有）",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-023",
@@ -250,7 +250,7 @@
     "precondition": "论文尚未解析完成",
     "procedure": "1. 打开智能总结页签",
     "expected": "显示暂无智能总结/解析中状态，不伪造内容",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-024",
@@ -261,7 +261,7 @@
     "precondition": "已打开已解析论文",
     "procedure": "1. 侧栏-信息\n2. 选择检索模式并输入关键词或点击 Wiki 标签\n3. 点击结果跳转",
     "expected": "返回匹配列表；可打开其他论文",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-025",
@@ -272,7 +272,7 @@
     "precondition": "论文可生成图谱（已解析更佳）",
     "procedure": "1. 打开知识图谱页签\n2. 查看叙事与画布\n3. 点击刷新",
     "expected": "图谱与脉络展示；刷新可更新或给出失败提示",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-026",
@@ -283,7 +283,7 @@
     "precondition": "可模拟图谱接口失败",
     "procedure": "1. 打开知识图谱\n2. 点击重试",
     "expected": "错误提示清晰；重试可用",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-027",
@@ -294,7 +294,7 @@
     "precondition": "论文已解析且 LLM 配置可用；qa_ready 或有 Wiki",
     "procedure": "1. 侧栏问答，范围选“Wiki+原文”\n2. 提问“这篇论文的核心方法是什么？”\n3. 查看回答与引用",
     "expected": "返回中文回答；附带出处（Wiki·… 或原文段落）",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-028",
@@ -305,7 +305,7 @@
     "precondition": "有智能总结/Wiki，但可不具备全文切块",
     "procedure": "1. 范围选“仅 Wiki”\n2. 提问创新点/局限",
     "expected": "基于 Wiki 字段回答并引用 Wiki 出处",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-029",
@@ -316,7 +316,7 @@
     "precondition": "未解析论文或清空依据范围导致无证据",
     "procedure": "1. 对未解析论文提问，或选“仅原文”但无文本块",
     "expected": "返回明确错误/提示；不捏造无依据结论",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-030",
@@ -327,7 +327,7 @@
     "precondition": "已有成功首轮问答",
     "procedure": "1. 继续追问“它的实验怎么做的？”\n2. 切换全部/问答页签",
     "expected": "追问结合上下文；会话消息不丢失",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-031",
@@ -338,7 +338,7 @@
     "precondition": "论文已解析；LLM 可用或可降级模板",
     "procedure": "1. 侧栏辅助\n2. 切换新手/研究/工程等模式\n3. 查看导读内容",
     "expected": "按模式展示导读；可重新生成",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-032",
@@ -349,7 +349,7 @@
     "precondition": "未解析论文",
     "procedure": "1. 打开辅助页签",
     "expected": "提示完成解析后可用，无假内容",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-033",
@@ -360,7 +360,7 @@
     "precondition": "已打开持久化论文详情",
     "procedure": "1. 侧栏笔记选“笔记”\n2. 输入内容保存\n3. 刷新/重进详情查看",
     "expected": "笔记保存成功且仅自己可见；列表可见",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-034",
@@ -371,7 +371,7 @@
     "precondition": "PDF 可划选",
     "procedure": "1. 划选 PDF 文本\n2. 在批注模式补充说明并保存",
     "expected": "摘录自动填入；批注保存；可再次看到高亮/摘录",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-035",
@@ -382,7 +382,7 @@
     "precondition": "批注模式且摘录为空",
     "procedure": "1. 不划选直接保存批注",
     "expected": "提示需先划选或填写摘录；不产生空批注",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-036",
@@ -393,7 +393,7 @@
     "precondition": "已打开论文详情",
     "procedure": "1. 输入评论并提交\n2. 删除自己的评论",
     "expected": "评论出现在列表；删除后消失",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-037",
@@ -404,7 +404,7 @@
     "precondition": "至少两篇已入库论文；LLM 可用或启发式可用",
     "procedure": "1. 侧栏对比：检索/收藏选论文 B\n2. 点击生成对比\n3. 查看相似点/差异",
     "expected": "生成对比结果；可预览对比论文并返回原论文",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-038",
@@ -415,7 +415,7 @@
     "precondition": "对比槽位为空",
     "procedure": "1. 直接点生成对比",
     "expected": "提示先选择对比论文",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-039",
@@ -426,7 +426,7 @@
     "precondition": "用户已收藏至少一篇",
     "procedure": "1. 打开学习-收藏\n2. 点击论文卡片",
     "expected": "进入对应论文详情",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-040",
@@ -437,7 +437,7 @@
     "precondition": "已登录学习页",
     "procedure": "1. 个人画像添加/删除兴趣主题并保存\n2. 默认模式切换人格",
     "expected": "设置持久化；返回工作区后画像推荐受主题/模式影响",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-041",
@@ -448,7 +448,7 @@
     "precondition": "新账号无收藏/笔记/历史",
     "procedure": "1. 依次打开收藏、笔记、历史、词典页签",
     "expected": "显示暂无数据空态，无报错",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-042",
@@ -459,7 +459,7 @@
     "precondition": "已对解析论文产生收藏/阅读/批注",
     "procedure": "1. 打开概念词典\n2. 搜索词条",
     "expected": "展示概念及来源论文数；搜索过滤正确",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-043",
@@ -470,7 +470,7 @@
     "precondition": "已登录设置页；网络可访问 arXiv（或环境允许）",
     "procedure": "1. 添加关键词订阅（如 Transformer）\n2. 保存同步参数\n3. 点击立即同步\n4. 回工作区查看订阅更新",
     "expected": "同步成功提示；订阅更新区出现相关论文",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-044",
@@ -481,7 +481,7 @@
     "precondition": "设置页抓取单篇入口可用",
     "procedure": "1. 输入合法 arXiv ID\n2. 抓取\n3. 打开论文",
     "expected": "抓取成功并可打开详情",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-045",
@@ -492,7 +492,7 @@
     "precondition": "设置页",
     "procedure": "1. 输入非法 ID\n2. 抓取",
     "expected": "失败提示明确；系统稳定",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-046",
@@ -503,7 +503,7 @@
     "precondition": "已登录",
     "procedure": "1. 修改邮箱或设置新密码（填写当前密码）\n2. 保存后重新登录验证",
     "expected": "更新成功；新凭证可登录",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-047",
@@ -514,7 +514,7 @@
     "precondition": "已登录",
     "procedure": "1. 设置中切换语言\n2. 顶栏切换浅色/深色主题",
     "expected": "文案与主题即时生效且刷新后保持",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-048",
@@ -525,7 +525,7 @@
     "precondition": "管理员账号",
     "procedure": "1. 登录\n2. 打开管理台、论文库",
     "expected": "菜单可见；页面可访问",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-049",
@@ -536,7 +536,7 @@
     "precondition": "普通用户账号",
     "procedure": "1. 登录后直接访问 /admin",
     "expected": "被拒绝或重定向到工作区；无管理菜单",
-    "remark": "备选流"
+    "remark": null
   },
   {
     "id": "TC-050",
@@ -547,7 +547,7 @@
     "precondition": "管理员；库中有多篇论文",
     "procedure": "1. 按关键词/类别/时间筛选\n2. 表头排序\n3. 打开一篇\n4. 软删除一篇并确认列表不再显示",
     "expected": "筛选排序正确；删除后列表与推荐不再出现该文",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-051",
@@ -558,7 +558,7 @@
     "precondition": "管理员；存在待解析或失败任务",
     "procedure": "1. 质量页点击入队待解析\n2. 对失败任务点重试",
     "expected": "操作成功提示；任务状态更新",
-    "remark": "基本流"
+    "remark": null
   },
   {
     "id": "TC-052",
@@ -569,7 +569,7 @@
     "precondition": "系统可正常访问",
     "procedure": "1. 执行登录失败、空检索、问答无依据、订阅同步等操作\n2. 检查提示文案",
     "expected": "提示简洁明确；无大段技术堆栈暴露给普通用户；关键路径有成功反馈",
-    "remark": "易用性"
+    "remark": null
   },
   {
     "id": "TC-053",
@@ -580,7 +580,7 @@
     "precondition": "已打开论文",
     "procedure": "1. 观察侧栏“工作空间/正在阅读”文案\n2. 在学习/设置与论文间切换\n3. 退出论文",
     "expected": "用户能理解当前锁定状态；无需培训即可完成返回与退出",
-    "remark": "易用性"
+    "remark": null
   },
   {
     "id": "TC-054",
@@ -591,7 +591,7 @@
     "precondition": "论文详情问答页签",
     "procedure": "1. 查看 Wiki+原文 / 仅Wiki / 仅原文分段控件\n2. 切换后提问",
     "expected": "控件可见、无需长说明即可选用；切换不影响已有消息理解",
-    "remark": "易用性"
+    "remark": null
   },
   {
     "id": "TC-055",
@@ -602,7 +602,7 @@
     "precondition": "新用户或空数据场景",
     "procedure": "1. 观察推荐加载、词典空、收藏空、PDF 加载",
     "expected": "有简洁加载指示或空态文案；无误导性“假数据”",
-    "remark": "易用性"
+    "remark": null
   },
   {
     "id": "TC-056",
@@ -613,7 +613,7 @@
     "precondition": "准备一名未使用过系统的测试用户",
     "procedure": "1. 仅口头目标：找一篇论文并问一个问题\n2. 观察是否可在 10 分钟内完成",
     "expected": "多数用户可独立完成主路径；卡点可记录为改进项",
-    "remark": "易用性"
+    "remark": null
   },
   {
     "id": "TC-057",
@@ -624,7 +624,7 @@
     "precondition": "Windows 10/11 + Chrome 最新版",
     "procedure": "1. 登录、检索、打开 PDF、问答、笔记、推荐刷新",
     "expected": "功能正常；布局无错乱；控制台无阻断性错误",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-058",
@@ -635,7 +635,7 @@
     "precondition": "Windows + Edge 最新版",
     "procedure": "1. 同 TC-057 核心流程",
     "expected": "功能与布局正常",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-059",
@@ -646,7 +646,7 @@
     "precondition": "Windows/macOS + Firefox 最新版",
     "procedure": "1. 同 TC-057 核心流程\n2. 重点检查 PDF.js 渲染与划选",
     "expected": "PDF 可渲染；划选批注可用；主要功能通过",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-060",
@@ -657,7 +657,7 @@
     "precondition": "macOS + Safari 17+",
     "procedure": "1. 登录、检索、详情、PDF、问答",
     "expected": "主要功能可用；已知差异记入备注",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-061",
@@ -668,7 +668,7 @@
     "precondition": "系统可访问",
     "procedure": "1. 分别在 1920×1080、1366×768、2560×1440 下访问工作区与详情\n2. 折叠/展开侧栏",
     "expected": "无严重重叠裁切；关键按钮可点击；详情双栏可用",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-062",
@@ -679,7 +679,7 @@
     "precondition": "Chrome",
     "procedure": "1. 设置页面缩放 80%、125%\n2. 操作检索与详情",
     "expected": "布局可接受；无关键控件不可达",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-063",
@@ -690,7 +690,7 @@
     "precondition": "按学校网络要求接入",
     "procedure": "1. 连接校园网或 aTrust\n2. 访问部署地址并完成登录与打开论文",
     "expected": "站点可达；API 正常；与直连差异记入备注",
-    "remark": "兼容性"
+    "remark": null
   },
   {
     "id": "TC-064",
@@ -701,7 +701,7 @@
     "precondition": "生产/演示环境；网络稳定",
     "procedure": "1. 发起一次常规检索\n2. 记录首屏结果时间",
     "expected": "一般检索在可接受时间内返回（建议 <5s，视模型与网络调整）",
-    "remark": "可选"
+    "remark": null
   },
   {
     "id": "TC-065",
@@ -712,7 +712,7 @@
     "precondition": "论文 PDF 已本地缓存",
     "procedure": "1. 打开论文主体\n2. 记录首屏可见时间",
     "expected": "同源缓存场景下首屏可接受（建议 <8s）",
-    "remark": "可选"
+    "remark": null
   },
   {
     "id": "TC-066",
@@ -723,7 +723,7 @@
     "precondition": "普通用户登录态",
     "procedure": "1. 使用普通用户 token 调用管理员删除论文/用户接口",
     "expected": "返回 401/403；数据未被删除",
-    "remark": "安全"
+    "remark": null
   },
   {
     "id": "TC-067",
@@ -734,7 +734,7 @@
     "precondition": "登录页",
     "procedure": "1. 用户名/密码输入 ' OR 1=1-- 等\n2. 提交",
     "expected": "登录失败且无 SQL 错误回显；系统稳定",
-    "remark": "安全"
+    "remark": null
   },
   {
     "id": "TC-068",
@@ -745,7 +745,7 @@
     "precondition": "已登录",
     "procedure": "1. 刷新浏览器\n2. 访问工作区",
     "expected": "仍保持登录；业务页可用",
-    "remark": "可选"
+    "remark": null
   },
   {
     "id": "TC-069",
@@ -756,6 +756,6 @@
     "precondition": "Ubuntu 主机与安装包就绪",
     "procedure": "1. 上传 papermate-*.tar.gz 与 deploy-on-host.sh\n2. 执行部署脚本\n3. 访问站点 /api/health",
     "expected": "健康检查 200；首页可打开",
-    "remark": "可选"
+    "remark": null
   }
 ]
