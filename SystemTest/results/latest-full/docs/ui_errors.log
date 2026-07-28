@@ -1,0 +1,18 @@
+TC-027 Locator.click: Timeout 20000ms exceeded.
+Call log:
+  - waiting for get_by_text("问答").first
+    - locator resolved to <span class="ant-tag ant-tag-filled ant-tag-success css-1pi45l5 css-var-_r_0_">解析状态：可问答</span>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+      - waiting 100ms
+    38 × waiting for element to be visible, enabled and stable
+       - element is not visible
+     - retrying click action
+       - waiting 500ms
+

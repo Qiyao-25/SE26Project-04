@@ -35,9 +35,19 @@ $env:PAPERMATE_API_PREFIX = "/api"
 powershell -File scripts\run_api_tests.ps1
 ```
 
-## 约定
+## 最新完整执行结果
 
-- 用例 ID 与 xlsx 一致：`TC-001` … `TC-069`
-- pytest 用例名或标记含 `tc_001` / `@pytest.mark.tc("TC-001")`
-- 仅 API 能覆盖的步骤写入 `api/`；UI 划选、浏览器兼容等写入 `manual/`
-- 执行后在 `results/` 留报告；回填「是否通过」用 `Y`/`N`（与 Information 页统计公式一致）
+入口目录：[`results/latest-full/`](./results/latest-full/)
+
+- 总报告：`REPORT.md`
+- 回填结果簿：`系统测试执行结果.xlsx`
+- 截图：`screenshots/`、`compatibility/`
+- API 证据：`api/`
+
+一键复跑：
+
+```powershell
+cd SystemTest
+$env:PAPERMATE_BASE_URL = "http://10.119.9.119"
+python scripts\run_full_system_test.py
+```

@@ -15,6 +15,11 @@ SystemTest/results/api-summary-*.md
 SystemTest/results/系统测试执行结果-*.xlsx
 SystemTest/results/system-test-results-*.xlsx
 SystemTest/results/_tmp-results-*.xlsx
+SystemTest/results/full-run-*/_tmp.xlsx
+SystemTest/results/full-run-*/
+!SystemTest/results/latest-full/
+!SystemTest/results/latest-full/**
+SystemTest/results/LATEST.txt
 SystemTest/results/__pycache__/
 SystemTest/**/__pycache__/
 SystemTest/.pytest_cache/
