@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime, timezone
 import re
 
@@ -21,14 +22,122 @@ _NOISE_TERMS = {
 
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.#-]{1,}|[\u4e00-\u9fff]{2,}")
 
+# Behavior → interest topics (A/B): auto-fill with locked/excluded preferences.
+_BEHAVIOR_ACTIONS = ("favorite", "reading_history", "note", "reading_progress")
+_AUTO_TOPIC_LIMIT = 12
+_PREF_LOCKED = "locked_topics"
+_PREF_EXCLUDED = "excluded_topics"
+_PREF_AUTO_ENABLED = "auto_topics_enabled"
 
-def _normalize_topics(topics: list[str]) -> list[str]:
+
+def _normalize_topics(topics: list[str] | None) -> list[str]:
     result: list[str] = []
-    for topic in topics:
+    for topic in topics or []:
         value = str(topic).strip()
         if value and value not in result:
             result.append(value)
     return result[:20]
+
+
+def _topic_key(value: str) -> str:
+    return str(value or "").strip().casefold()
+
+
+def _pref_topic_list(prefs: dict, key: str) -> list[str]:
+    return _normalize_topics(prefs.get(key) if isinstance(prefs, dict) else None)
+
+
+def derive_topics_from_behavior(session: Session, user_id: str, *, limit: int = _AUTO_TOPIC_LIMIT) -> list[str]:
+    """Rank arXiv categories from reading / favorite / note actions (favorites weigh more)."""
+    rows = session.execute(
+        select(UserAction.paper_id, UserAction.action_type)
+        .where(
+            UserAction.user_id == user_id,
+            UserAction.action_type.in_(_BEHAVIOR_ACTIONS),
+        )
+        .order_by(UserAction.occurred_at.desc())
+        .limit(80)
+    ).all()
+    paper_ids = [int(pid) for pid, _action in rows if pid is not None]
+    if not paper_ids:
+        return []
+
+    papers = session.scalars(select(Paper).where(Paper.id.in_(list(dict.fromkeys(paper_ids))))).all()
+    by_id = {paper.id: paper for paper in papers}
+    affinity: Counter[str] = Counter()
+    order: list[str] = []
+    for pid, action in rows:
+        paper = by_id.get(int(pid))
+        if paper is None:
+            continue
+        cat = (paper.primary_category or "").strip()
+        if not cat:
+            continue
+        weight = 2.0 if action == "favorite" else 1.0
+        affinity[cat] += weight
+        root = cat.split(".", 1)[0]
+        if root and root != cat:
+            affinity[root] += weight * 0.35
+        if cat not in order:
+            order.append(cat)
+
+    ranked = sorted(order, key=lambda topic: (-affinity.get(topic, 0), order.index(topic)))
+    return ranked[: max(1, min(limit, 20))]
+
+
+def merge_auto_topics(
+    *,
+    locked: list[str],
+    auto: list[str],
+    excluded: list[str],
+    limit: int = 20,
+) -> list[str]:
+    """B: locked always kept; auto fills remaining slots unless excluded."""
+    blocked = {_topic_key(item) for item in excluded}
+    merged: list[str] = []
+    for topic in _normalize_topics(locked):
+        if _topic_key(topic) in blocked:
+            continue
+        merged.append(topic)
+    for topic in _normalize_topics(auto):
+        key = _topic_key(topic)
+        if key in blocked or key in {_topic_key(item) for item in merged}:
+            continue
+        merged.append(topic)
+        if len(merged) >= limit:
+            break
+    return merged[:limit]
+
+
+def sync_topics_from_behavior(session: Session, user_id: str) -> UserProfileData | None:
+    """
+    Persist profile.topics from behavior (A) respecting locked/excluded (B).
+
+    preferences:
+      - auto_topics_enabled: default True; set False to pause auto sync
+      - locked_topics: never removed by sync
+      - excluded_topics: never added by sync
+    """
+    user_id = (user_id or "").strip()
+    if not user_id:
+        return None
+    profile = _get_or_create(session, user_id)
+    prefs = dict(profile.preferences or {})
+    if prefs.get(_PREF_AUTO_ENABLED) is False:
+        return _to_data(profile)
+
+    locked = _pref_topic_list(prefs, _PREF_LOCKED)
+    excluded = _pref_topic_list(prefs, _PREF_EXCLUDED)
+    auto = derive_topics_from_behavior(session, user_id)
+    next_topics = merge_auto_topics(locked=locked, auto=auto, excluded=excluded)
+    if list(profile.topics or []) == next_topics:
+        return _to_data(profile)
+
+    profile.topics = next_topics
+    profile.updated_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(profile)
+    return _to_data(profile)
 
 
 def _to_data(profile: UserProfile) -> UserProfileData:
@@ -62,16 +171,34 @@ def update_profile(session: Session, user_id: str, payload: UserProfileUpdate) -
     if not user_id:
         raise ValueError("USER_ID_INVALID")
     profile = _get_or_create(session, user_id)
+    prefs = dict(profile.preferences or {})
 
     if payload.persona is not None:
         profile.persona = payload.persona if payload.persona in PERSONAS else profile.persona
-    if payload.topics is not None:
-        profile.topics = _normalize_topics(payload.topics)
     if payload.preferences is not None:
-        merged = dict(profile.preferences or {})
-        merged.update(payload.preferences)
-        profile.preferences = merged
+        prefs.update(payload.preferences)
 
+    if payload.topics is not None:
+        previous = _normalize_topics(profile.topics)
+        next_topics = _normalize_topics(payload.topics)
+        # B: manual edit locks the chosen set; dropped topics stay excluded from auto-fill.
+        locked = _normalize_topics(next_topics)
+        excluded = _pref_topic_list(prefs, _PREF_EXCLUDED)
+        excluded_keys = {_topic_key(item) for item in excluded}
+        for topic in previous:
+            if _topic_key(topic) in {_topic_key(item) for item in next_topics}:
+                continue
+            if _topic_key(topic) not in excluded_keys:
+                excluded.append(topic)
+                excluded_keys.add(_topic_key(topic))
+        # Manual topics are no longer excluded.
+        excluded = [item for item in excluded if _topic_key(item) not in {_topic_key(t) for t in next_topics}]
+        prefs[_PREF_LOCKED] = locked
+        prefs[_PREF_EXCLUDED] = excluded[:40]
+        profile.topics = next_topics
+
+    profile.preferences = prefs
+    flag_modified(profile, "preferences")
     profile.updated_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(profile)

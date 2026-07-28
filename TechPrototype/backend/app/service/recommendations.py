@@ -477,6 +477,13 @@ def profile_recommendations(
     limit: int = 3,
     exclude_ids: list[int] | None = None,
 ) -> list[PaperItem]:
+    # Keep persisted topics aligned with reading/favorites (A/B merge).
+    try:
+        from app.service.profile import sync_topics_from_behavior
+
+        sync_topics_from_behavior(session, user_id)
+    except Exception:  # noqa: BLE001
+        pass
     profile = get_profile(session, user_id)
     persona_label = (persona or profile.persona or "研究").strip() or "研究"
     prefs = dict(profile.preferences or {})
