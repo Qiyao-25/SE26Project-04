@@ -6,6 +6,7 @@ import re
 import secrets
 import time
 from datetime import datetime, timezone
+from threading import Lock
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +19,9 @@ from app.schema.auth import AccountUpdate, AuthResponse, AuthUser, LoginRequest,
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ITERATIONS = 120_000
 TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
+_AUTH_CACHE: dict[str, tuple[float, AuthUser]] = {}
+_AUTH_CACHE_LOCK = Lock()
+_AUTH_CACHE_LIMIT = 10_000
 
 
 def _normalize_email(value: str) -> str:
@@ -63,6 +67,38 @@ def _response(user: User, settings: Settings) -> AuthResponse:
     return AuthResponse(access_token=_token(user, settings), user=_user_data(user))
 
 
+def _cached_user(token: str, *, now: float, ttl_s: int) -> AuthUser | None:
+    if ttl_s <= 0:
+        return None
+    with _AUTH_CACHE_LOCK:
+        item = _AUTH_CACHE.get(token)
+        if item is None:
+            return None
+        expires_at, user = item
+        if expires_at <= now:
+            _AUTH_CACHE.pop(token, None)
+            return None
+        return user
+
+
+def _cache_user(token: str, user: AuthUser, *, now: float, ttl_s: int) -> None:
+    if ttl_s <= 0:
+        return
+    with _AUTH_CACHE_LOCK:
+        if len(_AUTH_CACHE) >= _AUTH_CACHE_LIMIT:
+            _AUTH_CACHE.clear()
+        _AUTH_CACHE[token] = (now + ttl_s, user)
+
+
+def invalidate_user_auth_cache(user_id: str | int) -> None:
+    """Immediately revoke locally cached authentication results for a user."""
+    value = str(user_id)
+    with _AUTH_CACHE_LOCK:
+        stale = [token for token, (_expires_at, user) in _AUTH_CACHE.items() if user.user_id == value]
+        for token in stale:
+            _AUTH_CACHE.pop(token, None)
+
+
 def register(session: Session, payload: RegisterRequest, settings: Settings) -> AuthResponse:
     email = _normalize_email(payload.email)
     if session.scalar(select(User).where(User.email == email)) is not None:
@@ -92,12 +128,18 @@ def user_from_token(session: Session, token: str, settings: Settings) -> AuthUse
             raise ValueError
         padded = raw + "=" * (-len(raw) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded).decode())
-        if int(payload["exp"]) < int(time.time()):
+        now = time.time()
+        if int(payload["exp"]) < now:
             raise ValueError
+        cached = _cached_user(token, now=now, ttl_s=int(settings.auth_cache_ttl_s))
+        if cached is not None:
+            return cached
         user = session.get(User, int(payload["sub"]))
         if user is None or not user.is_active or int(payload.get("ver")) != user.token_version:
             raise ValueError
-        return _user_data(user)
+        result = _user_data(user)
+        _cache_user(token, result, now=now, ttl_s=int(settings.auth_cache_ttl_s))
+        return result
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         raise ValueError("AUTH_INVALID")
 
@@ -120,4 +162,5 @@ def update_account(session: Session, user_id: str, payload: AccountUpdate, setti
     user.updated_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(user)
+    invalidate_user_auth_cache(user.id)
     return _response(user, settings)

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.runtime import format_uptime, process_started_at, uptime_seconds
 from app.model import ParseTask, Paper, User, UserAction, UserProfile
+from app.service.auth import invalidate_user_auth_cache
 from app.service.tasks import MAX_ATTEMPTS
 
 
@@ -147,6 +148,7 @@ def update_user_status(session: Session, user_id: int, is_active: bool) -> dict:
     user.is_active = is_active
     session.commit()
     session.refresh(user)
+    invalidate_user_auth_cache(user.id)
     return {
         "id": user.id,
         "email": user.email,
@@ -172,6 +174,7 @@ def delete_user(session: Session, user_id: int) -> dict:
         session.delete(profile)
     session.delete(user)
     session.commit()
+    invalidate_user_auth_cache(user_id)
     return {"deleted": True, "id": user_id, "email": email}
 
 
