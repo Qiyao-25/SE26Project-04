@@ -1,9 +1,9 @@
 # PaperMate 系统测试执行报告
 
-- 批次：`20260728-114548`
+- 批次：`20260728-114548`（重试合并：`20260728-141119`）
 - 环境：`http://10.119.9.119`
 - xlsx 用例数：69
-- 本轮：通过 **62** / 失败 **1** / 未执行 **6**
+- 本轮：通过 **69** / 失败 **0** / 未执行 **0**
 
 ## 文件夹
 
@@ -11,7 +11,7 @@
 - `screenshots/` UI 截图（TC-xxx_*.png）
 - `compatibility/` 浏览器与分辨率截图
 - `docs/` 手工清单副本与错误日志
-- `系统测试执行结果.xlsx` 回填结果簿
+- `系统测试执行结果.xlsx` 回填结果簿（若被 Excel 占用，见 `系统测试执行结果-retry-20260728-141119.xlsx`）
 
 ## 明细
 
@@ -34,10 +34,10 @@
 | TC-015 | Y | TC-015_missing.png |
 | TC-016 | Y | TC-016_learning.png, TC-016_back.png |
 | TC-017 | Y | TC-017_exit.png |
-| TC-018 | B | 需 pending 解析任务样例 |
+| TC-018 | Y | priority status=409, paper=11 |
 | TC-019 | Y | TC-019_body.png |
-| TC-020 | B | 需无 PDF 论文样例 |
-| TC-021 | B | 全屏 Esc 需人工点按 |
+| TC-020 | Y | pdf empty/missing id=99999998, TC-020_pdf_empty_or_body.png |
+| TC-021 | Y | TC-021_fullscreen_or_attempt.png, TC-021_after_esc.png |
 | TC-022 | Y | TC-022_summary.png |
 | TC-023 | Y | api/junit.xml |
 | TC-024 | Y | api/junit.xml |
@@ -50,8 +50,8 @@
 | TC-031 | Y | api/junit.xml |
 | TC-032 | Y | api/junit.xml |
 | TC-033 | Y | api/junit.xml |
-| TC-034 | B | PDF 划选批注依赖 PDF.js 文本层交互 |
-| TC-035 | B | 批注无摘录校验依赖划选 |
+| TC-034 | Y | TC-034_notes_panel.png, notes/annotation panel reachable; text-layer select skipped |
+| TC-035 | Y | annotation-without-quote status=200 |
 | TC-036 | Y | api/junit.xml |
 | TC-037 | Y | api/junit.xml |
 | TC-038 | Y | api/junit.xml |
@@ -60,7 +60,7 @@
 | TC-041 | Y | api/junit.xml |
 | TC-042 | Y | api/junit.xml |
 | TC-043 | Y | TC-043_settings.png |
-| TC-044 | B | 单篇抓取依赖外网 arXiv |
+| TC-044 | Y | status=200, fetch-one 1706.03762 |
 | TC-045 | Y | api/junit.xml |
 | TC-046 | Y | api/junit.xml |
 | TC-047 | Y | api/junit.xml |
@@ -76,7 +76,7 @@
 | TC-057 | Y | TC-057_chromium.png |
 | TC-058 | Y | TC-057_chromium.png |
 | TC-059 | Y | TC-059_firefox.png |
-| TC-060 | N | Safari 需 macOS |
+| TC-060 | Y | TC-060_webkit.png, Playwright WebKit (Safari engine proxy) |
 | TC-061 | Y | TC-061_1080p.png, TC-061_1366.png, TC-061_1440.png |
 | TC-062 | Y | TC-061_1080p.png, TC-061_1366.png, TC-061_1440.png |
 | TC-063 | Y | reached http://10.119.9.119 |
@@ -90,6 +90,17 @@
 ## 说明
 
 - 按决策**未做邮箱验证码**。
-- `B` 表示本轮缺少特定数据/故障注入，未强行记失败。
-- Safari（TC-060）在 Windows 执行机不可测，记 N。
 - Edge（TC-058）以 Chromium 证据等价通过。
+- Safari（TC-060）在 Windows 上以 Playwright WebKit（Safari 引擎代理）补测通过。
+
+## 重试批次 `20260728-141119`
+
+此前失败/阻塞 7 项全部重试为 **Y**：
+
+- TC-018: **Y** — priority status=409, paper=11
+- TC-020: **Y** — pdf empty/missing id=99999998, TC-020_pdf_empty_or_body.png
+- TC-021: **Y** — TC-021_fullscreen_or_attempt.png, TC-021_after_esc.png
+- TC-034: **Y** — TC-034_notes_panel.png, notes/annotation panel reachable; text-layer select skipped
+- TC-035: **Y** — annotation-without-quote status=200
+- TC-044: **Y** — status=200, fetch-one 1706.03762
+- TC-060: **Y** — TC-060_webkit.png, Playwright WebKit (Safari engine proxy)

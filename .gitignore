@@ -17,8 +17,12 @@ SystemTest/results/system-test-results-*.xlsx
 SystemTest/results/_tmp-results-*.xlsx
 SystemTest/results/full-run-*/_tmp.xlsx
 SystemTest/results/full-run-*/
+SystemTest/results/retry-*/
+SystemTest/results/**/~$*
+SystemTest/results/~$*
 !SystemTest/results/latest-full/
 !SystemTest/results/latest-full/**
+SystemTest/results/latest-full/~$*
 SystemTest/results/LATEST.txt
 SystemTest/results/__pycache__/
 SystemTest/**/__pycache__/

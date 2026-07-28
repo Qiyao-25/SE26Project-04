@@ -1,4 +1,4 @@
-# 截图索引
+# 截图索引（含重试）
 
 - `TC-001_after_register.png`
 - `TC-001_register_form.png`
@@ -18,9 +18,13 @@
 - `TC-016_learning.png`
 - `TC-017_exit.png`
 - `TC-019_body.png`
+- `TC-020_pdf_empty_or_body.png`
+- `TC-021_after_esc.png`
+- `TC-021_fullscreen_or_attempt.png`
 - `TC-022_summary.png`
 - `TC-025_graph.png`
 - `TC-027_failed.png`
+- `TC-034_notes_panel.png`
 - `TC-039_learning.png`
 - `TC-043_settings.png`
 - `TC-048_admin.png`
@@ -34,6 +38,7 @@
 - `TC-069_health.png`
 - `compatibility/TC-057_chromium.png`
 - `compatibility/TC-059_firefox.png`
+- `compatibility/TC-060_webkit.png`
 - `compatibility/TC-061_1080p.png`
 - `compatibility/TC-061_1366.png`
 - `compatibility/TC-061_1440.png`
