@@ -16,11 +16,10 @@ import SettingsPage from '../pages/Settings/SettingsPage';
 import PaperLibraryPage from '../pages/PaperLibrary/PaperLibraryPage';
 
 const THEME_STORAGE_KEY = 'papermate-theme';
-const LIGHT_DEFAULT_MIGRATION_KEY = 'papermate-theme-light-default-v1';
+const LIGHT_DEFAULT_MIGRATION_KEY = 'papermate-theme-light-default-v2';
 
 function getInitialThemeMode() {
-  // 旧版本会在首次访问时自动写入 dark。升级后统一迁移一次到浅色，
-  // 后续仍然尊重并保存用户手动选择的主题。
+  // 统一将默认主题设为浅色；v2 会再次覆盖旧版 dark 默认值与用户曾保存的 dark。
   if (localStorage.getItem(LIGHT_DEFAULT_MIGRATION_KEY) !== 'done') {
     localStorage.setItem(LIGHT_DEFAULT_MIGRATION_KEY, 'done');
     localStorage.setItem(THEME_STORAGE_KEY, 'light');
