@@ -2,6 +2,8 @@ import {
   Layout,
   Menu,
   Button,
+  Drawer,
+  Grid,
   Typography,
   Space,
   Tag,
@@ -16,6 +18,8 @@ import {
   DatabaseOutlined,
   MoonOutlined,
   SunOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 
 import {
@@ -24,7 +28,7 @@ import {
   useLocation,
   useMatch,
 } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
@@ -32,6 +36,7 @@ import PaperDetailPage from '../pages/PaperDetail/PaperDetailPage';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function MainLayout({
   themeMode,
@@ -39,6 +44,9 @@ export default function MainLayout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const screens = useBreakpoint();
+  const isMobile = screens.md === false;
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { t } = useI18n();
   const paperMatch = useMatch('/paper/:paperId');
   const routePaperId = paperMatch?.params?.paperId
@@ -58,6 +66,10 @@ export default function MainLayout({
   useEffect(() => {
     if (routePaperId) setLockedPaperId(routePaperId);
   }, [routePaperId, setLockedPaperId]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const keptPaperId = routePaperId || (lockedPaperId ? String(lockedPaperId) : null);
   const onPaperDetail = Boolean(routePaperId);
@@ -132,6 +144,7 @@ export default function MainLayout({
   };
 
   const handleMenuClick = ({ key }) => {
+    setMobileNavOpen(false);
     // 工作空间被论文锁定时：点「工作空间」回到该论文详情
     if (key === '/workspace' && lockedPaperId) {
       navigate(`/paper/${lockedPaperId}`);
@@ -147,81 +160,132 @@ export default function MainLayout({
     navigate('/login', { replace: true });
   };
 
-  return (
-    <Layout className="main-layout">
-      <Sider
-        width={248}
-        theme={themeMode === 'dark' ? 'dark' : 'light'}
-        className="main-sider"
+  const navigationContent = (
+    <>
+      <div className="logo-area">
+        <div className="logo-row">
+          <span className="logo-mark">
+            PM
+          </span>
+
+          <div className="logo-text">
+            <Title
+              level={5}
+              style={{ margin: 0 }}
+            >
+              PaperMate
+            </Title>
+
+            <Text
+              type="secondary"
+              style={{ fontSize: 12 }}
+            >
+              ArXiv 智能论文阅读
+            </Text>
+          </div>
+
+          {isMobile ? (
+            <Button
+              type="text"
+              className="mobile-nav-close"
+              icon={<CloseOutlined />}
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="关闭导航菜单"
+            />
+          ) : null}
+        </div>
+      </div>
+
+      <Menu
+        mode="inline"
+        selectedKeys={[pathKey]}
+        items={menuItems}
+        onClick={handleMenuClick}
         style={{
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-          alignSelf: 'flex-start',
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      />
+
+      <div
+        className="sider-footer"
+        style={{
+          marginTop: 'auto',
+          flexShrink: 0,
         }}
       >
-        <div className="logo-area">
-          <div className="logo-row">
-            <span className="logo-mark">
-              PM
-            </span>
+        <Button
+          block
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+        >
+          {t('nav.logout')}
+        </Button>
+      </div>
+    </>
+  );
 
-            <div className="logo-text">
-              <Title
-                level={5}
-                style={{ margin: 0 }}
-              >
-                PaperMate
-              </Title>
-
-              <Text
-                type="secondary"
-                style={{ fontSize: 12 }}
-              >
-                ArXiv 智能论文阅读
-              </Text>
-            </div>
-          </div>
-        </div>
-
-        <Menu
-          mode="inline"
-          selectedKeys={[pathKey]}
-          items={menuItems}
-          onClick={handleMenuClick}
+  return (
+    <Layout className="main-layout">
+      {!isMobile ? (
+        <Sider
+          width={248}
+          theme={themeMode === 'dark' ? 'dark' : 'light'}
+          className="main-sider"
           style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-          }}
-        />
-
-        <div
-          className="sider-footer"
-          style={{
-            marginTop: 'auto',
-            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            alignSelf: 'flex-start',
           }}
         >
-          <Button
-            block
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-          >
-            {t('nav.logout')}
-          </Button>
+          {navigationContent}
+        </Sider>
+      ) : null}
+
+      <Drawer
+        placement="left"
+        width={280}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        closable={false}
+        className="mobile-nav-drawer"
+        styles={{
+          body: {
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+      >
+        <div className="mobile-nav-content">
+          {navigationContent}
         </div>
-      </Sider>
+      </Drawer>
 
       <Layout>
         <Header className="main-header">
-          <div className="header-title-wrap">
-            <Title
-              level={4}
-              style={{ margin: 0 }}
-            >
-              {meta.title}
-            </Title>
+          <div className="header-title-group">
+            {isMobile ? (
+              <Button
+                type="text"
+                className="mobile-menu-btn"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="打开导航菜单"
+                aria-expanded={mobileNavOpen}
+              />
+            ) : null}
+
+            <div className="header-title-wrap">
+              <Title
+                level={4}
+                style={{ margin: 0 }}
+              >
+                {meta.title}
+              </Title>
+            </div>
           </div>
 
           <Space
