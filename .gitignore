@@ -33,3 +33,7 @@ SystemTest/results/LATEST.txt
 SystemTest/results/__pycache__/
 SystemTest/**/__pycache__/
 SystemTest/.pytest_cache/
+
+# Local performance benchmark artifacts
+PerformanceTest/reports/*.json
+PerformanceTest/scripts/__pycache__/

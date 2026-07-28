@@ -71,6 +71,12 @@ class _LlmStubHandler(BaseHTTPRequestHandler):
         return
 
 
+
+class _LlmStubServer(ThreadingHTTPServer):
+    request_queue_size = 256
+    daemon_threads = True
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -213,7 +219,7 @@ def run(concurrency: int, workers: int) -> dict[str, Any]:
         database_url = f"sqlite:///{database_path.as_posix()}"
         _seed_database(database_url)
         llm_port = _free_port()
-        llm_server = ThreadingHTTPServer(("127.0.0.1", llm_port), _LlmStubHandler)
+        llm_server = _LlmStubServer(("127.0.0.1", llm_port), _LlmStubHandler)
         llm_thread = threading.Thread(target=llm_server.serve_forever, daemon=True)
         llm_thread.start()
         environment = os.environ.copy()
