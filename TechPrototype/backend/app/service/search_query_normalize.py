@@ -223,13 +223,22 @@ _AUTHOR_QUERY_RE = re.compile(
     re.IGNORECASE,
 )
 _ARXIV_RE = re.compile(r"(?:arxiv\s*[:：]?\s*)?(\d{4}\.\d{4,5})(?:v\d+)?", re.IGNORECASE)
+_YEAR_VALUE_RE = r"(?:19|20)\d{2}"
 _YEAR_RANGE_RE = re.compile(
-    r"(?P<y1>20\d{2}|19\d{2})\s*[-~到至]\s*(?P<y2>20\d{2}|19\d{2})"
-    r"|(?:after|since|从|自)?\s*(?P<from>20\d{2}|19\d{2})\s*(?:年)?\s*(?:后|以后|以来| onwards)?"
-    r"|(?:before|until|在)?\s*(?P<to>20\d{2}|19\d{2})\s*(?:年)?\s*(?:前|以前)"
-    r"|(?P<year>20\d{2}|19\d{2})\s*年",
+    rf"(?P<y1>{_YEAR_VALUE_RE})\s*(?:年)?\s*(?:[-~到至]|and)\s*(?P<y2>{_YEAR_VALUE_RE})\s*(?:年)?",
     re.IGNORECASE,
 )
+_YEAR_AFTER_RE = re.compile(
+    rf"(?:\b(?:after|since|from)\s+(?P<prefix_year>{_YEAR_VALUE_RE})(?:\s+onwards)?|"
+    rf"(?P<suffix_year>{_YEAR_VALUE_RE})\s*(?:年)?\s*(?:后|以后|之后|以来))",
+    re.IGNORECASE,
+)
+_YEAR_BEFORE_RE = re.compile(
+    rf"(?:\b(?:before|until)\s+(?P<prefix_year>{_YEAR_VALUE_RE})|"
+    rf"(?:在?\s*)?(?P<suffix_year>{_YEAR_VALUE_RE})\s*(?:年)?\s*(?:前|以前|之前))",
+    re.IGNORECASE,
+)
+_YEAR_EXACT_RE = re.compile(rf"(?P<year>{_YEAR_VALUE_RE})\s*(?:年)?")
 _EXCLUDE_PATTERNS = (
     (re.compile(r"(不要|排除|except|without)\s*(综述|survey|review)", re.I), ["survey", "review", "综述"]),
     (re.compile(r"(不要|排除)\s*(短文|poster)", re.I), ["poster"]),
@@ -314,38 +323,32 @@ def strip_query_fillers(query: str) -> str:
 
 def extract_year_range(query: str) -> tuple[int | None, int | None]:
     text = query or ""
-    before_match = re.search(r"\b(?:before|until)\s*(19\d{2}|20\d{2})\b", text, re.I)
-    if before_match:
-        return None, int(before_match.group(1))
-    after_match = re.search(r"\b(?:after|since)\s*(19\d{2}|20\d{2})\b", text, re.I)
-    if after_match:
-        return int(after_match.group(1)), None
-    match = _YEAR_RANGE_RE.search(text)
-    if not match:
-        # 「近几年」→ last 3 years
-        if re.search(r"近几年|近三年|近年来|recent years", text, re.I):
-            from datetime import datetime
-
-            year = datetime.now().year
-            return year - 2, year
-        return None, None
-    if match.groupdict().get("y1") and match.groupdict().get("y2"):
-        a, b = int(match.group("y1")), int(match.group("y2"))
+    range_match = _YEAR_RANGE_RE.search(text)
+    if range_match:
+        a, b = int(range_match.group("y1")), int(range_match.group("y2"))
         return min(a, b), max(a, b)
-    if match.groupdict().get("from"):
-        y = int(match.group("from"))
-        if re.search(r"后|以后|以来|after|since", text, re.I):
-            return y, None
-        return y, y
-    if match.groupdict().get("to"):
-        return None, int(match.group("to"))
-    if match.groupdict().get("year"):
-        y = int(match.group("year"))
-        if re.search(rf"{y}\s*年\s*(后|以后|以来)|after\s*{y}|since\s*{y}", text, re.I):
-            return y, None
-        if re.search(rf"{y}\s*年\s*(前|以前)|before\s*{y}", text, re.I):
-            return None, y
-        return y, y
+
+    before_match = _YEAR_BEFORE_RE.search(text)
+    if before_match:
+        year = before_match.group("prefix_year") or before_match.group("suffix_year")
+        return None, int(year)
+
+    after_match = _YEAR_AFTER_RE.search(text)
+    if after_match:
+        year = after_match.group("prefix_year") or after_match.group("suffix_year")
+        return int(year), None
+
+    # 「近几年」→ last 3 years
+    if re.search(r"近几年|近三年|近年来|recent years", text, re.I):
+        from datetime import datetime
+
+        year = datetime.now().year
+        return year - 2, year
+
+    exact_match = _YEAR_EXACT_RE.search(text)
+    if exact_match:
+        year = int(exact_match.group("year"))
+        return year, year
     return None, None
 
 

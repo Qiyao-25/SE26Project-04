@@ -46,8 +46,13 @@ def test_strip_fillers_removes_polite_prefix_honorific_and_paper_suffix() -> Non
 
 def test_extract_year_range_covers_ranges_boundaries_exact_and_recent() -> None:
     assert extract_year_range("2025 到 2022 年的论文") == (2022, 2025)
+    assert extract_year_range("between 2021 and 2023") == (2021, 2023)
     assert extract_year_range("2023 年后大模型") == (2023, None)
+    assert extract_year_range("from 2023 onwards") == (2023, None)
+    assert extract_year_range("since 2022") == (2022, None)
     assert extract_year_range("before 2020") == (None, 2020)
+    assert extract_year_range("在 2020 年前") == (None, 2020)
+    assert extract_year_range("2024 年前") == (None, 2024)
     assert extract_year_range("2024 年的论文") == (2024, 2024)
     recent_from, recent_to = extract_year_range("recent years multimodal papers")
     assert recent_to is not None
