@@ -51,6 +51,7 @@ def _token(user: User, settings: Settings) -> str:
         "sub": str(user.id),
         "email": user.email,
         "role": user.role,
+        "ver": user.token_version,
         "exp": int(time.time()) + TOKEN_TTL_SECONDS,
     }
     raw = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
@@ -94,7 +95,7 @@ def user_from_token(session: Session, token: str, settings: Settings) -> AuthUse
         if int(payload["exp"]) < int(time.time()):
             raise ValueError
         user = session.get(User, int(payload["sub"]))
-        if user is None or not user.is_active:
+        if user is None or not user.is_active or int(payload.get("ver")) != user.token_version:
             raise ValueError
         return _user_data(user)
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
@@ -115,6 +116,7 @@ def update_account(session: Session, user_id: str, payload: AccountUpdate, setti
         user.email = email
     if payload.password:
         user.password_hash = hash_password(payload.password)
+        user.token_version += 1
     user.updated_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(user)

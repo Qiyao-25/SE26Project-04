@@ -4,11 +4,10 @@ services:
     environment:
       POSTGRES_DB: papermate
       POSTGRES_USER: papermate
-      POSTGRES_PASSWORD: papermate
+      # Set PAPERMATE_POSTGRES_PASSWORD outside Git, for example in deploy/.env.
+      POSTGRES_PASSWORD: ${PAPERMATE_POSTGRES_PASSWORD:?set PAPERMATE_POSTGRES_PASSWORD in the deploy environment}
     volumes:
       - papermate_pg:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U papermate -d papermate"]
       interval: 5s
@@ -23,14 +22,14 @@ services:
       - ../backend/.env
     environment:
       PAPERMATE_ENV: prod
-      PAPERMATE_DATABASE_URL: postgresql+psycopg://papermate:papermate@db:5432/papermate
+      PAPERMATE_DB_PASSWORD: ${PAPERMATE_POSTGRES_PASSWORD:?set PAPERMATE_POSTGRES_PASSWORD in the deploy environment}
       PAPERMATE_CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
       PAPERMATE_ENABLE_DOCS: "false"
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
 
   web:
     image: nginx:1.27-alpine

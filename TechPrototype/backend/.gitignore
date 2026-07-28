@@ -8,5 +8,6 @@ reports/
 data/*.db
 data/*.sqlite
 data/pdfs/
+data/locks/
 .venv/
 *.egg-info/

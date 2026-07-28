@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.core.auth import require_current_user
 from app.core.database import get_db
+from app.schema.auth import AuthUser
 from app.schema.common import ApiResponse
 from app.schema.papers import ChunkItem, ChunkSearchRequest, ChunkSearchResponse
 from app.repository.chunks import search_chunks
@@ -30,10 +32,10 @@ def _search(request: ChunkSearchRequest, session: Session) -> ChunkSearchRespons
 
 
 @router.post("/api/search/chunks", response_model=ApiResponse[ChunkSearchResponse], summary="检索论文文本块")
-def search_chunks_api(request: ChunkSearchRequest, http_request: Request, db: Session = Depends(db_session)):
+def search_chunks_api(request: ChunkSearchRequest, http_request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     return ApiResponse(data=_search(request, db), request_id=http_request.state.request_id)
 
 
 @router.post("/search/chunks", response_model=ApiResponse[ChunkSearchResponse], include_in_schema=False)
-def search_chunks_legacy(request: ChunkSearchRequest, http_request: Request, db: Session = Depends(db_session)):
+def search_chunks_legacy(request: ChunkSearchRequest, http_request: Request, _user: AuthUser = Depends(require_current_user), db: Session = Depends(db_session)):
     return ApiResponse(data=_search(request, db), request_id=http_request.state.request_id)

@@ -425,6 +425,7 @@ def fetch_one_paper(
     query: str,
     parse: bool = True,
     settings=None,
+    owner_user_id: int | None = None,
 ) -> FetchOnePaperResponse:
     """Fetch a single paper from arXiv by id/URL/title and upsert into the library."""
     from app.service.arxiv_client import ArxivClient
@@ -505,6 +506,7 @@ def fetch_one_paper(
                 "full_parse",
                 f"fetch-one-{item.paper_id}-{item.arxiv_id}",
                 force=False,
+                owner_user_id=owner_user_id,
             )
             task_id = task.task_id
             if task.status == "queued":

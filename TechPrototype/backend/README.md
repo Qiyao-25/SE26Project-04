@@ -61,6 +61,8 @@ python -c "from app.core.config import get_settings; s=get_settings(); print({'e
 
 生产环境的 PaperPipeline 启动时也必须使用同一个 `PAPERMATE_WORKER_TOKEN`，并通过 `X-Worker-Token` 调用内部接口。开发环境未配置 Token 时，Worker 接口允许本机联调通过。
 
+Worker 领取任务后，`POST /api/tasks/claim` 返回本次任务专属的 `lease_token`。后续 `PATCH /api/tasks/{id}`、`POST /api/tasks/{id}/results` 和 `POST /api/tasks/{id}/finalize` 必须同时携带 `X-Task-Lease: <lease_token>`。`X-Worker-Token` 只证明调用方是受信任的 Worker，`X-Task-Lease` 才证明它仍拥有该具体任务的写权限；任务超时回收或被替代后，旧租约会失效。
+
 ## 3. 可重复执行命令
 
 在 backend 目录、并且已激活 .venv 的情况下执行：
@@ -172,6 +174,12 @@ python -m alembic upgrade head
 python -m alembic downgrade base
 python -m alembic upgrade head
 python -m pytest --capture=no
+
+# 可选：真实 HTTP 接口测试（需要本机允许监听端口）
+PAPERMATE_RUN_HTTP_TESTS=1 python -m pytest tests/test_http_api.py
+
+# 可选：PostgreSQL 集成测试
+PAPERMATE_TEST_POSTGRES_URL=postgresql+psycopg://user:password@host:5432/papermate python -m pytest tests/test_postgres_integration.py
 ```
 
 迁移命令的预期结果是：第一次升级到 0001_initial_schema (head)，回滚后恢复为空库，再次升级成功。测试中的 StarletteDeprecationWarning 是依赖兼容性警告，不代表测试失败；以最后的 passed 数量和退出码为准。

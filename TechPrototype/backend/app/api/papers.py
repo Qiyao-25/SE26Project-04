@@ -111,6 +111,7 @@ def fetch_one(
             query=payload.query.strip(),
             parse=payload.parse,
             settings=request.app.state.settings,
+            owner_user_id=int(_user.user_id),
         )
     except PaperServiceError as exc:
         return _db_error(request, exc)
@@ -149,7 +150,14 @@ def parse(
     if not idempotency_key or not idempotency_key.strip():
         return _db_error(request, PaperServiceError("VALIDATION_ERROR", "必须提供 Idempotency-Key", 400))
     try:
-        data, created = create_task(db, paper_id, payload.task_type, idempotency_key.strip(), force=payload.force)
+        data, created = create_task(
+            db,
+            paper_id,
+            payload.task_type,
+            idempotency_key.strip(),
+            force=payload.force,
+            owner_user_id=int(_user.user_id),
+        )
     except ValueError as exc:
         if str(exc) == "PAPER_NOT_FOUND":
             return _db_error(request, PaperServiceError("PAPER_NOT_FOUND", "论文不存在", 404))
@@ -176,7 +184,7 @@ def parse_priority(
     When the task is queued, starts the in-process runner immediately.
     """
     try:
-        data, should_start = boost_parse_priority(db, paper_id)
+        data, should_start = boost_parse_priority(db, paper_id, owner_user_id=int(_user.user_id))
     except ValueError as exc:
         code = str(exc)
         if code == "PAPER_NOT_FOUND":
@@ -384,7 +392,7 @@ def remove_paper(
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
-@router.get("/{paper_id}", summary="获取论文详情")
+@router.get("/{paper_id}", response_model=ApiResponse[PaperItem], summary="获取论文详情")
 def detail(paper_id: int, request: Request, db: Session = Depends(db_session)):
     try:
         data = get_paper_detail(db, paper_id)

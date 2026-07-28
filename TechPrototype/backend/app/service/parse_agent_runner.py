@@ -24,7 +24,7 @@ from app.model import PaperContent, ParseTask, Paper
 from app.schema.papers import ParseResultCommit, StructuredResultInput, TextChunkInput
 from app.service.content_validator import ContentValidationAgent
 from app.service.papers import get_related_paper_payloads
-from app.service.tasks import MAX_ATTEMPTS, save_parse_result
+from app.service.tasks import MAX_ATTEMPTS, assert_task_lease, claim_specific_task, save_parse_result
 
 logger = logging.getLogger("papermate.parse_agent")
 
@@ -42,7 +42,16 @@ def run_parse_agent_job(
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
     session = SessionLocal()
     try:
-        _execute(session, task_id, settings, text_extractor=text_extractor)
+        lease_token = claim_specific_task(session, task_id)
+        if lease_token is None:
+            logger.info("parse_agent_skip_not_queued task_id=%s", task_id)
+            return
+        _execute(session, task_id, settings, lease_token=lease_token, text_extractor=text_extractor)
+    except ValueError as exc:
+        if str(exc) == "TASK_LEASE_LOST":
+            logger.info("parse_agent_skip_lease_lost task_id=%s", task_id)
+            return
+        raise
     except Exception as exc:  # noqa: BLE001
         logger.exception("parse_agent_job_crashed task_id=%s err=%s", task_id, exc)
         try:
@@ -59,12 +68,10 @@ def _execute(
     task_id: int,
     settings: Settings,
     *,
+    lease_token: str,
     text_extractor: TextExtractor | None = None,
 ) -> None:
-    task = session.get(ParseTask, task_id)
-    if task is None or task.status not in {"queued", "running"}:
-        logger.info("parse_agent_skip task_id=%s status=%s", task_id, getattr(task, "status", None))
-        return
+    task = assert_task_lease(session, task_id, lease_token)
 
     paper = session.get(Paper, task.paper_id)
     if paper is None:
@@ -220,6 +227,7 @@ def _execute(
         session,
         task_id,
         ParseResultCommit(chunks=chunk_inputs, results=results),
+        lease_token=lease_token,
     )
     logger.info(
         "parse_agent_succeeded task_id=%s paper_id=%s chunks=%s source=%s graph=%s",
@@ -234,7 +242,10 @@ def _execute(
 def _mark_running(session: Session, task: ParseTask, paper: Paper, *, stage: str) -> None:
     from datetime import datetime, timezone
 
+    session.refresh(task)
     now = datetime.now(timezone.utc)
+    if task.status != "running" or not task.lease_token:
+        raise ValueError("TASK_LEASE_LOST")
     task.status = "running"
     task.stage = stage
     task.started_at = task.started_at or now
