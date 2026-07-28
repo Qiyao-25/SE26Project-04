@@ -13,6 +13,8 @@ SystemTest/results/api-junit-*.xml
 SystemTest/results/api-run-*.log
 SystemTest/results/api-summary-*.md
 SystemTest/results/系统测试执行结果-*.xlsx
+SystemTest/results/system-test-results-*.xlsx
+SystemTest/results/_tmp-results-*.xlsx
 SystemTest/results/__pycache__/
 SystemTest/**/__pycache__/
 SystemTest/.pytest_cache/
