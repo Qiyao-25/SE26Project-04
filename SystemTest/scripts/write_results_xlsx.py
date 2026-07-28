@@ -49,11 +49,30 @@ def main() -> None:
     args = parser.parse_args()
 
     RESULTS.mkdir(parents=True, exist_ok=True)
-    out = RESULTS / f"系统测试执行结果-{args.stamp}.xlsx"
-    copy2(SRC_XLSX, out)
     outcomes = parse_junit(args.junit)
 
-    wb = load_workbook(out)
+    summary = RESULTS / f"api-summary-{args.stamp}.md"
+    lines = [
+        f"# API 系统测试摘要 ({args.stamp})",
+        "",
+        f"- junit: `{args.junit.name}`",
+        f"- 回填用例数: {len(outcomes)}",
+        f"- 通过: {sum(1 for v in outcomes.values() if v == 'Y')}",
+        f"- 失败: {sum(1 for v in outcomes.values() if v == 'N')}",
+        "",
+        "| TC | Status |",
+        "|----|--------|",
+    ]
+    for tid in sorted(outcomes):
+        lines.append(f"| {tid} | {outcomes[tid]} |")
+    summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {summary}")
+
+    # Prefer ASCII filename to avoid editor locks on CJK paths; fall back to temp then replace.
+    out = RESULTS / f"system-test-results-{args.stamp}.xlsx"
+    tmp = RESULTS / f"_tmp-results-{args.stamp}.xlsx"
+    copy2(SRC_XLSX, tmp)
+    wb = load_workbook(tmp)
     ws = wb["Test Cases"]
     filled = 0
     for row in range(5, ws.max_row + 1):
@@ -68,25 +87,20 @@ def main() -> None:
         remark = ws.cell(row, 13).value or ""
         ws.cell(row, 13, f"{remark}; auto@{args.stamp}".strip("; "))
         filled += 1
-    wb.save(out)
-
-    summary = RESULTS / f"api-summary-{args.stamp}.md"
-    lines = [
-        f"# API 系统测试摘要 ({args.stamp})",
-        "",
-        f"- junit: `{args.junit.name}`",
-        f"- 回填用例数: {filled}",
-        f"- 通过: {sum(1 for v in outcomes.values() if v == 'Y')}",
-        f"- 失败: {sum(1 for v in outcomes.values() if v == 'N')}",
-        "",
-        "| TC | Status |",
-        "|----|--------|",
-    ]
-    for tid in sorted(outcomes):
-        lines.append(f"| {tid} | {outcomes[tid]} |")
-    summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote {out}")
-    print(f"wrote {summary}")
+    try:
+        wb.save(tmp)
+        tmp.replace(out)
+        print(f"wrote {out} (filled {filled})")
+    except PermissionError as exc:
+        alt = RESULTS / f"system-test-results-{args.stamp}-alt.xlsx"
+        wb.save(alt)
+        print(f"permission denied for {out}; wrote {alt} instead ({exc})")
+    finally:
+        if tmp.exists() and tmp != out:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
