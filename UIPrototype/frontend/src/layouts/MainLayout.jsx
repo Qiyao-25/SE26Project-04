@@ -2,10 +2,11 @@ import {
   Layout,
   Menu,
   Button,
+  Drawer,
+  Grid,
   Typography,
   Space,
   Tag,
-  Drawer,
 } from 'antd';
 
 import {
@@ -18,6 +19,7 @@ import {
   MoonOutlined,
   SunOutlined,
   MenuOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 
 import {
@@ -34,6 +36,7 @@ import PaperDetailPage from '../pages/PaperDetail/PaperDetailPage';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function MainLayout({
   themeMode,
@@ -41,13 +44,14 @@ export default function MainLayout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const screens = useBreakpoint();
+  const isMobile = screens.md === false;
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { t } = useI18n();
   const paperMatch = useMatch('/paper/:paperId');
   const routePaperId = paperMatch?.params?.paperId
     ? String(paperMatch.params.paperId)
     : null;
-
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const {
     logout,
@@ -62,6 +66,10 @@ export default function MainLayout({
   useEffect(() => {
     if (routePaperId) setLockedPaperId(routePaperId);
   }, [routePaperId, setLockedPaperId]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const keptPaperId = routePaperId || (lockedPaperId ? String(lockedPaperId) : null);
   const onPaperDetail = Boolean(routePaperId);
@@ -146,38 +154,73 @@ export default function MainLayout({
   };
 
   const handleLogout = () => {
-    setMobileNavOpen(false);
     // 清理只属于当前登录会话的数据，再由全局上下文清理登录态
     sessionStorage.removeItem('papermate-session-subscriptions');
+    setMobileNavOpen(false);
     logout();
     navigate('/login', { replace: true });
   };
 
-  const siderTheme = themeMode === 'dark' ? 'dark' : 'light';
-
-  const renderNavPanel = () => (
+  const navigationContent = (
     <>
       <div className="logo-area">
         <div className="logo-row">
-          <span className="logo-mark">PM</span>
+          <span className="logo-mark">
+            PM
+          </span>
+
           <div className="logo-text">
-            <Title level={5} style={{ margin: 0 }}>PaperMate</Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>ArXiv 智能论文阅读</Text>
+            <Title
+              level={5}
+              style={{ margin: 0 }}
+            >
+              PaperMate
+            </Title>
+
+            <Text
+              type="secondary"
+              style={{ fontSize: 12 }}
+            >
+              ArXiv 智能论文阅读
+            </Text>
           </div>
+
+          {isMobile ? (
+            <Button
+              type="text"
+              className="mobile-nav-close"
+              icon={<CloseOutlined />}
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="关闭导航菜单"
+            />
+          ) : null}
         </div>
       </div>
 
       <Menu
         mode="inline"
-        theme={siderTheme}
         selectedKeys={[pathKey]}
         items={menuItems}
         onClick={handleMenuClick}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
       />
 
-      <div className="sider-footer" style={{ marginTop: 'auto', flexShrink: 0 }}>
-        <Button block icon={<LogoutOutlined />} onClick={handleLogout}>
+      <div
+        className="sider-footer"
+        style={{
+          marginTop: 'auto',
+          flexShrink: 0,
+        }}
+      >
+        <Button
+          block
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+        >
           {t('nav.logout')}
         </Button>
       </div>
@@ -186,47 +229,64 @@ export default function MainLayout({
 
   return (
     <Layout className="main-layout">
-      <Sider
-        width={248}
-        theme={siderTheme}
-        className="main-sider main-sider-desktop"
-        style={{
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-          alignSelf: 'flex-start',
-        }}
-      >
-        {renderNavPanel()}
-      </Sider>
+      {!isMobile ? (
+        <Sider
+          width={248}
+          theme={themeMode === 'dark' ? 'dark' : 'light'}
+          className="main-sider"
+          style={{
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            alignSelf: 'flex-start',
+          }}
+        >
+          {navigationContent}
+        </Sider>
+      ) : null}
 
       <Drawer
-        title="PaperMate"
         placement="left"
         width={280}
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
-        className="main-sider-drawer"
-        styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
+        closable={false}
+        className="mobile-nav-drawer"
+        styles={{
+          body: {
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
       >
-        <div className={`main-sider main-sider-mobile theme-${siderTheme}`}>
-          {renderNavPanel()}
+        <div className="mobile-nav-content">
+          {navigationContent}
         </div>
       </Drawer>
 
       <Layout>
         <Header className="main-header">
-          <div className="header-title-wrap">
-            <Button
-              type="text"
-              className="mobile-nav-toggle"
-              icon={<MenuOutlined />}
-              aria-label="打开导航菜单"
-              onClick={() => setMobileNavOpen(true)}
-            />
-            <Title level={4} style={{ margin: 0 }}>
-              {meta.title}
-            </Title>
+          <div className="header-title-group">
+            {isMobile ? (
+              <Button
+                type="text"
+                className="mobile-menu-btn"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="打开导航菜单"
+                aria-expanded={mobileNavOpen}
+              />
+            ) : null}
+
+            <div className="header-title-wrap">
+              <Title
+                level={4}
+                style={{ margin: 0 }}
+              >
+                {meta.title}
+              </Title>
+            </div>
           </div>
 
           <Space

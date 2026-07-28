@@ -15,6 +15,20 @@ import AdminRoute from './AdminRoute';
 import SettingsPage from '../pages/Settings/SettingsPage';
 import PaperLibraryPage from '../pages/PaperLibrary/PaperLibraryPage';
 
+const THEME_STORAGE_KEY = 'papermate-theme';
+const LIGHT_DEFAULT_MIGRATION_KEY = 'papermate-theme-light-default-v1';
+
+function getInitialThemeMode() {
+  // 旧版本会在首次访问时自动写入 dark。升级后统一迁移一次到浅色，
+  // 后续仍然尊重并保存用户手动选择的主题。
+  if (localStorage.getItem(LIGHT_DEFAULT_MIGRATION_KEY) !== 'done') {
+    localStorage.setItem(LIGHT_DEFAULT_MIGRATION_KEY, 'done');
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    return 'light';
+  }
+  const savedMode = localStorage.getItem(THEME_STORAGE_KEY);
+  return savedMode === 'dark' || savedMode === 'light' ? savedMode : 'light';
+}
 
 const getAntdTheme = (mode) => {
   if (mode === 'dark') {
@@ -222,13 +236,11 @@ const getAntdTheme = (mode) => {
   };
 };
 export default function AppRoutes() {
-  const [themeMode, setThemeMode] = useState(
-    localStorage.getItem('papermate-theme') || 'dark'
-  );
+  const [themeMode, setThemeMode] = useState(getInitialThemeMode);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeMode);
-    localStorage.setItem('papermate-theme', themeMode);
+    localStorage.setItem(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
 
   const theme = useMemo(() => getAntdTheme(themeMode), [themeMode]);

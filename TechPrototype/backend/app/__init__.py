@@ -1,2 +1,0 @@
-"""PaperMate backend application package."""
-
