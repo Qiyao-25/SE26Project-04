@@ -45,7 +45,7 @@ def test_list_tasks_returns_oldest_queued_tasks_first() -> None:
         assert second.task_id == first.task_id
         forced, _ = create_task(session, paper_id, "full_parse", "queue-key-force", force=True)
         assert forced.task_id != first.task_id
-        assert get_task(session, first.task_id).error_code == "SUPERSEDED"
+        assert get_task(session, first.task_id, is_admin=True).error_code == "SUPERSEDED"
         queued = list_tasks(session, status="queued", limit=10)
         assert [task.task_id for task in queued] == [forced.task_id]
         update_task(session, forced.task_id, TaskUpdate(status="running"))
@@ -58,7 +58,7 @@ def test_task_stage_is_persisted() -> None:
         task, _ = create_task(session, paper_id, "full_parse", "stage-key")
         updated = update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"))
         assert updated.stage == "parse"
-        assert get_task(session, task.task_id).stage == "parse"
+        assert get_task(session, task.task_id, is_admin=True).stage == "parse"
 
 
 def test_worker_claim_is_atomic_and_starts_task() -> None:
@@ -73,12 +73,37 @@ def test_worker_claim_is_atomic_and_starts_task() -> None:
         assert claim_task(session, "worker-b") is None
 
 
+def test_worker_lease_is_required_for_status_and_result_writeback() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="lease-paper", title="Lease Paper")]).items[0].paper_id
+        task, _ = create_task(session, paper_id, "full_parse", "lease-key")
+        claimed = claim_task(session, "worker-a")
+        assert claimed is not None and claimed.lease_token
+
+        for token, expected in ((None, "TASK_LEASE_REQUIRED"), ("stale-token", "TASK_LEASE_LOST")):
+            try:
+                update_task(session, task.task_id, TaskUpdate(status="running", stage="parse"), lease_token=token)
+            except ValueError as exc:
+                assert str(exc) == expected
+            else:
+                raise AssertionError(f"expected {expected}")
+
+        updated = update_task(
+            session,
+            task.task_id,
+            TaskUpdate(status="running", stage="parse"),
+            lease_token=claimed.lease_token,
+        )
+        assert updated.stage == "parse"
+
+
 def test_completed_task_rejects_late_status_update() -> None:
     with make_session() as session:
         paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="transition-paper", title="Transition Paper")]).items[0].paper_id
         task, _ = create_task(session, paper_id, "full_parse", "transition-key")
-        claim_task(session, "worker-a")
-        update_task(session, task.task_id, TaskUpdate(status="failed", error_code="PARSE_FAILED"))
+        claimed = claim_task(session, "worker-a")
+        assert claimed is not None and claimed.lease_token
+        update_task(session, task.task_id, TaskUpdate(status="failed", error_code="PARSE_FAILED"), lease_token=claimed.lease_token)
         retry_task(session, task.task_id)
         update_task(session, task.task_id, TaskUpdate(status="running"))
         save_results(session, task.task_id, StructuredResultBatch(results=[StructuredResultInput(result_type="summary", content_json={"summary": "done"})]))
@@ -145,7 +170,7 @@ def test_content_empty_soft_deletes_paper() -> None:
         paper = session.get(Paper, paper_id)
         assert paper is not None
         assert paper.deleted_at is not None
-        assert get_task(session, task.task_id).error_code == "CONTENT_EMPTY"
+        assert get_task(session, task.task_id, is_admin=True).error_code == "CONTENT_EMPTY"
 
 
 def test_stale_running_task_is_recovered() -> None:
@@ -158,7 +183,7 @@ def test_stale_running_task_is_recovered() -> None:
         session.commit()
         recovered = recover_stale_tasks(session, stale_after_seconds=60)
         assert [item.task_id for item in recovered] == [task.task_id]
-        assert get_task(session, task.task_id).status == "timed_out"
+        assert get_task(session, task.task_id, is_admin=True).status == "timed_out"
 
 
 def test_metadata_only_papers_can_be_enqueued() -> None:
@@ -166,7 +191,7 @@ def test_metadata_only_papers_can_be_enqueued() -> None:
         paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="pending-paper", title="Pending Paper")]).items[0].paper_id
         queued = enqueue_pending_tasks(session, limit=10)
         assert queued and queued[0].paper_id == paper_id
-        assert get_task(session, queued[0].task_id).status == "queued"
+        assert get_task(session, queued[0].task_id, is_admin=True).status == "queued"
 
 
 def test_finalize_replaces_chunks_and_updates_queue_readiness() -> None:
@@ -220,6 +245,25 @@ def test_boost_parse_priority_creates_at_most_one_stable_task() -> None:
         assert second.task_id == first.task_id
         queued = [t for t in list_tasks(session, status="queued", limit=20) if t.paper_id == paper_id]
         assert len(queued) == 1
+
+
+def test_user_claims_unowned_auto_task_when_explicitly_starting_parse() -> None:
+    with make_session() as session:
+        paper_id = batch_upsert_papers(session, [PaperUpsert(arxiv_id="auto-owned", title="Auto Owned")]).items[0].paper_id
+        auto_task = enqueue_pending_tasks(session, limit=10)[0]
+
+        claimed, created = create_task(
+            session,
+            paper_id,
+            "full_parse",
+            "user-parse-request",
+            owner_user_id=42,
+        )
+
+        assert created is False
+        assert claimed.task_id == auto_task.task_id
+        assert claimed.owner_user_id == 42
+        assert get_task(session, auto_task.task_id, user_id=42).owner_user_id == 42
 
 
 def test_boost_parse_priority_rejects_already_parsed() -> None:

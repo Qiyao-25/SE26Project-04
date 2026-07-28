@@ -17,7 +17,7 @@
 | `ingest.py` / `BackendClient.batch_upsert_papers` | `POST /api/papers/batch` | **请求体 = JSON 数组** `list[PaperUpsert]`（服务端也接受 `{papers:[...]}`） |
 | `paper_meta_to_backend` | `AuthorInput` | 作者字段为 `{name}` |
 | `wiki_to_backend_structured_rows` | `GET .../wiki` | 写出 summary / concepts / methods / experiments / limitations |
-| `chunk_to_backend` + `finalize` | `POST /api/tasks/{id}/finalize` | 原子提交 chunks + 结构化结果 |
+| `chunk_to_backend` + `finalize` | `POST /api/tasks/{id}/finalize` + `X-Task-Lease` | 原子提交 chunks + 结构化结果；租约失效时拒绝旧 Worker 写回 |
 | `QAResult.to_ui()` | `AskPaperResult` / mock | `pageNumber` / `sectionTitle` / `quote` |
 | 信封解析 | `ApiResponse` | `{code, message, data, request_id}` |
 

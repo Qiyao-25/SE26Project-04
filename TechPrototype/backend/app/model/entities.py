@@ -65,6 +65,7 @@ class ParseTask(Base):
     __tablename__ = "parse_tasks"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     paper_id: Mapped[int] = mapped_column(ForeignKey("papers.id"), index=True)
+    owner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     task_type: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -74,6 +75,7 @@ class ParseTask(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(String(64))
     stage: Mapped[str | None] = mapped_column(String(32))
+    lease_token: Mapped[str | None] = mapped_column(String(128), index=True)
     paper: Mapped[Paper] = relationship(back_populates="parse_tasks")
 
 
@@ -133,6 +135,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="user", server_default="user")
     is_active: Mapped[bool] = mapped_column(default=True, server_default="1", nullable=False)
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

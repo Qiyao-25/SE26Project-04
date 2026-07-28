@@ -54,6 +54,17 @@ async def run_parse_scheduler(app, stop_event: asyncio.Event) -> None:
         logger.info("parse_scheduler_disabled")
         return
 
+    from app.service.scheduler_lock import release_scheduler_lock, try_acquire_scheduler_lock
+
+    lock = await asyncio.to_thread(
+        try_acquire_scheduler_lock,
+        settings.scheduler_lock_dir,
+        "parse-scheduler",
+    )
+    if lock is None:
+        logger.info("parse_scheduler_skipped_lock_owned_by_another_process")
+        return
+
     # Idle poll only applies when there is nothing left to parse.
     idle_interval = max(15, int(getattr(settings, "parse_scheduler_interval_s", 30)))
     batch = max(1, int(getattr(settings, "parse_scheduler_batch", 5)))
@@ -66,33 +77,36 @@ async def run_parse_scheduler(app, stop_event: asyncio.Event) -> None:
     )
 
     try:
-        await asyncio.wait_for(stop_event.wait(), timeout=initial_delay)
-        return
-    except asyncio.TimeoutError:
-        pass
-
-    while not stop_event.is_set():
         try:
-            while not stop_event.is_set() and await asyncio.to_thread(_has_work, app.state.engine):
-                task_ids = await asyncio.to_thread(_enqueue_and_pick, app.state.engine, batch)
-                if not task_ids:
-                    # Work exists but nothing runnable yet (e.g. already running) — back off briefly.
-                    break
-                logger.info("parse_scheduler_running tasks=%s", task_ids)
-                for task_id in task_ids[:batch]:
-                    if stop_event.is_set():
-                        break
-                    try:
-                        await asyncio.to_thread(_run_one, app.state.engine, task_id, settings)
-                        logger.info("parse_scheduler_finished task_id=%s", task_id)
-                    except Exception:  # noqa: BLE001
-                        logger.exception("parse_scheduler_task_failed task_id=%s", task_id)
-                # No idle sleep here: keep draining until unparsed papers are gone.
-        except Exception:  # noqa: BLE001
-            logger.exception("parse_scheduler_failed")
-
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=idle_interval)
+            await asyncio.wait_for(stop_event.wait(), timeout=initial_delay)
             return
         except asyncio.TimeoutError:
-            continue
+            pass
+
+        while not stop_event.is_set():
+            try:
+                while not stop_event.is_set() and await asyncio.to_thread(_has_work, app.state.engine):
+                    task_ids = await asyncio.to_thread(_enqueue_and_pick, app.state.engine, batch)
+                    if not task_ids:
+                        # Work exists but nothing runnable yet (e.g. already running) — back off briefly.
+                        break
+                    logger.info("parse_scheduler_running tasks=%s", task_ids)
+                    for task_id in task_ids[:batch]:
+                        if stop_event.is_set():
+                            break
+                        try:
+                            await asyncio.to_thread(_run_one, app.state.engine, task_id, settings)
+                            logger.info("parse_scheduler_finished task_id=%s", task_id)
+                        except Exception:  # noqa: BLE001
+                            logger.exception("parse_scheduler_task_failed task_id=%s", task_id)
+                    # No idle sleep here: keep draining until unparsed papers are gone.
+            except Exception:  # noqa: BLE001
+                logger.exception("parse_scheduler_failed")
+
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=idle_interval)
+                return
+            except asyncio.TimeoutError:
+                continue
+    finally:
+        release_scheduler_lock(lock)

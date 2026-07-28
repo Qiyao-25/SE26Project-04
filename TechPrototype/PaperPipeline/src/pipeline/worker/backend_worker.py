@@ -48,14 +48,15 @@ class BackendParseWorker:
     def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         task_id = int(task["task_id"])
         paper_id = int(task["paper_id"])
+        lease_token = str(task.get("lease_token") or "")
         try:
-            self.client.update_task(task_id, "running", stage="fetch")
+            self.client.update_task(task_id, "running", stage="fetch", lease_token=lease_token)
             paper = self.client.get_paper(paper_id)
             arxiv_id = str(paper.get("arxiv_id") or "").strip()
             if not arxiv_id:
                 raise WorkerFailure("PAPER_METADATA_INVALID", "论文缺少 arXiv ID")
 
-            self.client.update_task(task_id, "running", stage="parse")
+            self.client.update_task(task_id, "running", stage="parse", lease_token=lease_token)
             parsed = parse_document(
                 arxiv_id,
                 self.pdf_dir,
@@ -69,7 +70,7 @@ class BackendParseWorker:
             if not parsed.ok:
                 raise WorkerFailure("PARSE_FAILED", parsed.error or "PDF 解析失败")
 
-            self.client.update_task(task_id, "running", stage="summarize")
+            self.client.update_task(task_id, "running", stage="summarize", lease_token=lease_token)
             try:
                 wiki = (
                     build_structured_with_agent(
@@ -98,7 +99,7 @@ class BackendParseWorker:
             if not wiki.required_ok():
                 raise WorkerFailure("STRUCTURED_RESULT_FAILED", "结构化摘要字段不完整")
 
-            self.client.update_task(task_id, "running", stage="validate")
+            self.client.update_task(task_id, "running", stage="validate", lease_token=lease_token)
             chunks = [
                 chunk_to_backend(asdict(paragraph))
                 for paragraph in parsed.paragraphs
@@ -108,7 +109,7 @@ class BackendParseWorker:
                 raise WorkerFailure("PARSE_FAILED", "解析结果无有效文本块")
             # backend TextChunkBatch max_length=5000
             chunks = chunks[:5000]
-            self.client.update_task(task_id, "running", stage="persist")
+            self.client.update_task(task_id, "running", stage="persist", lease_token=lease_token)
             self.client.finalize_parse_result(
                 task_id,
                 chunks,
@@ -122,19 +123,20 @@ class BackendParseWorker:
                     page_count=parsed.page_count,
                     source=f"pipeline_{parsed.source_type}",
                 ),
+                lease_token=lease_token,
             )
             result = {"task_id": task_id, "paper_id": paper_id, "status": "succeeded", "stage": "completed", "source_type": parsed.source_type, "chunks": len(chunks), "validation_flags": wiki.validation_flags}
             logger.info("parse_task_succeeded task_id=%s paper_id=%s chunks=%s", task_id, paper_id, len(chunks))
             return result
         except WorkerFailure as exc:
-            return self._fail(task_id, paper_id, exc.code, str(exc))
+            return self._fail(task_id, paper_id, exc.code, str(exc), lease_token)
         except Exception as exc:  # noqa: BLE001
             logger.exception("parse_task_failed task_id=%s paper_id=%s", task_id, paper_id)
-            return self._fail(task_id, paper_id, "WORKER_ERROR", str(exc))
+            return self._fail(task_id, paper_id, "WORKER_ERROR", str(exc), lease_token)
 
-    def _fail(self, task_id: int, paper_id: int, code: str, detail: str) -> dict[str, Any]:
+    def _fail(self, task_id: int, paper_id: int, code: str, detail: str, lease_token: str) -> dict[str, Any]:
         try:
-            self.client.update_task(task_id, "failed", code, stage="failed")
+            self.client.update_task(task_id, "failed", code, stage="failed", lease_token=lease_token)
         except Exception:  # noqa: BLE001
             logger.exception("parse_task_failure_writeback_failed task_id=%s", task_id)
         logger.error("parse_task_failed task_id=%s paper_id=%s code=%s detail=%s", task_id, paper_id, code, detail)

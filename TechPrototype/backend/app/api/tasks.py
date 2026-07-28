@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -22,12 +22,15 @@ def map_error(request: Request, error: ValueError):
     mapping = {
         "PAPER_NOT_FOUND": ("PAPER_NOT_FOUND", "论文不存在", 404),
         "TASK_NOT_FOUND": ("TASK_NOT_FOUND", "解析任务不存在", 404),
+        "TASK_FORBIDDEN": ("TASK_FORBIDDEN", "不能访问其他用户的解析任务", 403),
         "TASK_CONFLICT": ("TASK_CONFLICT", "解析任务状态或幂等键冲突", 409),
         "TASK_RETRY_CONFLICT": ("TASK_RETRY_CONFLICT", "当前任务状态不允许重试", 409),
         "TASK_RETRY_EXHAUSTED": ("TASK_RETRY_EXHAUSTED", "解析任务已达到最大重试次数", 409),
         "TASK_STATE_CONFLICT": ("TASK_STATE_CONFLICT", "解析任务状态不允许该操作", 409),
         "TASK_DELETE_CONFLICT": ("TASK_DELETE_CONFLICT", "运行中的解析任务不可删除", 409),
         "WORKER_ID_INVALID": ("WORKER_ID_INVALID", "Worker 标识不能为空", 400),
+        "TASK_LEASE_REQUIRED": ("TASK_LEASE_REQUIRED", "缺少解析任务租约", 409),
+        "TASK_LEASE_LOST": ("TASK_LEASE_LOST", "解析任务租约已失效", 409),
     }
     code, message, status_code = mapping.get(str(error), ("INTERNAL_ERROR", "任务处理失败", 500))
     return error_response(request, code, message, status_code)
@@ -62,10 +65,15 @@ def task_detail(
     task_id: int,
     request: Request,
     db: Session = Depends(db_session),
-    _user: AuthUser = Depends(require_current_user),
+        _user: AuthUser = Depends(require_current_user),
 ):
     try:
-        data = get_task(db, task_id)
+        data = get_task(
+            db,
+            task_id,
+            user_id=int(_user.user_id),
+            is_admin=_user.role == "admin",
+        )
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
@@ -115,9 +123,16 @@ def enqueue_pending(
 
 
 @router.patch("/{task_id}", response_model=ApiResponse[TaskResponse], summary="更新解析任务状态")
-def task_update(task_id: int, payload: TaskUpdate, request: Request, _worker: None = Depends(require_worker_access), db: Session = Depends(db_session)):
+def task_update(
+    task_id: int,
+    payload: TaskUpdate,
+    request: Request,
+    lease_token: str | None = Header(default=None, alias="X-Task-Lease"),
+    _worker: None = Depends(require_worker_access),
+    db: Session = Depends(db_session),
+):
     try:
-        data = update_task(db, task_id, payload)
+        data = update_task(db, task_id, payload, lease_token=lease_token)
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
@@ -152,18 +167,32 @@ def task_delete(
 
 
 @router.post("/{task_id}/results", response_model=ApiResponse[TaskResponse], summary="写入结构化解析结果")
-def task_results(task_id: int, payload: StructuredResultBatch, request: Request, _worker: None = Depends(require_worker_access), db: Session = Depends(db_session)):
+def task_results(
+    task_id: int,
+    payload: StructuredResultBatch,
+    request: Request,
+    lease_token: str | None = Header(default=None, alias="X-Task-Lease"),
+    _worker: None = Depends(require_worker_access),
+    db: Session = Depends(db_session),
+):
     try:
-        data = save_results(db, task_id, payload)
+        data = save_results(db, task_id, payload, lease_token=lease_token)
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)
 
 
 @router.post("/{task_id}/finalize", response_model=ApiResponse[TaskResponse], summary="一次性提交论文解析结果")
-def task_finalize(task_id: int, payload: ParseResultCommit, request: Request, _worker: None = Depends(require_worker_access), db: Session = Depends(db_session)):
+def task_finalize(
+    task_id: int,
+    payload: ParseResultCommit,
+    request: Request,
+    lease_token: str | None = Header(default=None, alias="X-Task-Lease"),
+    _worker: None = Depends(require_worker_access),
+    db: Session = Depends(db_session),
+):
     try:
-        data = save_parse_result(db, task_id, payload)
+        data = save_parse_result(db, task_id, payload, lease_token=lease_token)
     except ValueError as exc:
         return map_error(request, exc)
     return ApiResponse(data=data, request_id=request.state.request_id)

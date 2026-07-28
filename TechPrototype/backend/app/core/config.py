@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     parse_scheduler_enabled: bool = True
     parse_scheduler_interval_s: int = 30
     parse_scheduler_batch: int = 5
+    scheduler_lock_dir: str = str(BACKEND_DIR / "data" / "locks")
     # arXiv API (campus networks often need longer timeout; API may 429)
     arxiv_api_base: str = "https://export.arxiv.org/api/query"
     arxiv_rss_base: str = "https://rss.arxiv.org/rss"
@@ -139,6 +140,10 @@ class Settings(BaseSettings):
         if not storage_path.is_absolute():
             storage_path = BACKEND_DIR / storage_path
         self.paper_storage_dir = str(storage_path.resolve())
+        lock_dir = Path(self.scheduler_lock_dir).expanduser()
+        if not lock_dir.is_absolute():
+            lock_dir = BACKEND_DIR / lock_dir
+        self.scheduler_lock_dir = str(lock_dir.resolve())
         return self
 
     def validate_runtime(self) -> None:

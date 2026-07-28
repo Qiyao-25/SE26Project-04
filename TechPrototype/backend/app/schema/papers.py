@@ -88,6 +88,9 @@ class TaskResponse(BaseModel):
     error_code: str | None
     stage: str | None = None
     retryable: bool = False
+    owner_user_id: int | None = None
+    # Only populated by the internal claim endpoint; ordinary task reads omit it.
+    lease_token: str | None = None
 
 
 class TaskQueueStats(BaseModel):
