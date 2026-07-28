@@ -164,6 +164,7 @@ _FILLERS = (
     "找一下", "帮我找", "帮我搜", "帮我查", "请帮我", "麻烦", "看一下", "查一下",
     "搜一下", "搜索一下", "有没有", "我想找", "我想看", "给我找", "给我搜",
     "请找", "请搜", "找找", "搜搜", "查询", "检索", "搜索", "查找",
+    "找", "搜", "查",
 )
 _TOPIC_ZH_EN: dict[str, list[str]] = {
     "代码生成": ["code generation", "program synthesis"],
@@ -296,9 +297,15 @@ def extract_arxiv_id(query: str) -> str | None:
 
 def strip_query_fillers(query: str) -> str:
     text = (query or "").strip()
-    for filler in _FILLERS:
-        if text.startswith(filler):
-            text = text[len(filler) :].lstrip(" ，,。:：")
+    # Strip chained prefixes such as “请帮我找”, preferring the longest phrase first.
+    while text:
+        matched = next(
+            (filler for filler in sorted(_FILLERS, key=len, reverse=True) if text.startswith(filler)),
+            None,
+        )
+        if matched is None:
+            break
+        text = text[len(matched) :].lstrip(" ，,。:：")
     for honor in _HONORIFICS:
         text = text.replace(honor, "")
     text = re.sub(r"的?(论文|文章|工作|著作|成果)\s*$", "", text)
@@ -307,6 +314,12 @@ def strip_query_fillers(query: str) -> str:
 
 def extract_year_range(query: str) -> tuple[int | None, int | None]:
     text = query or ""
+    before_match = re.search(r"\b(?:before|until)\s*(19\d{2}|20\d{2})\b", text, re.I)
+    if before_match:
+        return None, int(before_match.group(1))
+    after_match = re.search(r"\b(?:after|since)\s*(19\d{2}|20\d{2})\b", text, re.I)
+    if after_match:
+        return int(after_match.group(1)), None
     match = _YEAR_RANGE_RE.search(text)
     if not match:
         # 「近几年」→ last 3 years
@@ -385,6 +398,11 @@ def resolve_author_hints(query: str) -> tuple[list[str], bool, list[str]]:
     warnings: list[str] = []
     verified = False
     for name in raw_names:
+        name = name.strip()
+        for honorific in _HONORIFICS:
+            if name.endswith(honorific):
+                name = name[: -len(honorific)].strip()
+                break
         if name in KNOWN_AUTHOR_ALIASES:
             hints.extend(KNOWN_AUTHOR_ALIASES[name])
             verified = True
