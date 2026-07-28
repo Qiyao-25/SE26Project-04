@@ -121,6 +121,16 @@ export default function PaperDetailPage({ paperIdProp = null }) {
   }, [paperId, comparePreviewActive, comparePaperB]);
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 992px)');
+    const keepSidebarVisible = () => {
+      if (media.matches) setSidebarCollapsed(false);
+    };
+    keepSidebarVisible();
+    media.addEventListener('change', keepSidebarVisible);
+    return () => media.removeEventListener('change', keepSidebarVisible);
+  }, []);
+
+  useEffect(() => {
     if (!pdfFullscreen) return undefined;
     const onKeyDown = (event) => {
       if (event.key === 'Escape') setPdfFullscreen(false);
