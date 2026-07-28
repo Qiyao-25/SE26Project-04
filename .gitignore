@@ -4,3 +4,32 @@
 dist/
 *.tar.gz
 .DS_Store
+
+# Cursor IDE local config (not a product module)
+.cursor/
+
+# Unit test generated reports (keep README + source tests tracked)
+UnitTest/**/reports/
+UnitTest/**/*.log
+UnitTest/**/coverage-html/
+UIPrototype/frontend/coverage/
+
+# System test run artifacts (keep scripts & templates tracked)
+SystemTest/results/api-junit-*.xml
+SystemTest/results/api-run-*.log
+SystemTest/results/api-summary-*.md
+SystemTest/results/系统测试执行结果-*.xlsx
+SystemTest/results/system-test-results-*.xlsx
+SystemTest/results/_tmp-results-*.xlsx
+SystemTest/results/full-run-*/_tmp.xlsx
+SystemTest/results/full-run-*/
+SystemTest/results/retry-*/
+SystemTest/results/**/~$*
+SystemTest/results/~$*
+!SystemTest/results/latest-full/
+!SystemTest/results/latest-full/**
+SystemTest/results/latest-full/~$*
+SystemTest/results/LATEST.txt
+SystemTest/results/__pycache__/
+SystemTest/**/__pycache__/
+SystemTest/.pytest_cache/

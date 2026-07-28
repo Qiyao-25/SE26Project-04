@@ -5,6 +5,7 @@ import {
   Typography,
   Space,
   Tag,
+  Drawer,
 } from 'antd';
 
 import {
@@ -16,6 +17,7 @@ import {
   DatabaseOutlined,
   MoonOutlined,
   SunOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
 
 import {
@@ -24,7 +26,7 @@ import {
   useLocation,
   useMatch,
 } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
@@ -44,6 +46,8 @@ export default function MainLayout({
   const routePaperId = paperMatch?.params?.paperId
     ? String(paperMatch.params.paperId)
     : null;
+
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const {
     logout,
@@ -132,6 +136,7 @@ export default function MainLayout({
   };
 
   const handleMenuClick = ({ key }) => {
+    setMobileNavOpen(false);
     // 工作空间被论文锁定时：点「工作空间」回到该论文详情
     if (key === '/workspace' && lockedPaperId) {
       navigate(`/paper/${lockedPaperId}`);
@@ -141,18 +146,50 @@ export default function MainLayout({
   };
 
   const handleLogout = () => {
+    setMobileNavOpen(false);
     // 清理只属于当前登录会话的数据，再由全局上下文清理登录态
     sessionStorage.removeItem('papermate-session-subscriptions');
     logout();
     navigate('/login', { replace: true });
   };
 
+  const siderTheme = themeMode === 'dark' ? 'dark' : 'light';
+
+  const renderNavPanel = () => (
+    <>
+      <div className="logo-area">
+        <div className="logo-row">
+          <span className="logo-mark">PM</span>
+          <div className="logo-text">
+            <Title level={5} style={{ margin: 0 }}>PaperMate</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>ArXiv 智能论文阅读</Text>
+          </div>
+        </div>
+      </div>
+
+      <Menu
+        mode="inline"
+        theme={siderTheme}
+        selectedKeys={[pathKey]}
+        items={menuItems}
+        onClick={handleMenuClick}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+      />
+
+      <div className="sider-footer" style={{ marginTop: 'auto', flexShrink: 0 }}>
+        <Button block icon={<LogoutOutlined />} onClick={handleLogout}>
+          {t('nav.logout')}
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <Layout className="main-layout">
       <Sider
         width={248}
-        theme={themeMode === 'dark' ? 'dark' : 'light'}
-        className="main-sider"
+        theme={siderTheme}
+        className="main-sider main-sider-desktop"
         style={{
           position: 'sticky',
           top: 0,
@@ -160,66 +197,34 @@ export default function MainLayout({
           alignSelf: 'flex-start',
         }}
       >
-        <div className="logo-area">
-          <div className="logo-row">
-            <span className="logo-mark">
-              PM
-            </span>
-
-            <div className="logo-text">
-              <Title
-                level={5}
-                style={{ margin: 0 }}
-              >
-                PaperMate
-              </Title>
-
-              <Text
-                type="secondary"
-                style={{ fontSize: 12 }}
-              >
-                ArXiv 智能论文阅读
-              </Text>
-            </div>
-          </div>
-        </div>
-
-        <Menu
-          mode="inline"
-          selectedKeys={[pathKey]}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-          }}
-        />
-
-        <div
-          className="sider-footer"
-          style={{
-            marginTop: 'auto',
-            flexShrink: 0,
-          }}
-        >
-          <Button
-            block
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-          >
-            {t('nav.logout')}
-          </Button>
-        </div>
+        {renderNavPanel()}
       </Sider>
+
+      <Drawer
+        title="PaperMate"
+        placement="left"
+        width={280}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        className="main-sider-drawer"
+        styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
+      >
+        <div className={`main-sider main-sider-mobile theme-${siderTheme}`}>
+          {renderNavPanel()}
+        </div>
+      </Drawer>
 
       <Layout>
         <Header className="main-header">
           <div className="header-title-wrap">
-            <Title
-              level={4}
-              style={{ margin: 0 }}
-            >
+            <Button
+              type="text"
+              className="mobile-nav-toggle"
+              icon={<MenuOutlined />}
+              aria-label="打开导航菜单"
+              onClick={() => setMobileNavOpen(true)}
+            />
+            <Title level={4} style={{ margin: 0 }}>
               {meta.title}
             </Title>
           </div>

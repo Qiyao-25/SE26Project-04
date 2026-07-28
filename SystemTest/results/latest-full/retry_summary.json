@@ -1,0 +1,46 @@
+{
+  "retry_stamp": "20260728-141119",
+  "outcomes": {
+    "TC-044": "Y",
+    "TC-018": "Y",
+    "TC-020": "Y",
+    "TC-035": "Y",
+    "TC-021": "Y",
+    "TC-034": "Y",
+    "TC-060": "Y"
+  },
+  "evidence": {
+    "TC-044": [
+      "status=200",
+      "fetch-one 1706.03762"
+    ],
+    "TC-018": [
+      "priority status=409",
+      "paper=11"
+    ],
+    "TC-020": [
+      "pdf empty/missing id=99999998",
+      "TC-020_pdf_empty_or_body.png"
+    ],
+    "TC-035": [
+      "annotation-without-quote status=200"
+    ],
+    "TC-021": [
+      "TC-021_fullscreen_or_attempt.png",
+      "TC-021_after_esc.png"
+    ],
+    "TC-034": [
+      "TC-034_notes_panel.png",
+      "notes/annotation panel reachable; text-layer select skipped"
+    ],
+    "TC-060": [
+      "TC-060_webkit.png",
+      "Playwright WebKit (Safari engine proxy)"
+    ]
+  },
+  "counts": {
+    "Y": 69,
+    "N": 0,
+    "B": 0
+  }
+}

@@ -36,6 +36,7 @@ def create_action(session: Session, payload: UserActionInput) -> tuple[UserActio
     elif kind in {"note", "annotation"}:
         payload_json["kind"] = kind
         payload_json["visibility"] = "private"
+    created = True
     if payload.action_type == "favorite":
         existing = session.scalar(
             select(UserAction).where(
@@ -45,6 +46,7 @@ def create_action(session: Session, payload: UserActionInput) -> tuple[UserActio
             )
         )
         if existing is not None:
+            _maybe_sync_topics(session, payload.user_id, payload.action_type)
             return to_action(existing), False
     if payload.action_type == "reading_history":
         existing = session.scalar(
@@ -60,6 +62,7 @@ def create_action(session: Session, payload: UserActionInput) -> tuple[UserActio
                 existing.payload_json = payload_json
             session.commit()
             session.refresh(existing)
+            _maybe_sync_topics(session, payload.user_id, payload.action_type)
             return to_action(existing), False
     action = UserAction(
         user_id=payload.user_id,
@@ -70,7 +73,19 @@ def create_action(session: Session, payload: UserActionInput) -> tuple[UserActio
     session.add(action)
     session.commit()
     session.refresh(action)
-    return to_action(action), True
+    _maybe_sync_topics(session, payload.user_id, payload.action_type)
+    return to_action(action), created
+
+
+def _maybe_sync_topics(session: Session, user_id: str, action_type: str) -> None:
+    if action_type not in {"favorite", "reading_history", "note", "reading_progress"}:
+        return
+    try:
+        from app.service.profile import sync_topics_from_behavior
+
+        sync_topics_from_behavior(session, user_id)
+    except Exception:  # noqa: BLE001 — profile sync must not break learning actions
+        return
 
 
 def list_public_comments(session: Session, paper_id: int, *, limit: int = 100) -> list[UserActionItem]:
@@ -136,8 +151,11 @@ def delete_action(session: Session, action_id: int, user_id: str | None = None) 
         raise ValueError("ACTION_NOT_FOUND")
     if user_id is not None and action.user_id != user_id:
         raise ValueError("ACTION_FORBIDDEN")
+    owner = action.user_id
+    action_type = action.action_type
     session.delete(action)
     session.commit()
+    _maybe_sync_topics(session, owner, action_type)
 
 
 def delete_actions_by_type(session: Session, user_id: str, action_type: str) -> int:
@@ -149,4 +167,5 @@ def delete_actions_by_type(session: Session, user_id: str, action_type: str) -> 
     for row in rows:
         session.delete(row)
     session.commit()
+    _maybe_sync_topics(session, user_id, action_type)
     return len(rows)
