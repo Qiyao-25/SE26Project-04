@@ -99,3 +99,6 @@ python TechPrototype/deploy/pack.py
 | [TechPrototype/PaperPipeline/](./TechPrototype/PaperPipeline/) | 论文处理流水线 |
 | [TechPrototype/deploy/](./TechPrototype/deploy/) | 打包与服务器部署脚本 |
 | [TechPrototype/docs/](./TechPrototype/docs/) | 架构与部署文档 |
+| [docs/](./docs/) | 系统测试用例等课程文档 |
+| [SystemTest/](./SystemTest/) | 系统测试脚本、手工清单与执行结果（对照 `docs/系统测试用例.xlsx`） |
+| [.cursor/](./.cursor/) | Cursor IDE 配置（skills）；非业务模块，见该目录 README |
