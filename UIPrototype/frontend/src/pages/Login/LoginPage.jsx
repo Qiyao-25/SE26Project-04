@@ -51,14 +51,9 @@ export default function LoginPage() {
     navigate('/workspace');
   };
 
-  const fillDemoUser = () => {
-    loginForm.setFieldsValue({ email: 'student@example.com', password: '123456' });
-    message.info('已填入普通用户演示账号');
-  };
-
   const fillAdmin = () => {
-    loginForm.setFieldsValue({ email: 'admin', password: 'admin123' });
-    message.info('已填入管理员演示账号');
+    loginForm.setFieldsValue({ email: 'admin', password: 'PaperMate@20260728' });
+    message.info('已填入管理员账号');
   };
 
   return (
@@ -130,12 +125,13 @@ export default function LoginPage() {
                       进入 PaperMate
                     </Button>
                     <div className="auth-demo-row">
-                      <Button onClick={fillDemoUser}>填入普通用户</Button>
-                      <Button onClick={fillAdmin}>填入管理员</Button>
+                      <Button block onClick={fillAdmin} style={{ gridColumn: '1 / -1' }}>
+                        填入管理员
+                      </Button>
                     </div>
                     <div className="auth-note">
                       <Text type="secondary">
-                        普通用户需先注册；管理员演示账号为 <strong>admin / admin123</strong>。
+                        普通用户请先注册；管理员可点击上方按钮快速填入。
                       </Text>
                     </div>
                   </Form>
