@@ -1,5 +1,9 @@
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("fcntl")
+
 from app.service.scheduler_lock import release_scheduler_lock, try_acquire_scheduler_lock
 
 

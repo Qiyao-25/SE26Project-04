@@ -9,7 +9,7 @@
 ## 相关目录
 
 - 系统测试执行脚本与结果 → [`SystemTest/`](../SystemTest/)
-- 单元测试报告 → [`UnitTest/`](../UnitTest/) 与 [`TechPrototype/backend/UNIT_TEST_REPORT.md`](../TechPrototype/backend/UNIT_TEST_REPORT.md)
+- 单元测试报告 → [`UnitTest/backend/UNIT_TEST_REPORT.md`](../UnitTest/backend/UNIT_TEST_REPORT.md)
 - 架构/部署文档 → [`TechPrototype/docs/`](../TechPrototype/docs/)
 
 ## 维护说明

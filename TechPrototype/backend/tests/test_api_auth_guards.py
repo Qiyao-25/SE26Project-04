@@ -7,7 +7,10 @@ from app.main import create_app
 
 def _route(app, path: str, method: str):
     for included in app.routes:
-        for route in getattr(getattr(included, "original_router", None), "routes", []):
+        router = getattr(included, "original_router", None)
+        if router is None:
+            continue
+        for route in router.routes:
             if route.path == path and method in route.methods:
                 return route
     raise AssertionError(f"route not found: {method} {path}")

@@ -2,43 +2,30 @@
 
 ## 正式报告
 
-见仓库内文档：[`TechPrototype/backend/UNIT_TEST_REPORT.md`](../../TechPrototype/backend/UNIT_TEST_REPORT.md)
+[`UNIT_TEST_REPORT.md`](./UNIT_TEST_REPORT.md) — 智能检索专项 **98.40%** 语句覆盖率（>90%）
 
-| 指标 | 结果 |
+## 测试代码（不在此目录重复存放）
+
+```
+TechPrototype/backend/tests/
+├── conftest.py                         # 共享 fixtures
+├── test_http_routes.py                 # FastAPI TestClient 路由覆盖
+├── test_search_query_normalize_unit.py # 智能检索专项
+├── test_http_security.py               # 鉴权/租约契约
+└── …                                   # 其余 service/API 用例
+```
+
+## 运行
+
+| 场景 | 命令 |
 |------|------|
-| 覆盖范围 | `search_query_normalize.py` + `search_session_store.py` |
-| 语句覆盖率 | **94.14%** |
-| 专项用例 | 19 passed |
-| 全量回归 | 122 passed, 2 skipped |
+| 智能检索专项 + 覆盖率门禁 | `bash TechPrototype/backend/scripts/run_search_coverage.sh` |
+| 全量回归 | `cd TechPrototype/backend && python -m pytest` |
+| Windows 一键 | `powershell -File UnitTest/scripts/run_backend_unit_tests.ps1` |
 
-## 测试代码位置
+## 报告输出
 
-```
-TechPrototype/backend/
-├── tests/                          # pytest 用例
-│   ├── test_search_query_normalize_unit.py
-│   ├── test_http_security.py
-│   ├── test_http_api.py
-│   └── ...
-├── scripts/
-│   ├── run_search_coverage.sh      # 智能检索专项 + 覆盖率门禁
-│   └── start-api.sh                # Docker 启动前迁移
-└── UNIT_TEST_REPORT.md             # 本模块验收报告（权威副本）
-```
+写入 `UnitTest/backend/reports/`（本地生成，不提交 Git）：
 
-## 复现
-
-```bash
-cd TechPrototype/backend
-python -m pip install -e ".[dev]"
-python -m pytest -q
-bash scripts/run_search_coverage.sh
-```
-
-生成物（本地，不提交）：
-
-- `reports/junit-search.xml`
-- `reports/coverage-search.xml`
-- `reports/coverage-html/index.html`
-
-也可复制到本目录 `reports/` 便于课程打包归档。
+- `junit-search.xml` / `coverage-search.xml` / `coverage-html/`
+- `junit-full.xml` / `coverage.xml`（全量回归时）
