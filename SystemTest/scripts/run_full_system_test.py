@@ -137,20 +137,28 @@ def api_register_user() -> tuple[str, str, dict]:
 
 def login_demo_user(page) -> tuple[bool, str | None]:
     """Return (ok, access_token)."""
+    token = None
+    password = None
+    email = None
     try:
-        token, _password, user = api_register_user()
+        token, password, user = api_register_user()
+        email = user.get("email")
         inject_auth(page, token, user)
         if "/workspace" in page.url or page.get_by_text("检索").count():
             return True, token
     except Exception as exc:  # noqa: BLE001
         log_err(f"inject_auth {exc}")
         token = None
+    if not email:
+        token, password, user = api_register_user()
+        email = user.get("email")
     clear_session(page)
     page.get_by_role("tab", name="登录").click()
-    page.get_by_role("button", name="填入普通用户").click()
+    page.locator("input[placeholder='请输入注册邮箱或账号']").fill(email)
+    page.locator("input[placeholder='请输入密码']").fill(password)
     page.locator("button[type='submit']").first.click()
     page.wait_for_timeout(3000)
-    return ("/workspace" in page.url or page.get_by_text("检索").count() > 0), token if "token" in dir() else None
+    return ("/workspace" in page.url or page.get_by_text("检索").count() > 0), token
 
 
 def login_admin(page) -> bool:
@@ -166,7 +174,7 @@ def login_admin(page) -> bool:
             import httpx
 
             with httpx.Client(base_url=BASE, timeout=30.0) as client:
-                r = client.post("/api/auth/login", json={"email": "admin", "password": "admin123"})
+                r = client.post("/api/auth/login", json={"email": "admin", "password": "PaperMate@20260728"})
                 if r.status_code == 200 and r.json().get("code") == "OK":
                     data = r.json()["data"]
                     inject_auth(page, data["access_token"], data["user"])
