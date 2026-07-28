@@ -91,14 +91,29 @@ python TechPrototype/deploy/pack.py
 
 ## 五、仓库结构
 
+```
+SE26Project-04/
+├── UIPrototype/frontend/          # React 前端（含 Vitest 单元测试）
+├── TechPrototype/
+│   ├── backend/                   # FastAPI 后端（pytest + UNIT_TEST_REPORT.md）
+│   ├── PaperPipeline/             # 论文解析 Worker 流水线
+│   ├── deploy/                    # Docker / Nginx / 打包 / 主机部署
+│   └── docs/                      # 架构、部署、运维文档
+├── docs/                          # 课程交付：系统测试用例 xlsx
+├── UnitTest/                      # 单元测试报告索引（>90% 覆盖率验收）
+├── SystemTest/                    # 系统测试脚本、结果、截图（对照 docs/xlsx）
+└── dist/                          # 本地打包产物（gitignore，不提交）
+```
+
 | 目录 | 说明 |
 |------|------|
 | [UIPrototype/](./UIPrototype/) | 界面原型（前端） |
 | [TechPrototype/](./TechPrototype/) | 技术迭代：后端、流水线、部署与技术文档 |
-| [TechPrototype/backend/](./TechPrototype/backend/) | FastAPI 后端 |
+| [TechPrototype/backend/](./TechPrototype/backend/) | FastAPI 后端；单元测试见 `tests/`，报告见 `UNIT_TEST_REPORT.md` |
 | [TechPrototype/PaperPipeline/](./TechPrototype/PaperPipeline/) | 论文处理流水线 |
 | [TechPrototype/deploy/](./TechPrototype/deploy/) | 打包与服务器部署脚本 |
 | [TechPrototype/docs/](./TechPrototype/docs/) | 架构与部署文档 |
-| [docs/](./docs/) | 系统测试用例等课程文档 |
-| [SystemTest/](./SystemTest/) | 系统测试脚本、手工清单与执行结果（对照 `docs/系统测试用例.xlsx`） |
-| [.cursor/](./.cursor/) | Cursor IDE 配置（skills）；非业务模块，见该目录 README |
+| [docs/](./docs/) | 系统测试用例 xlsx 等课程文档 |
+| [UnitTest/](./UnitTest/) | 单元测试交付入口（后端 94.14% 智能检索专项已验收） |
+| [SystemTest/](./SystemTest/) | 系统测试脚本、手工清单与执行结果（69/69 通过，见 `results/latest-full/`） |
+| [dist/](./dist/) | 本地安装包输出目录（不提交 Git） |

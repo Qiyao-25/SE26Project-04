@@ -8,6 +8,12 @@ dist/
 # Cursor IDE local config (not a product module)
 .cursor/
 
+# Unit test generated reports (keep README + source tests tracked)
+UnitTest/**/reports/
+UnitTest/**/*.log
+UnitTest/**/coverage-html/
+UIPrototype/frontend/coverage/
+
 # System test run artifacts (keep scripts & templates tracked)
 SystemTest/results/api-junit-*.xml
 SystemTest/results/api-run-*.log

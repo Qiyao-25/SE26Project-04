@@ -13,8 +13,11 @@
 | `api/` | 可 API 自动化的功能用例（pytest + httpx） |
 | `manual/` | 需浏览器的功能、易用性、兼容性清单 |
 | `scripts/run_api_tests.ps1` | 一键跑 API 系统测并写结果摘要 |
+| `scripts/run_full_system_test.py` | 全量系统测（API + Playwright + 截图） |
+| `scripts/retry_failed_tests.py` | 重试失败/阻塞 TC 并合并到 latest-full |
 | `scripts/write_results_xlsx.py` | 把执行结果回填到结果簿 |
-| `results/` | 执行报告、回填后的结果 xlsx |
+| `results/latest-full/` | **最新**完整执行结果（报告、xlsx、截图） |
+| `results/` | 历史批次与 API 摘要（部分 gitignore） |
 
 ## 快速执行（API 自动化）
 
