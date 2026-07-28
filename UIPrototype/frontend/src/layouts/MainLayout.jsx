@@ -156,6 +156,7 @@ export default function MainLayout({
   const handleLogout = () => {
     // 清理只属于当前登录会话的数据，再由全局上下文清理登录态
     sessionStorage.removeItem('papermate-session-subscriptions');
+    setMobileNavOpen(false);
     logout();
     navigate('/login', { replace: true });
   };
