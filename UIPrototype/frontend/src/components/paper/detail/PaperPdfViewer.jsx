@@ -6,7 +6,30 @@ import { API_BASE_URL } from '../../../services/runtimeConfig';
 import { pushAnnotationSelection, readDomSelection } from '../../../utils/annotationSelection';
 
 const MAX_PAGES = 60;
-const SCALE = 1.25;
+const BASE_SCALE = 1.5;
+const FULLSCREEN_SCALE = 1.75;
+const MAX_PIXEL_RATIO = 2.5;
+
+function getDisplayScale(fullscreen) {
+  return fullscreen ? FULLSCREEN_SCALE : BASE_SCALE;
+}
+
+function getOutputPixelRatio() {
+  return Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+}
+
+function preparePageCanvas(canvas, viewport) {
+  const outputScale = getOutputPixelRatio();
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.width = `${Math.floor(viewport.width)}px`;
+  canvas.style.height = `${Math.floor(viewport.height)}px`;
+  const context = canvas.getContext('2d');
+  const transform = outputScale !== 1
+    ? [outputScale, 0, 0, outputScale, 0, 0]
+    : null;
+  return { context, transform };
+}
 
 let workerReadyPromise = null;
 
@@ -161,7 +184,8 @@ export default function PaperPdfViewer({
         for (let pageNumber = 1; pageNumber <= total; pageNumber += 1) {
           if (cancelled) return;
           const page = await pdf.getPage(pageNumber);
-          const viewport = page.getViewport({ scale: SCALE });
+          const displayScale = getDisplayScale(fullscreen);
+          const viewport = page.getViewport({ scale: displayScale });
 
           const pageWrap = document.createElement('div');
           pageWrap.className = 'pdf-page';
@@ -171,8 +195,6 @@ export default function PaperPdfViewer({
 
           const canvas = document.createElement('canvas');
           canvas.className = 'pdf-page-canvas';
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
           pageWrap.appendChild(canvas);
 
           const textLayerDiv = document.createElement('div');
@@ -183,9 +205,11 @@ export default function PaperPdfViewer({
 
           host.appendChild(pageWrap);
 
+          const { context, transform } = preparePageCanvas(canvas, viewport);
           const renderTask = page.render({
-            canvasContext: canvas.getContext('2d'),
+            canvasContext: context,
             viewport,
+            transform,
           });
           tasks.push(renderTask);
           await renderTask.promise;

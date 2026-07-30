@@ -800,6 +800,7 @@ select {
 
 .pdf-page-canvas {
   display: block;
+  image-rendering: auto;
 }
 
 .textLayer {
