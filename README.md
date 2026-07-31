@@ -93,12 +93,15 @@ python FinalRelease/source/deploy/pack.py
 
 ```
 SE26Project-04/
-├── FinalRelease/                  # 最终交付（代码 + 测试 + 文档）
+├── FinalRelease/                  # 最终交付（代码 + 测试 + 文档）— **部署入口**
 │   ├── source/                    # 源代码：backend / frontend / PaperPipeline / deploy
 │   ├── Test/
 │   │   ├── system/                # 系统测试（原 SystemTest）
 │   │   └── unit/                  # 单元测试报告与脚本（原 UnitTest）
 │   └── docs/                      # 交付文档、UML、部署说明、系统测试用例 xlsx
+├── TechPrototype/                 # 【参考】重组前技术原型目录（与 FinalRelease 并列，勿用于部署）
+├── UIPrototype/                   # 【参考】重组前界面原型目录
+├── docs/                          # 【参考】原根文档索引
 └── dist/                          # 本地打包产物（gitignore，不提交）
 ```
 
@@ -114,3 +117,6 @@ SE26Project-04/
 | [FinalRelease/Test/system/](./FinalRelease/Test/system/) | 系统测试（69/69，见 `results/latest-full/`） |
 | [FinalRelease/Test/unit/](./FinalRelease/Test/unit/) | 单元测试报告与覆盖率归档 |
 | [dist/](./dist/) | 本地安装包输出（不提交 Git） |
+| [TechPrototype/](./TechPrototype/) | **参考**：重组前后端/流水线/部署目录 |
+| [UIPrototype/](./UIPrototype/) | **参考**：重组前前端目录 |
+| [docs/](./docs/) | **参考**：原根文档索引（用例 xlsx 以 `FinalRelease/docs/` 为准） |

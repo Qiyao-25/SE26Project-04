@@ -1,0 +1,19 @@
+[run]
+source = app
+branch = False
+omit =
+    app/agents/*
+    app/service/crawl_scheduler.py
+    app/service/parse_scheduler.py
+    app/service/scheduler_lock.py
+    app/main.py
+    */__init__.py
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError

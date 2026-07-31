@@ -1,0 +1,47 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "paperId": "attention",
+    "parseStatus": "completed",
+    "summary": "Transformer 使用自注意力机制直接建模序列中任意位置之间的关系，避免循环结构带来的串行计算限制。",
+    "concepts": [
+      {
+        "conceptId": "concept-self-attention",
+        "name": "Self-Attention",
+        "description": "由同一序列生成查询、键和值，计算序列内部元素之间的相关性。"
+      },
+      {
+        "conceptId": "concept-multi-head",
+        "name": "Multi-Head Attention",
+        "description": "在多个表示子空间中并行计算注意力，再拼接各个注意力头的输出。"
+      },
+      {
+        "conceptId": "concept-position",
+        "name": "Positional Encoding",
+        "description": "向输入嵌入加入位置信息，使模型能够识别词语顺序。"
+      }
+    ],
+    "methods": [
+      {
+        "order": 1,
+        "title": "编码器输入处理",
+        "description": "将词向量与位置编码相加后输入编码器。"
+      },
+      {
+        "order": 2,
+        "title": "多头注意力计算",
+        "description": "并行计算多个缩放点积注意力头，拼接后进行线性变换。"
+      },
+      {
+        "order": 3,
+        "title": "前馈网络与残差连接",
+        "description": "每一层使用前馈网络、残差连接和层归一化处理注意力输出。"
+      }
+    ],
+    "limitations": [
+      "标准自注意力对序列长度具有平方级时间和空间复杂度。",
+      "训练高质量模型需要较大的计算资源和数据规模。"
+    ]
+  }
+}

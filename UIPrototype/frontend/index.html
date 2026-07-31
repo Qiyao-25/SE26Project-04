@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>PaperMate 界面原型</title>
+    <script>
+      (function () {
+        var THEME_KEY = 'papermate-theme';
+        var MIGRATION_KEY = 'papermate-theme-light-default-v2';
+        var mode = 'light';
+        try {
+          if (localStorage.getItem(MIGRATION_KEY) !== 'done') {
+            localStorage.setItem(MIGRATION_KEY, 'done');
+            localStorage.setItem(THEME_KEY, 'light');
+          } else {
+            var saved = localStorage.getItem(THEME_KEY);
+            mode = saved === 'dark' || saved === 'light' ? saved : 'light';
+          }
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', mode);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

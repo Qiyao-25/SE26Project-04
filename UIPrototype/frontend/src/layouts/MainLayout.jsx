@@ -1,0 +1,347 @@
+import {
+  Layout,
+  Menu,
+  Button,
+  Drawer,
+  Grid,
+  Typography,
+  Space,
+  Tag,
+} from 'antd';
+
+import {
+  HomeOutlined,
+  BookOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  DashboardOutlined,
+  DatabaseOutlined,
+  MoonOutlined,
+  SunOutlined,
+  MenuOutlined,
+  CloseOutlined,
+} from '@ant-design/icons';
+
+import {
+  Outlet,
+  useNavigate,
+  useLocation,
+  useMatch,
+} from 'react-router-dom';
+import { useEffect, useState } from 'react';
+
+import { useApp } from '../context/AppContext';
+import { useI18n } from '../i18n';
+import PaperDetailPage from '../pages/PaperDetail/PaperDetailPage';
+
+const { Header, Sider, Content } = Layout;
+const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
+
+export default function MainLayout({
+  themeMode,
+  setThemeMode,
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const screens = useBreakpoint();
+  const isMobile = screens.md === false;
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { t } = useI18n();
+  const paperMatch = useMatch('/paper/:paperId');
+  const routePaperId = paperMatch?.params?.paperId
+    ? String(paperMatch.params.paperId)
+    : null;
+
+  const {
+    logout,
+    persona,
+    topics,
+    isAdmin,
+    showAdminNav,
+    lockedPaperId,
+    setLockedPaperId,
+  } = useApp();
+
+  useEffect(() => {
+    if (routePaperId) setLockedPaperId(routePaperId);
+  }, [routePaperId, setLockedPaperId]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  const keptPaperId = routePaperId || (lockedPaperId ? String(lockedPaperId) : null);
+  const onPaperDetail = Boolean(routePaperId);
+  // 论文详情归属工作空间页签
+  const pathKey = onPaperDetail ? '/workspace' : location.pathname;
+
+  const workspaceMeta = lockedPaperId
+    ? {
+        title: onPaperDetail ? t('page.workspace.readingTitle') : t('page.workspace.title'),
+        sub: onPaperDetail
+          ? t('page.workspace.readingSub')
+          : t('page.workspace.lockedSub'),
+      }
+    : {
+        title: t('page.workspace.title'),
+        sub: t('page.workspace.sub'),
+      };
+
+  const pageTitles = {
+    '/workspace': workspaceMeta,
+    '/learning': { title: t('page.learning.title'), sub: t('page.learning.sub') },
+    '/admin': { title: t('page.admin.title'), sub: t('page.admin.sub') },
+    '/papers': { title: t('page.library.title'), sub: t('page.library.sub') },
+    '/settings': { title: t('page.settings.title'), sub: t('page.settings.sub') },
+  };
+
+  const meta = onPaperDetail || pathKey === '/workspace'
+    ? workspaceMeta
+    : (pageTitles[pathKey] || {
+        title: 'PaperMate',
+        sub: '',
+      });
+
+  const menuItems = [
+    {
+      key: '/workspace',
+      icon: <HomeOutlined />,
+      label: lockedPaperId ? t('nav.workspaceReading') : t('nav.workspace'),
+    },
+    {
+      key: '/learning',
+      icon: <BookOutlined />,
+      label: t('nav.learning'),
+    },
+    ...(showAdminNav
+      ? [
+          {
+            key: '/papers',
+            icon: <DatabaseOutlined />,
+            label: t('nav.library'),
+          },
+          {
+            key: '/admin',
+            icon: <DashboardOutlined />,
+            label: t('nav.admin'),
+          },
+        ]
+      : []),
+    {
+      key: '/settings',
+      icon: <SettingOutlined />,
+      label: t('nav.settings'),
+    },
+  ];
+
+  const toggleTheme = () => {
+    setThemeMode(
+      themeMode === 'dark'
+        ? 'light'
+        : 'dark'
+    );
+  };
+
+  const handleMenuClick = ({ key }) => {
+    setMobileNavOpen(false);
+    // 工作空间被论文锁定时：点「工作空间」回到该论文详情
+    if (key === '/workspace' && lockedPaperId) {
+      navigate(`/paper/${lockedPaperId}`);
+      return;
+    }
+    navigate(key);
+  };
+
+  const handleLogout = () => {
+    // 清理只属于当前登录会话的数据，再由全局上下文清理登录态
+    sessionStorage.removeItem('papermate-session-subscriptions');
+    setMobileNavOpen(false);
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const navigationContent = (
+    <>
+      <div className="logo-area">
+        <div className="logo-row">
+          <span className="logo-mark">
+            PM
+          </span>
+
+          <div className="logo-text">
+            <Title
+              level={5}
+              style={{ margin: 0 }}
+            >
+              PaperMate
+            </Title>
+
+            <Text
+              type="secondary"
+              style={{ fontSize: 12 }}
+            >
+              ArXiv 智能论文阅读
+            </Text>
+          </div>
+
+          {isMobile ? (
+            <Button
+              type="text"
+              className="mobile-nav-close"
+              icon={<CloseOutlined />}
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="关闭导航菜单"
+            />
+          ) : null}
+        </div>
+      </div>
+
+      <Menu
+        mode="inline"
+        selectedKeys={[pathKey]}
+        items={menuItems}
+        onClick={handleMenuClick}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+        }}
+      />
+
+      <div
+        className="sider-footer"
+        style={{
+          marginTop: 'auto',
+          flexShrink: 0,
+        }}
+      >
+        <Button
+          block
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+        >
+          {t('nav.logout')}
+        </Button>
+      </div>
+    </>
+  );
+
+  return (
+    <Layout className="main-layout">
+      {!isMobile ? (
+        <Sider
+          width={248}
+          theme={themeMode === 'dark' ? 'dark' : 'light'}
+          className="main-sider"
+          style={{
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            alignSelf: 'flex-start',
+          }}
+        >
+          {navigationContent}
+        </Sider>
+      ) : null}
+
+      <Drawer
+        placement="left"
+        width={280}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        closable={false}
+        className="mobile-nav-drawer"
+        styles={{
+          body: {
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+      >
+        <div className="mobile-nav-content">
+          {navigationContent}
+        </div>
+      </Drawer>
+
+      <Layout>
+        <Header className="main-header">
+          <div className="header-title-group">
+            {isMobile ? (
+              <Button
+                type="text"
+                className="mobile-menu-btn"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="打开导航菜单"
+                aria-expanded={mobileNavOpen}
+              />
+            ) : null}
+
+            <div className="header-title-wrap">
+              <Title
+                level={4}
+                style={{ margin: 0 }}
+              >
+                {meta.title}
+              </Title>
+            </div>
+          </div>
+
+          <Space
+            className="header-tags"
+            size={8}
+            wrap
+          >
+            <Button
+              className="theme-toggle-btn"
+              icon={
+                themeMode === 'dark'
+                  ? <SunOutlined />
+                  : <MoonOutlined />
+              }
+              onClick={toggleTheme}
+              title={
+                themeMode === 'dark'
+                  ? '切换到浅色模式'
+                  : '切换到深色模式'
+              }
+            >
+              {themeMode === 'dark'
+                ? t('nav.themeLight')
+                : t('nav.themeDark')}
+            </Button>
+
+            <Tag color={isAdmin ? 'red' : 'blue'}>
+              {isAdmin
+                ? '管理员'
+                : `画像: ${persona}`}
+            </Tag>
+
+            <Tag>
+              {Array.isArray(topics) && topics.length > 0
+                ? topics.join(', ')
+                : '未设置研究方向'}
+            </Tag>
+          </Space>
+        </Header>
+
+        <Content className="main-content">
+          {keptPaperId ? (
+            <div
+              className="paper-detail-keepalive"
+              style={{ display: onPaperDetail ? 'block' : 'none' }}
+              aria-hidden={!onPaperDetail}
+            >
+              <PaperDetailPage key={keptPaperId} paperIdProp={keptPaperId} />
+            </div>
+          ) : null}
+          {!onPaperDetail ? (
+            <Outlet context={{ themeMode, setThemeMode }} />
+          ) : null}
+        </Content>
+      </Layout>
+    </Layout>
+  );
+}

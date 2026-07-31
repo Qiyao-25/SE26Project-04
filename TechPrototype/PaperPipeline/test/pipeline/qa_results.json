@@ -1,0 +1,934 @@
+{
+  "generated_at": "2026-07-17T01:26:18.430440+00:00",
+  "mode": "sample",
+  "api_base": null,
+  "total": 20,
+  "passed": 20,
+  "pass_rate": 1.0,
+  "results": [
+    {
+      "id": "Q01",
+      "sample": "P1",
+      "arxiv_id": "1706.03762",
+      "question": "Transformer 是否依赖 CNN/RNN？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1706.03762",
+        "question": "Transformer 是否依赖 CNN/RNN？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam@google.com Niki Parmar∗ Google Research nikip@google.com Jakob Uszkoreit∗ Google Research usz@google.com Llion Jones∗ G"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0035,
+        "retrieval_s": 0.0032
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P1",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P1",
+        "answer": "Based on the retrieved passage (chunk p1_0): Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam",
+        "createdAt": "2026-07-17T01:26:18.397434+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P1",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam@google.com Niki Parmar∗ Google Research nikip@google.com Jakob Uszkoreit∗ Google Research usz@google.com Llion Jones∗ G",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q02",
+      "sample": "P1",
+      "arxiv_id": "1706.03762",
+      "question": "Multi-Head Attention 的作用？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1706.03762",
+        "question": "Multi-Head Attention 的作用？",
+        "ok": true,
+        "answer": "Multi-Head Attention lets the model attend to representation subspaces from different positions in parallel, as described in the cited section.",
+        "citations": [
+          {
+            "chunk_id": "p3_2",
+            "page_no": 3,
+            "section": "introduction",
+            "quote": "Figure 1: The Transformer - model architecture. The Transformer follows this overall architecture using stacked self-attention and point-wise, fully connected layers for both the encoder and decoder, shown in the left and right halves of Figure 1, respectively. 3.1 Encoder and Decoder Stacks Encoder: The encoder is composed of a stack of N = 6 identical layers. Each layer has two sub-layers. The f"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0018,
+        "retrieval_s": 0.0018
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P1",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P1",
+        "answer": "Multi-Head Attention lets the model attend to representation subspaces from different positions in parallel, as described in the cited section.",
+        "createdAt": "2026-07-17T01:26:18.399437+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p3_2",
+            "paperId": "P1",
+            "paperTitle": "",
+            "sectionId": "section-p3_2",
+            "sectionTitle": "Introduction",
+            "pageNumber": 3,
+            "quote": "Figure 1: The Transformer - model architecture. The Transformer follows this overall architecture using stacked self-attention and point-wise, fully connected layers for both the encoder and decoder, shown in the left and right halves of Figure 1, respectively. 3.1 Encoder and Decoder Stacks Encoder: The encoder is composed of a stack of N = 6 identical layers. Each layer has two sub-layers. The f",
+            "chunk_id": "p3_2",
+            "page_no": 3,
+            "section": "introduction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q03",
+      "sample": "P2",
+      "arxiv_id": "1810.04805",
+      "question": "BERT 预训练任务有哪些？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1810.04805",
+        "question": "BERT 预训练任务有哪些？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language repre- sentation "
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0022,
+        "retrieval_s": 0.0021
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P2",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P2",
+        "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
+        "createdAt": "2026-07-17T01:26:18.402434+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P2",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language repre- sentation ",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q04",
+      "sample": "P2",
+      "arxiv_id": "1810.04805",
+      "question": "双向编码器如何体现？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1810.04805",
+        "question": "双向编码器如何体现？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language repre- sentation "
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0016,
+        "retrieval_s": 0.0016
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P2",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P2",
+        "answer": "Based on the retrieved passage (chunk p1_0): BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called",
+        "createdAt": "2026-07-17T01:26:18.403434+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P2",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova Google AI Language {jacobdevlin,mingweichang,kentonl,kristout}@google.com Abstract We introduce a new language representa- tion model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language repre- sentation ",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q05",
+      "sample": "P3",
+      "arxiv_id": "1806.07366",
+      "question": "Neural ODE 把网络深度看成什么？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1806.07366",
+        "question": "Neural ODE 把网络深度看成什么？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead of specifying a discrete sequence of hidden layers, we parameterize the derivative of the hidden state using a neural n"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0019,
+        "retrieval_s": 0.0018
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P3",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P3",
+        "answer": "Based on the retrieved passage (chunk p1_0): Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead",
+        "createdAt": "2026-07-17T01:26:18.405434+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P3",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead of specifying a discrete sequence of hidden layers, we parameterize the derivative of the hidden state using a neural n",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q06",
+      "sample": "P3",
+      "arxiv_id": "1806.07366",
+      "question": "训练时如何反向传播？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1806.07366",
+        "question": "训练时如何反向传播？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead of specifying a discrete sequence of hidden layers, we parameterize the derivative of the hidden state using a neural n"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0016,
+        "retrieval_s": 0.0015
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P3",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P3",
+        "answer": "Based on the retrieved passage (chunk p1_0): Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead",
+        "createdAt": "2026-07-17T01:26:18.407433+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P3",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Neural Ordinary Differential Equations Ricky T. Q. Chen*, Yulia Rubanova*, Jesse Bettencourt*, David Duvenaud University of Toronto, Vector Institute {rtqichen, rubanova, jessebett, duvenaud}@cs.toronto.edu Abstract We introduce a new family of deep neural network models. Instead of specifying a discrete sequence of hidden layers, we parameterize the derivative of the hidden state using a neural n",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q07",
+      "sample": "P4",
+      "arxiv_id": "2106.09685",
+      "question": "LoRA 更新什么矩阵？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2106.09685",
+        "question": "LoRA 更新什么矩阵？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu (Version 2) ABSTRACT An important paradigm of natural language processing consists of large-scale pre- training on gene"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.003,
+        "retrieval_s": 0.003
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P4",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P4",
+        "answer": "Based on the retrieved passage (chunk p1_0): LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu",
+        "createdAt": "2026-07-17T01:26:18.410434+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P4",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu (Version 2) ABSTRACT An important paradigm of natural language processing consists of large-scale pre- training on gene",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q08",
+      "sample": "P4",
+      "arxiv_id": "2106.09685",
+      "question": "相对全量微调参数量如何？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2106.09685",
+        "question": "相对全量微调参数量如何？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu (Version 2) ABSTRACT An important paradigm of natural language processing consists of large-scale pre- training on gene"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0017,
+        "retrieval_s": 0.0016
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P4",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P4",
+        "answer": "Based on the retrieved passage (chunk p1_0): LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu",
+        "createdAt": "2026-07-17T01:26:18.412437+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P4",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "LORA: L OW-R ANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft Corporation {edwardhu, yeshe, phwallis, zeyuana, yuanzhil, swang, luw, wzchen }@microsoft.com yuanzhil@andrew.cmu.edu (Version 2) ABSTRACT An important paradigm of natural language processing consists of large-scale pre- training on gene",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q09",
+      "sample": "P5",
+      "arxiv_id": "2303.18223",
+      "question": "Survey 主要覆盖哪类模型？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2303.18223",
+        "question": "Survey 主要覆盖哪类模型？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): 1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Pe",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Peiyu Liu, Jian-Yun Nie and Ji-Rong Wen† Abstract—Ever since the Turing Test was proposed in the 1950s, humans have explor"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0018,
+        "retrieval_s": 0.0018
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P5",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P5",
+        "answer": "Based on the retrieved passage (chunk p1_0): 1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Pe",
+        "createdAt": "2026-07-17T01:26:18.414434+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P5",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Peiyu Liu, Jian-Yun Nie and Ji-Rong Wen† Abstract—Ever since the Turing Test was proposed in the 1950s, humans have explor",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q10",
+      "sample": "P5",
+      "arxiv_id": "2303.18223",
+      "question": "文中主题如何划分？（概括）",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2303.18223",
+        "question": "文中主题如何划分？（概括）",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): 1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Pe",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Peiyu Liu, Jian-Yun Nie and Ji-Rong Wen† Abstract—Ever since the Turing Test was proposed in the 1950s, humans have explor"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0015,
+        "retrieval_s": 0.0014
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P5",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P5",
+        "answer": "Based on the retrieved passage (chunk p1_0): 1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Pe",
+        "createdAt": "2026-07-17T01:26:18.416440+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P5",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "1 A Survey of Large Language Models Wayne Xin Zhao, Kun Zhou*, Junyi Li*, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, Yifan Du, Chen Y ang, Yushuo Chen, Zhipeng Chen, Jinhao Jiang, Ruiyang Ren, Yifan Li, Xinyu Tang, Zikang Liu, Peiyu Liu, Jian-Yun Nie and Ji-Rong Wen† Abstract—Ever since the Turing Test was proposed in the 1950s, humans have explor",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q11",
+      "sample": "P6",
+      "arxiv_id": "2010.11929",
+      "question": "ViT 如何切分图像？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2010.11929",
+        "question": "ViT 如何切分图像？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, Neil Houlsby∗,† ∗equal technical contribution,†equal advising Google Research, "
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0021,
+        "retrieval_s": 0.0021
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P6",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P6",
+        "answer": "Based on the retrieved passage (chunk p1_0): Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg",
+        "createdAt": "2026-07-17T01:26:18.418443+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P6",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, Neil Houlsby∗,† ∗equal technical contribution,†equal advising Google Research, ",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q12",
+      "sample": "P6",
+      "arxiv_id": "2010.11929",
+      "question": "与 CNN 归纳偏置差异？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2010.11929",
+        "question": "与 CNN 归纳偏置差异？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, Neil Houlsby∗,† ∗equal technical contribution,†equal advising Google Research, "
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0012,
+        "retrieval_s": 0.0012
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P6",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P6",
+        "answer": "Based on the retrieved passage (chunk p1_0): Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg",
+        "createdAt": "2026-07-17T01:26:18.419443+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P6",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16 X16 W ORDS : TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Alexander Kolesnikov∗, Dirk Weissenborn∗, Xiaohua Zhai∗, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, Neil Houlsby∗,† ∗equal technical contribution,†equal advising Google Research, ",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q13",
+      "sample": "P7",
+      "arxiv_id": "2005.11401",
+      "question": "RAG 结合哪两类能力？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2005.11401",
+        "question": "RAG 结合哪两类能力？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Research;‡University College London;⋆New York University; plewis@fb.com Abstract Large pre-trained language models have be"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0018,
+        "retrieval_s": 0.0017
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P7",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P7",
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "createdAt": "2026-07-17T01:26:18.421435+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P7",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Research;‡University College London;⋆New York University; plewis@fb.com Abstract Large pre-trained language models have be",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q14",
+      "sample": "P7",
+      "arxiv_id": "2005.11401",
+      "question": "检索器与生成器如何协作？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2005.11401",
+        "question": "检索器与生成器如何协作？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Research;‡University College London;⋆New York University; plewis@fb.com Abstract Large pre-trained language models have be"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0014,
+        "retrieval_s": 0.0014
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P7",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P7",
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "createdAt": "2026-07-17T01:26:18.423432+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P7",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Research;‡University College London;⋆New York University; plewis@fb.com Abstract Large pre-trained language models have be",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q15",
+      "sample": "P8",
+      "arxiv_id": "2005.14165",
+      "question": "GPT-3 参数量级？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2005.14165",
+        "question": "GPT-3 参数量级？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh Daniel M. Ziegler Jeffrey Wu Clemens Winter Christopher Hesse Mark Chen Eric Sigler Mateusz Litwin Scott Gray Benjamin C"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0017,
+        "retrieval_s": 0.0017
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P8",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P8",
+        "answer": "Based on the retrieved passage (chunk p1_0): Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh",
+        "createdAt": "2026-07-17T01:26:18.425435+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P8",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh Daniel M. Ziegler Jeffrey Wu Clemens Winter Christopher Hesse Mark Chen Eric Sigler Mateusz Litwin Scott Gray Benjamin C",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q16",
+      "sample": "P8",
+      "arxiv_id": "2005.14165",
+      "question": "few-shot 指什么？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2005.14165",
+        "question": "few-shot 指什么？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh Daniel M. Ziegler Jeffrey Wu Clemens Winter Christopher Hesse Mark Chen Eric Sigler Mateusz Litwin Scott Gray Benjamin C"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0014,
+        "retrieval_s": 0.0014
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P8",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P8",
+        "answer": "Based on the retrieved passage (chunk p1_0): Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh",
+        "createdAt": "2026-07-17T01:26:18.426433+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P8",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam Girish Sastry Amanda Askell Sandhini Agarwal Ariel Herbert-Voss Gretchen Krueger Tom Henighan Rewon Child Aditya Ramesh Daniel M. Ziegler Jeffrey Wu Clemens Winter Christopher Hesse Mark Chen Eric Sigler Mateusz Litwin Scott Gray Benjamin C",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q17",
+      "sample": "P1",
+      "arxiv_id": "1706.03762",
+      "question": "Transformer encoder 有多少层？",
+      "kind": "fact",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "1706.03762",
+        "question": "Transformer encoder 有多少层？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam@google.com Niki Parmar∗ Google Research nikip@google.com Jakob Uszkoreit∗ Google Research usz@google.com Llion Jones∗ G"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0015,
+        "retrieval_s": 0.0014
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P1",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P1",
+        "answer": "Based on the retrieved passage (chunk p1_0): Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam",
+        "createdAt": "2026-07-17T01:26:18.428439+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P1",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works. Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam@google.com Niki Parmar∗ Google Research nikip@google.com Jakob Uszkoreit∗ Google Research usz@google.com Llion Jones∗ G",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q18",
+      "sample": "P7",
+      "arxiv_id": "2005.11401",
+      "question": "RAG 如何减少幻觉？",
+      "kind": "method",
+      "expect_ok": true,
+      "passed": true,
+      "result": {
+        "arxiv_id": "2005.11401",
+        "question": "RAG 如何减少幻觉？",
+        "ok": true,
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "citations": [
+          {
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body",
+            "quote": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Research;‡University College London;⋆New York University; plewis@fb.com Abstract Large pre-trained language models have be"
+          }
+        ],
+        "rejected": false,
+        "error": null,
+        "mode": "sample",
+        "elapsed_s": 0.0016,
+        "retrieval_s": 0.0016
+      },
+      "ui_qa": {
+        "conversationId": "conversation-P7",
+        "messageId": "assistant-20260717012618",
+        "paperId": "P7",
+        "answer": "Based on the retrieved passage (chunk p1_0): Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Re",
+        "createdAt": "2026-07-17T01:26:18.429439+00:00",
+        "citations": [
+          {
+            "citationId": "citation-001-p1_0",
+            "paperId": "P7",
+            "paperTitle": "",
+            "sectionId": "section-p1_0",
+            "sectionTitle": "Body",
+            "pageNumber": 1,
+            "quote": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks Patrick Lewis†‡, Ethan Perez⋆, Aleksandra Piktus†, Fabio Petroni†, Vladimir Karpukhin†, Naman Goyal†, Heinrich Küttler†, Mike Lewis†, Wen-tau Yih†, Tim Rocktäschel†‡, Sebastian Riedel†‡, Douwe Kiela† †Facebook AI Research;‡University College London;⋆New York University; plewis@fb.com Abstract Large pre-trained language models have be",
+            "chunk_id": "p1_0",
+            "page_no": 1,
+            "section": "body"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q19",
+      "sample": "P9",
+      "arxiv_id": "9999.99999",
+      "question": "这篇论文的主要贡献是什么？",
+      "kind": "reject",
+      "expect_ok": false,
+      "passed": true,
+      "result": {
+        "arxiv_id": "9999.99999",
+        "question": "这篇论文的主要贡献是什么？",
+        "ok": false,
+        "answer": "",
+        "citations": [],
+        "rejected": true,
+        "error": "paper unavailable; refuse with no fake citations",
+        "mode": "sample",
+        "elapsed_s": 0.0,
+        "retrieval_s": 0.0
+      }
+    },
+    {
+      "id": "Q20",
+      "sample": "P10",
+      "arxiv_id": "0000.00001",
+      "question": "作者提出了什么方法？",
+      "kind": "reject",
+      "expect_ok": false,
+      "passed": true,
+      "result": {
+        "arxiv_id": "0000.00001",
+        "question": "作者提出了什么方法？",
+        "ok": false,
+        "answer": "",
+        "citations": [],
+        "rejected": true,
+        "error": "paper unavailable; refuse with no fake citations",
+        "mode": "sample",
+        "elapsed_s": 0.0,
+        "retrieval_s": 0.0
+      }
+    }
+  ]
+}

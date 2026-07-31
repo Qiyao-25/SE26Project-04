@@ -1,0 +1,72 @@
+{
+  "sample": "P1",
+  "arxiv_id": "1706.03762",
+  "pipeline": {
+    "task_id": "tsk_c2b00955b6",
+    "idempotency_key": "17c936400e654dea",
+    "status": "qa_ready",
+    "attempts": 1,
+    "created_at": "2026-07-16T07:40:55.184880+00:00",
+    "updated_at": "2026-07-16T07:40:55.334433+00:00",
+    "input": {
+      "arxiv_id": "1706.03762",
+      "pipeline_ver": "v0",
+      "keyword": null,
+      "force": false
+    },
+    "stage_timings": [
+      {
+        "stage": "fetch",
+        "elapsed_s": 0.057,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "parse",
+        "elapsed_s": 0.0613,
+        "status": "ok",
+        "detail": ""
+      },
+      {
+        "stage": "summarize",
+        "elapsed_s": 0.0303,
+        "status": "ok",
+        "detail": ""
+      }
+    ],
+    "result": {
+      "arxiv_id": "1706.03762",
+      "summary": "[1706.03762] Stub abstract for pipeline skeleton demo.",
+      "concept": "Key concepts from chunks: Introduction stub paragraph. Method stub paragraph.",
+      "methods": "Methods sketched from 2 chunks.",
+      "pdf_path": "data/samples/1706.03762.pdf",
+      "chunk_count": 2,
+      "meta": {
+        "title": "Stub title for 1706.03762",
+        "authors": [
+          "Demo Author"
+        ]
+      }
+    },
+    "error": null,
+    "local_fallback": true
+  },
+  "qa": {
+    "arxiv_id": "1706.03762",
+    "question": "Multi-Head Attention 的作用？",
+    "ok": true,
+    "answer": "Multi-Head Attention lets the model attend to representation subspaces from different positions in parallel, as described in the cited section.",
+    "citations": [
+      {
+        "chunk_id": "p3_2",
+        "page_no": 3,
+        "section": "introduction"
+      }
+    ],
+    "rejected": false,
+    "error": null,
+    "mode": "sample",
+    "elapsed_s": 0.0027,
+    "retrieval_s": 0.0026
+  }
+}

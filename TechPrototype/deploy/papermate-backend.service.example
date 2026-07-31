@@ -1,0 +1,24 @@
+[Unit]
+Description=PaperMate FastAPI Backend
+After=network.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=papermate
+Group=papermate
+WorkingDirectory=/opt/papermate/backend
+EnvironmentFile=/opt/papermate/backend/.env
+# 仅本机监听，由 Nginx 对外
+ExecStart=/opt/papermate/backend/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5
+# 解析/问答可能较久，避免过早被杀
+TimeoutStopSec=30
+
+# 基础安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

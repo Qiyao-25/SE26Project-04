@@ -1,0 +1,38 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "searchId": "search-transformer-001",
+    "query": "Transformer",
+    "total": 2,
+    "page": 1,
+    "pageSize": 12,
+    "searchTimeMs": 38,
+    "items": [
+      {
+        "paperId": "attention",
+        "title": "Attention Is All You Need",
+        "authors": ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar"],
+        "primaryCategory": "cs.CL",
+        "arxivId": "1706.03762",
+        "publishedAt": "2017-06-12",
+        "summary": "提出完全基于注意力机制的 Transformer 编码器—解码器架构。",
+        "keywords": ["Transformer", "Self-Attention", "Machine Translation"],
+        "parseStatus": "completed",
+        "isFavorite": false
+      },
+      {
+        "paperId": "bert",
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers",
+        "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+        "primaryCategory": "cs.CL",
+        "arxivId": "1810.04805",
+        "publishedAt": "2018-10-11",
+        "summary": "使用 Transformer Encoder 进行深度双向语言表示预训练。",
+        "keywords": ["BERT", "Transformer", "Pre-training"],
+        "parseStatus": "completed",
+        "isFavorite": true
+      }
+    ]
+  }
+}

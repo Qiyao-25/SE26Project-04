@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-07-15T02:58:24.356537+00:00",
+  "target": 100,
+  "cleaned_count": 100,
+  "ingest_mode": "local_seed",
+  "ingest_message": "C 入库 API 未配置或不可用：已写入本地 seed.json 作为回退。设置环境变量 PAPERMATE_API_BASE 后重跑即可尝试真入库。",
+  "seed_path": "C:\\Users\\19103\\Desktop\\软工原\\project\\SE26Project-04\\PaperPipeline\\data\\seed.json",
+  "failures_path": "C:\\Users\\19103\\Desktop\\软工原\\project\\SE26Project-04\\PaperPipeline\\data\\ingest_failures.json",
+  "sample_ids": [
+    "2201.00978",
+    "2104.11502",
+    "2404.05657",
+    "1809.04281",
+    "2212.14538"
+  ],
+  "pass_h047": true,
+  "pass_h048_seed": true,
+  "pass_h048_api": false
+}

@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-07-16T07:40:41.778270+00:00",
+  "scenarios": [
+    {
+      "scenario": "success",
+      "task_id": "tsk_dcbbdbe5ad",
+      "status": "qa_ready",
+      "attempts": 1,
+      "stage_timings": [
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0503,
+          "status": "ok",
+          "detail": ""
+        },
+        {
+          "stage": "parse",
+          "elapsed_s": 0.0626,
+          "status": "ok",
+          "detail": ""
+        },
+        {
+          "stage": "summarize",
+          "elapsed_s": 0.0304,
+          "status": "ok",
+          "detail": ""
+        }
+      ],
+      "log_path": "data\\logs\\tsk_dcbbdbe5ad.json"
+    },
+    {
+      "scenario": "fetch_failure",
+      "task_id": "tsk_073d4db774",
+      "status": "fetch_failed",
+      "attempts": 3,
+      "stage_timings": [
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0575,
+          "status": "failed",
+          "detail": "fetch_failed: invalid or unavailable id"
+        },
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0615,
+          "status": "failed",
+          "detail": "fetch_failed: invalid or unavailable id"
+        },
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0618,
+          "status": "failed",
+          "detail": "fetch_failed: invalid or unavailable id"
+        }
+      ],
+      "log_path": "data\\logs\\tsk_073d4db774.json"
+    },
+    {
+      "scenario": "parse_retry_recovery",
+      "task_id": "tsk_b3676a08be",
+      "status": "qa_ready",
+      "attempts": 2,
+      "stage_timings": [
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0594,
+          "status": "ok",
+          "detail": ""
+        },
+        {
+          "stage": "parse",
+          "elapsed_s": 0.0616,
+          "status": "failed",
+          "detail": "parse_failed: empty text"
+        },
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0596,
+          "status": "ok",
+          "detail": ""
+        },
+        {
+          "stage": "parse",
+          "elapsed_s": 0.0603,
+          "status": "ok",
+          "detail": ""
+        },
+        {
+          "stage": "summarize",
+          "elapsed_s": 0.0307,
+          "status": "ok",
+          "detail": ""
+        }
+      ],
+      "log_path": "data\\logs\\tsk_b3676a08be.json"
+    }
+  ]
+}

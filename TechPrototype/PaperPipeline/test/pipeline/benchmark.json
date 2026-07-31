@@ -1,0 +1,92 @@
+{
+  "generated_at": "2026-07-16T07:40:45.728293+00:00",
+  "mode": "no-key-sample",
+  "papers": [
+    {
+      "arxiv_id": "1706.03762",
+      "ok": true,
+      "stages": [
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0535,
+          "ok": true
+        },
+        {
+          "stage": "parse",
+          "elapsed_s": 0.0606,
+          "ok": true
+        },
+        {
+          "stage": "summarize",
+          "elapsed_s": 0.0308,
+          "ok": true
+        },
+        {
+          "stage": "qa",
+          "elapsed_s": 0.0035,
+          "ok": true
+        }
+      ],
+      "total_s": 0.1484
+    },
+    {
+      "arxiv_id": "1810.04805",
+      "ok": true,
+      "stages": [
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0577,
+          "ok": true
+        },
+        {
+          "stage": "parse",
+          "elapsed_s": 0.0629,
+          "ok": true
+        },
+        {
+          "stage": "summarize",
+          "elapsed_s": 0.031,
+          "ok": true
+        },
+        {
+          "stage": "qa",
+          "elapsed_s": 0.0022,
+          "ok": true
+        }
+      ],
+      "total_s": 0.1538
+    },
+    {
+      "arxiv_id": "2005.11401",
+      "ok": true,
+      "stages": [
+        {
+          "stage": "fetch",
+          "elapsed_s": 0.0592,
+          "ok": true
+        },
+        {
+          "stage": "parse",
+          "elapsed_s": 0.0612,
+          "ok": true
+        },
+        {
+          "stage": "summarize",
+          "elapsed_s": 0.0306,
+          "ok": true
+        },
+        {
+          "stage": "qa",
+          "elapsed_s": 0.0024,
+          "ok": true
+        }
+      ],
+      "total_s": 0.1534
+    }
+  ],
+  "summary": {
+    "count": 3,
+    "ok": 3,
+    "avg_total_s": 0.1519
+  }
+}

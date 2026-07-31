@@ -1,0 +1,38 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "paperId": "attention",
+    "contentType": "pdf",
+    "pdfUrl": "https://arxiv.org/pdf/1706.03762",
+    "htmlUrl": "https://ar5iv.labs.arxiv.org/html/1706.03762",
+    "pageCount": 15,
+    "defaultPage": 1,
+    "sections": [
+      {
+        "sectionId": "section-abstract",
+        "title": "Abstract",
+        "pageStart": 1,
+        "pageEnd": 1
+      },
+      {
+        "sectionId": "section-introduction",
+        "title": "1 Introduction",
+        "pageStart": 1,
+        "pageEnd": 2
+      },
+      {
+        "sectionId": "section-model",
+        "title": "3 Model Architecture",
+        "pageStart": 3,
+        "pageEnd": 7
+      },
+      {
+        "sectionId": "section-results",
+        "title": "6 Results",
+        "pageStart": 8,
+        "pageEnd": 10
+      }
+    ]
+  }
+}
