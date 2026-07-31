@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     environment: str = "dev"
     version: str = "0.1.0"
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'data' / 'dev.db').as_posix()}"
+    # Per-process SQLAlchemy pool. Deployments with multiple Uvicorn workers
+    # must size these values against the database's global connection limit.
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
+    db_pool_timeout_s: float = 5.0
+    auth_cache_ttl_s: int = 15
     paper_storage_dir: str = str(BACKEND_DIR / "data" / "pdfs")
     echo_sql: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -121,6 +127,9 @@ class Settings(BaseSettings):
             self.qa_agent_timeout_s = self.agent_timeout_s
         if self.environment == "test":
             self.crawl_enabled = False
+            # Test databases are repeatedly created and destroyed in-process;
+            # never let an in-memory auth cache cross their boundaries.
+            self.auth_cache_ttl_s = 0
         if self.enable_docs is None:
             self.enable_docs = self.environment not in {"prod", "production"}
         return self

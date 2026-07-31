@@ -34,6 +34,10 @@
 
     PAPERMATE_ENV=dev
 PAPERMATE_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/papermate
+PAPERMATE_DB_POOL_SIZE=10
+PAPERMATE_DB_MAX_OVERFLOW=5
+PAPERMATE_DB_POOL_TIMEOUT_S=5
+PAPERMATE_AUTH_CACHE_TTL_S=15
 
 并安装 PostgreSQL 驱动：
 
@@ -80,6 +84,14 @@ python -m alembic upgrade head
 python -m scripts.import_seed --seed ../PaperPipeline/data/seed.json
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+本地开发可保持单 worker。为满足 100 并发 Web 服务要求，生产环境应使用 PostgreSQL，并以部署样例的连接池配置启动 4 个 worker：
+
+```bash
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
+```
+
+连接池配置按 **每个 worker** 计算，所有 worker 的 `pool_size + max_overflow` 总和不得超过 PostgreSQL 的连接上限。SQLite 仅用于本地开发和轻量验收，不作为此并发目标的生产数据库。
 
 首次启动建议先不使用 --reload，确认服务正常后再按需开启热重载。停止前台运行的服务可以直接按 Ctrl+C。
 
