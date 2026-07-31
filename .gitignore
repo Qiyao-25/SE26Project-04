@@ -9,27 +9,27 @@ dist/
 .cursor/
 
 # Unit test generated reports (keep README + source tests tracked)
-UnitTest/**/reports/
-UnitTest/**/*.log
-UnitTest/**/coverage-html/
-UIPrototype/frontend/coverage/
+FinalRelease/Test/unit/**/reports/
+FinalRelease/Test/unit/**/*.log
+FinalRelease/Test/unit/**/coverage-html/
+FinalRelease/source/frontend/coverage/
 
 # System test run artifacts (keep scripts & templates tracked)
-SystemTest/results/api-junit-*.xml
-SystemTest/results/api-run-*.log
-SystemTest/results/api-summary-*.md
-SystemTest/results/系统测试执行结果-*.xlsx
-SystemTest/results/system-test-results-*.xlsx
-SystemTest/results/_tmp-results-*.xlsx
-SystemTest/results/full-run-*/_tmp.xlsx
-SystemTest/results/full-run-*/
-SystemTest/results/retry-*/
-SystemTest/results/**/~$*
-SystemTest/results/~$*
-!SystemTest/results/latest-full/
-!SystemTest/results/latest-full/**
-SystemTest/results/latest-full/~$*
-SystemTest/results/LATEST.txt
-SystemTest/results/__pycache__/
-SystemTest/**/__pycache__/
-SystemTest/.pytest_cache/
+FinalRelease/Test/system/results/api-junit-*.xml
+FinalRelease/Test/system/results/api-run-*.log
+FinalRelease/Test/system/results/api-summary-*.md
+FinalRelease/Test/system/results/系统测试执行结果-*.xlsx
+FinalRelease/Test/system/results/system-test-results-*.xlsx
+FinalRelease/Test/system/results/_tmp-results-*.xlsx
+FinalRelease/Test/system/results/full-run-*/_tmp.xlsx
+FinalRelease/Test/system/results/full-run-*/
+FinalRelease/Test/system/results/retry-*/
+FinalRelease/Test/system/results/**/~$*
+FinalRelease/Test/system/results/~$*
+!FinalRelease/Test/system/results/latest-full/
+!FinalRelease/Test/system/results/latest-full/**
+FinalRelease/Test/system/results/latest-full/~$*
+FinalRelease/Test/system/results/LATEST.txt
+FinalRelease/Test/system/results/__pycache__/
+FinalRelease/Test/system/**/__pycache__/
+FinalRelease/Test/system/.pytest_cache/

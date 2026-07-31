@@ -1,0 +1,34 @@
+TC-001: Locator.fill: Timeout 45000ms exceeded.
+Call log:
+  - waiting for get_by_label("邮箱")
+    - locator resolved to <input value="" id="email" type="text" aria-required="true" placeholder="请输入注册邮箱或账号" class="ant-input ant-input-lg css-1pi45l5"/>
+    - fill("ui.1769835095@systemtest.local")
+  - attempting fill action
+    2 × waiting for element to be visible, enabled and editable
+      - element is not visible
+    - retrying fill action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and editable
+      - element is not visible
+    - retrying fill action
+      - waiting 100ms
+    89 × waiting for element to be visible, enabled and editable
+       - element is not visible
+     - retrying fill action
+       - waiting 500ms
+
+TC-002: Locator.fill: Timeout 45000ms exceeded.
+Call log:
+  - waiting for locator(".ant-tabs-tabpane-active input[type='password']").first
+
+TC-004: Locator.fill: Timeout 45000ms exceeded.
+Call log:
+  - waiting for locator(".ant-tabs-tabpane-active input[type='password']")
+ / Locator.click: Timeout 45000ms exceeded.
+Call log:
+  - waiting for locator(".ant-tabs-tabpane-active button[type='submit']")
+
+TC-005: Locator.fill: Timeout 45000ms exceeded.
+Call log:
+  - waiting for locator(".ant-tabs-tabpane-active input[type='password']")
+

@@ -1,0 +1,8 @@
+................F......................                                  [100%]
+================================== FAILURES ===================================
+E   assert 400 in {200, 401, 403, 422}
+     +  where 400 = <Response [400 Bad Request]>.status_code
+C:\Users\19103\Desktop\软工原\project\SE26Project-04\SystemTest\api\test_tc_extended.py:134: assert 400 in {200, 401, 403, 422}
+=========================== short test summary info ===========================
+FAILED api/test_tc_extended.py::test_tc_043_subscriptions_list - assert 400 i...
+

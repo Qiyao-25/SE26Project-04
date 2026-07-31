@@ -1,0 +1,22 @@
+# 截图索引
+
+- `TC-001_after_register.png`
+- `TC-001_register_form.png`
+- `TC-002_mismatch.png`
+- `TC-004_failed.png`
+- `TC-005_wrong_password.png`
+- `TC-006_redirect.png`
+- `TC-007_logout.png`
+- `TC-008_workspace.png`
+- `TC-010_failed.png`
+- `TC-014_detail.png`
+- `TC-015_missing.png`
+- `TC-039_learning.png`
+- `TC-043_settings.png`
+- `TC-048_admin.png`
+- `TC-050_library.png`
+- `TC-051_quality_or_admin.png`
+- `TC-068_refresh.png`
+- `TC-069_health.png`
+- `compatibility/TC-057_chromium_failed.png`
+- `compatibility/TC-059_firefox_failed.png`

@@ -45,20 +45,20 @@
 8. 业务测试数据集（100条标准论文数据）
 9. 100并发压力性能测试完整记录
 10. AI内容准确率评估测试报告
-11. 项目环境安装部署说明文档（见 `TechPrototype/docs/部署说明.md`，样例配置在 `TechPrototype/deploy/`）
+11. 项目环境安装部署说明文档（见 `FinalRelease/docs/others/部署说明.md`，样例配置在 `FinalRelease/source/deploy/`）
 12. 项目最终演示材料
 
 ## 部署速览
 正式服务器安装包建议 **前端 + 后端** 两套（可选第三套部署配置包）。打包命令：
 
 ```bash
-python TechPrototype/deploy/pack.py
+python FinalRelease/source/deploy/pack.py
 ```
 
-- 安装步骤：[TechPrototype/docs/部署说明.md](TechPrototype/docs/部署说明.md)
-- **更新与运维**：[TechPrototype/docs/服务器运维与更新.md](TechPrototype/docs/服务器运维与更新.md)
-- 核对清单：[TechPrototype/docs/部署核对清单.md](TechPrototype/docs/部署核对清单.md)
-- 一键脚本：`TechPrototype/deploy/deploy-on-host.sh`、`TechPrototype/deploy/upload-packages.ps1`
+- 安装步骤：[FinalRelease/docs/others/部署说明.md](FinalRelease/docs/others/部署说明.md)
+- **更新与运维**：[FinalRelease/docs/others/服务器运维与更新.md](FinalRelease/docs/others/服务器运维与更新.md)
+- 核对清单：[FinalRelease/docs/others/部署核对清单.md](FinalRelease/docs/others/部署核对清单.md)
+- 一键脚本：`FinalRelease/source/deploy/deploy-on-host.sh`、`FinalRelease/source/deploy/upload-packages.ps1`
 ## 三、项目主要风险及应对方案
 ### 风险1：功能新增过多，需求范围膨胀，工期无法按期交付
 - 缓解方案：严格遵循「MVP优先、核心亮点可演示、非核心功能可降级」原则管控需求范围
@@ -93,27 +93,24 @@ python TechPrototype/deploy/pack.py
 
 ```
 SE26Project-04/
-├── UIPrototype/frontend/          # React 前端（含 Vitest 单元测试）
-├── TechPrototype/
-│   ├── backend/                   # FastAPI 后端（pytest 用例在 tests/）
-│   ├── PaperPipeline/             # 论文解析 Worker 流水线
-│   ├── deploy/                    # Docker / Nginx / 打包 / 主机部署
-│   └── docs/                      # 架构、部署、运维文档
-├── docs/                          # 课程交付：系统测试用例 xlsx
-├── UnitTest/                      # 单元测试报告与覆盖率归档（>90%）
-├── SystemTest/                    # 系统测试脚本、结果、截图
+├── FinalRelease/                  # 最终交付（代码 + 测试 + 文档）
+│   ├── source/                    # 源代码：backend / frontend / PaperPipeline / deploy
+│   ├── Test/
+│   │   ├── system/                # 系统测试（原 SystemTest）
+│   │   └── unit/                  # 单元测试报告与脚本（原 UnitTest）
+│   └── docs/                      # 交付文档、UML、部署说明、系统测试用例 xlsx
 └── dist/                          # 本地打包产物（gitignore，不提交）
 ```
 
 | 目录 | 说明 |
 |------|------|
-| [UIPrototype/](./UIPrototype/) | 界面原型（前端） |
-| [TechPrototype/](./TechPrototype/) | 技术迭代：后端、流水线、部署与技术文档 |
-| [TechPrototype/backend/](./TechPrototype/backend/) | FastAPI 后端；单元测试见 `tests/` |
-| [TechPrototype/PaperPipeline/](./TechPrototype/PaperPipeline/) | 论文处理流水线 |
-| [TechPrototype/deploy/](./TechPrototype/deploy/) | 打包与服务器部署脚本 |
-| [TechPrototype/docs/](./TechPrototype/docs/) | 架构与部署文档 |
-| [docs/](./docs/) | 系统测试用例 xlsx 等课程文档 |
-| [UnitTest/](./UnitTest/) | 单元测试报告（`backend/UNIT_TEST_REPORT.md`，智能检索 98.40%） |
-| [SystemTest/](./SystemTest/) | 系统测试脚本、手工清单与执行结果（69/69 通过，见 `results/latest-full/`） |
-| [dist/](./dist/) | 本地安装包输出目录（不提交 Git） |
+| [FinalRelease/](./FinalRelease/) | 最终交付根目录 |
+| [FinalRelease/source/](./FinalRelease/source/) | 前后端源码、流水线、部署脚本 |
+| [FinalRelease/source/backend/](./FinalRelease/source/backend/) | FastAPI 后端；pytest 在 `tests/` |
+| [FinalRelease/source/frontend/](./FinalRelease/source/frontend/) | React 前端 |
+| [FinalRelease/source/PaperPipeline/](./FinalRelease/source/PaperPipeline/) | 论文处理流水线 |
+| [FinalRelease/source/deploy/](./FinalRelease/source/deploy/) | 打包与服务器部署 |
+| [FinalRelease/docs/](./FinalRelease/docs/) | 架构、部署、答辩与课程文档 |
+| [FinalRelease/Test/system/](./FinalRelease/Test/system/) | 系统测试（69/69，见 `results/latest-full/`） |
+| [FinalRelease/Test/unit/](./FinalRelease/Test/unit/) | 单元测试报告与覆盖率归档 |
+| [dist/](./dist/) | 本地安装包输出（不提交 Git） |

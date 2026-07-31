@@ -115,7 +115,7 @@ sequenceDiagram
 ## 本地启动
 
 ```bash
-cd SE26Project-04/TechPrototype/backend
+cd FinalRelease/source/backend
 source .venv/bin/activate
 python -m alembic upgrade head
 python -m scripts.seed

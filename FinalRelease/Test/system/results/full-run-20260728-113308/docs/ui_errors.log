@@ -1,0 +1,36 @@
+TC-004 Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+relogin Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+search Locator.fill: Timeout 20000ms exceeded.
+Call log:
+  - waiting for get_by_placeholder("检索论文…")
+
+usability Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+TC-057 Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+TC-059 Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+TC-061 1080p Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+TC-061 1366 Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
+TC-061 1440 Timeout 25000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/workspace**" until 'load'
+============================================================
