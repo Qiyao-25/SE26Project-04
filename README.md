@@ -101,7 +101,6 @@ SE26Project-04/
 │   └── docs/                      # 交付文档、UML、部署说明、系统测试用例 xlsx
 ├── TechPrototype/                 # 【参考】重组前技术原型目录（与 FinalRelease 并列，勿用于部署）
 ├── UIPrototype/                   # 【参考】重组前界面原型目录
-├── docs/                          # 【参考】原根文档索引
 └── dist/                          # 本地打包产物（gitignore，不提交）
 ```
 
@@ -119,4 +118,3 @@ SE26Project-04/
 | [dist/](./dist/) | 本地安装包输出（不提交 Git） |
 | [TechPrototype/](./TechPrototype/) | **参考**：重组前后端/流水线/部署目录 |
 | [UIPrototype/](./UIPrototype/) | **参考**：重组前前端目录 |
-| [docs/](./docs/) | **参考**：原根文档索引（用例 xlsx 以 `FinalRelease/docs/` 为准） |
